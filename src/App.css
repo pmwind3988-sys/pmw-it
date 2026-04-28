@@ -101,7 +101,38 @@
   to { transform: rotate(360deg); }
 }
 
-/* ── Force SurveyJS inputs to always be light ── */
+/* ── Login Required Screen ── */
+.login-required {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  text-align: center;
+  padding: 24px;
+}
+
+.login-required svg {
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+}
+
+.login-required h2 {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+}
+
+.login-required p {
+  color: var(--text-secondary);
+  margin-bottom: 24px;
+  font-size: 15px;
+}
+
+.login-required .ms-button {
+  max-width: 200px;
+}
 
 /* ── Force SurveyJS inputs to always be light ── */
 .survey-light-wrapper,

@@ -240,7 +240,17 @@ export default function FormPage() {
   };
 
   if (!isAuthenticated) {
-    return <div style={{ textAlign: 'center', padding: '50px' }}><p>Please log in to access this page.</p></div>;
+    return (
+      <div className="login-required">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 16v-4M12 8h.01" />
+        </svg>
+        <h2>Sign in Required</h2>
+        <p>Please log in to access this page.</p>
+        <button className="ms-button" onClick={() => window.location.href = '/login'}>Sign In</button>
+      </div>
+    );
   }
 
   const account = instance.getActiveAccount();

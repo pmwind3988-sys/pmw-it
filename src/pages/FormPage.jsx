@@ -5,7 +5,7 @@ import 'survey-core/survey-core.min.css';
 import { useMsal, useIsAuthenticated } from '@azure/msal-react';
 import { InteractionRequiredAuthError } from '@azure/msal-browser';
 import { useTheme } from '../context/ThemeContext';
-import { submitEmployeesToSharePoint, fetchAllColumnChoices } from '../services/sharePointService';
+import { submitEmployeesToSharePoint, fetchAllColumnChoices, fetchListItemById, updateListItem } from '../services/sharePointService';
 import { sharePointRequest } from '../authConfig';
 import QRCode from 'qrcode';
 import { LayeredLightPanelless } from "survey-core/themes";
@@ -17,20 +17,26 @@ const SHAREPOINT_SITE_URL =
 
 const CHOICE_COLUMNS = ['Entity', 'Equipment_x0020_Items', 'Software_x0020_Licenses', 'Request_x0020_Type'];
 
-const getSurveyJson = (requestType, choices = {}) => {
+const getSurveyJson = (requestType, choices = {}, isEditMode = false) => {
 
   // Create choices with value=raw SharePoint value, text=display label
   const toChoices = (arr) =>
     arr.map(v => ({ value: v, text: v }));
 
   return {
-    completeText: 'Submit',
+    completeText: isEditMode ? 'Update' : 'Submit',
+    allowAddPanel: !isEditMode,
+    panelAddText: isEditMode ? null : 'Add Employee',
+    panelRemoveText: isEditMode ? null : 'Remove',
+    panelCount: isEditMode ? 1 : 1,
+    minPanelCount: 1,
+    maxPanelCount: isEditMode ? 1 : 10,
     theme: 'default',
     elements: [
       {
         type: 'paneldynamic',
         name: 'employeeRequests',
-        title: 'Employee Requests',
+        title: isEditMode ? 'Employee Request' : 'Employee Requests',
         templateElements: [
           {
             type: 'panel',
@@ -106,7 +112,18 @@ export default function FormPage() {
   const [requestType, setRequestType] = useState('');
   const [spChoices, setSpChoices] = useState(null);
   const [choicesError, setChoicesError] = useState('');
+  const [editItemId, setEditItemId] = useState(null);
+  const [editItemData, setEditItemData] = useState(null);
   const sharePanelRef = useRef(null);
+
+  // Check for edit mode from URL params
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const editId = params.get('edit');
+    if (editId) {
+      setEditItemId(parseInt(editId));
+    }
+  }, []);
 
   // Close share panel when clicking outside
   useEffect(() => {
@@ -139,13 +156,23 @@ export default function FormPage() {
             tokenRes = await instance.acquireTokenPopup({ ...sharePointRequest, account });
           } else throw e;
         }
+        
         const choices = await fetchAllColumnChoices(SHAREPOINT_SITE_URL, tokenRes.accessToken, CHOICE_COLUMNS);
-        console.log('[SP] choices loaded:', JSON.stringify(choices, null, 2));
+        
+        let itemData = null;
+        if (editItemId) {
+          itemData = await fetchListItemById(SHAREPOINT_SITE_URL, tokenRes.accessToken, editItemId);
+        }
+        
         if (!cancelled) {
           setSpChoices(choices);
-          setRequestType(prev => prev || choices['Request_x0020_Type']?.[0] || '');
+          setEditItemData(itemData);
+          if (itemData) {
+            setRequestType(itemData.Request_x0020_Type || choices['Request_x0020_Type']?.[0] || '');
+          } else {
+            setRequestType(prev => prev || choices['Request_x0020_Type']?.[0] || '');
+          }
         }
-        // ← second setSpChoices removed
       } catch (err) {
         if (!cancelled) setChoicesError(err.message || 'Failed to load form options from SharePoint.');
       }
@@ -156,17 +183,36 @@ export default function FormPage() {
 
   const survey = useMemo(() => {
     if (!spChoices) return null;
-    return new Model(getSurveyJson(requestType, spChoices));
-  }, [requestType, spChoices]);
+    return new Model(getSurveyJson(requestType, spChoices, !!editItemId));
+  }, [requestType, spChoices, editItemId]);
 
-  // Restore draft from localStorage
+  // Restore draft from localStorage or populate edit data
   useEffect(() => {
     if (!survey) return;
-    const saved = localStorage.getItem(`surveyData_${requestType}`);
-    if (saved) {
-      try { survey.data = JSON.parse(saved); } catch (_) { }
+    
+    if (editItemData && editItemId) {
+      // Populate form with existing data for editing
+      const employeeData = [{
+        fullName: editItemData.Title || '',
+        callingName: editItemData.Calling_x0020_Name || '',
+        position: editItemData.Position || '',
+        entity: editItemData.Entity || '',
+        employeeId: editItemData.Employee_x0020_ID || '',
+        joinDate: editItemData.Join_x0020__x002f__x0020_Last_x0 ? editItemData.Join_x0020__x002f__x0020_Last_x0.split('T')[0] : '',
+        equipmentItems: editItemData.Equipment_x0020_Items ? editItemData.Equipment_x0020_Items.results : [],
+        equipmentRemarks: editItemData.Equipment_x0020_Remarks || '',
+        softwareLicenses: editItemData.Software_x0020_Licenses ? editItemData.Software_x0020_Licenses.results : [],
+        specialPermission: editItemData.Special_x0020_Permission || '',
+      }];
+      survey.data = { employeeRequests: employeeData };
+    } else {
+      // Restore draft from localStorage for new form
+      const saved = localStorage.getItem(`surveyData_${requestType}`);
+      if (saved) {
+        try { survey.data = JSON.parse(saved); } catch (_) { }
+      }
     }
-  }, [requestType, survey]);
+  }, [requestType, survey, editItemData, editItemId]);
 
   const getSharePointToken = async () => {
     const account = instance.getActiveAccount();
@@ -202,11 +248,41 @@ export default function FormPage() {
       setFormError('');
       try {
         const accessToken = await getSharePointToken();
-        await submitEmployeesToSharePoint(SHAREPOINT_SITE_URL, accessToken, employees, requestType);
-        localStorage.removeItem(`surveyData_${requestType}`);
-        setSubmitState('success');
-        setToast('Form submitted successfully!');
-        setTimeout(() => setToast(''), 3000);
+        
+        if (editItemId) {
+          // Update existing item
+          const emp = employees[0];
+          const itemData = {
+            Title: emp.fullName || '',
+            Calling_x0020_Name: emp.callingName || '',
+            Position: emp.position || '',
+            Entity: emp.entity || '',
+            Employee_x0020_ID: emp.employeeId || '',
+            Equipment_x0020_Remarks: emp.equipmentRemarks || '',
+            Special_x0020_Permission: emp.specialPermission || '',
+          };
+          if (emp.joinDate) {
+            const d = new Date(emp.joinDate);
+            if (!isNaN(d.getTime())) {
+              itemData.Join_x0020__x002f__x0020_Last_x0 = d.toISOString();
+            }
+          }
+          if (emp.equipmentItems?.length) itemData.Equipment_x0020_Items = emp.equipmentItems;
+          if (emp.softwareLicenses?.length) itemData.Software_x0020_Licenses = emp.softwareLicenses;
+          itemData.Request_x0020_Type = requestType;
+          
+          await updateListItem(SHAREPOINT_SITE_URL, accessToken, editItemId, itemData);
+          setSubmitState('success');
+          setToast('Request updated successfully!');
+          setTimeout(() => setToast(''), 3000);
+        } else {
+          // Create new item
+          await submitEmployeesToSharePoint(SHAREPOINT_SITE_URL, accessToken, employees, requestType);
+          localStorage.removeItem(`surveyData_${requestType}`);
+          setSubmitState('success');
+          setToast('Form submitted successfully!');
+          setTimeout(() => setToast(''), 3000);
+        }
       } catch (error) {
         console.error('[FormPage] Submit error:', error);
         setSubmitState('error');
@@ -220,7 +296,7 @@ export default function FormPage() {
       survey.onValueChanged.remove(handleValueChanged);
       survey.onComplete.remove(handleComplete);
     };
-  }, [survey, requestType]);
+  }, [survey, requestType, editItemId]);
 
   // QR Code
   useEffect(() => {
@@ -347,7 +423,17 @@ export default function FormPage() {
       {/* Main form */}
       <div className="form-container">
         <div className="form-header">
-          <h1>IT Request Form</h1>
+          <div className="header-row">
+            {editItemId && (
+              <button className="back-btn" onClick={() => window.location.href = '/list'}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M19 12H5M12 19l-7-7 7-7" />
+                </svg>
+                Back to List
+              </button>
+            )}
+          </div>
+          <h1>{editItemId ? 'View Request' : 'IT Request Form'}</h1>
           <p>{requestType ? `${requestType} Request` : ''}</p>
         </div>
 

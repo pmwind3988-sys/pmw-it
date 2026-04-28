@@ -35,7 +35,7 @@ export default function Homepage() {
     if (inProgress !== InteractionStatus.None) return;
 
     if (isAuthenticated) {
-      window.location.replace('/it-boarding-form');
+      window.location.replace('/list');
     } else {
       window.location.replace('/login');
     }

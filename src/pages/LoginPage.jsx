@@ -15,7 +15,7 @@ export default function LoginPage() {
   useEffect(() => {
     if (inProgress !== InteractionStatus.None) return;
     if (isAuthenticated) {
-      window.location.replace('/it-boarding-form');
+      window.location.replace('/list');
     }
   }, [isAuthenticated, inProgress]);
 

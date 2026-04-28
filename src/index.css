@@ -297,6 +297,32 @@ body {
   gap: 8px;
 }
 
+.header-row {
+  display: flex;
+  justify-content: flex-start;
+  width: 100%;
+  max-width: 800px;
+  margin-bottom: 8px;
+}
+
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.back-btn:hover {
+  background: var(--border);
+}
+
 .form-header h1 {
   font-size: 32px;
   font-weight: 600;

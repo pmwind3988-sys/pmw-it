@@ -285,3 +285,54 @@ export async function fetchAllColumnChoices(siteUrl, accessToken, staticNames) {
   );
   return Object.fromEntries(entries);
 }
+
+// ─── Fetch all list items ───────────────────────────────────────────────────────────
+
+export async function fetchAllListItems(siteUrl, accessToken) {
+  const headers = buildHeaders(accessToken);
+  const res = await fetch(
+    `${siteUrl}/_api/web/lists/getByTitle('${encodeURIComponent(LIST_NAME)}')/items?$orderby=ID desc&$top=100`,
+    { method: 'GET', headers }
+  );
+  if (!res.ok) throw new Error(`Failed to fetch list items (${res.status})`);
+  const data = await res.json();
+  return data.d?.results || [];
+}
+
+// ─── Update a list item ──────────────────────────────────────────────────
+
+export async function updateListItem(siteUrl, accessToken, itemId, itemData) {
+  const headers = {
+    'Accept': 'application/json;odata=verbose',
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${accessToken}`,
+  };
+  const formDigest = await getFormDigest(siteUrl, accessToken);
+  const res = await fetch(
+    `${siteUrl}/_api/web/lists/getByTitle('${encodeURIComponent(LIST_NAME)}')/items(${itemId})`,
+    {
+      method: 'PATCH',
+      headers: { ...headers, 'X-RequestDigest': formDigest, 'IF-MATCH': '*' },
+      body: JSON.stringify(itemData),
+    }
+  );
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to update list item (${res.status}): ${text}`);
+  }
+  // PATCH returns 204 No Content on success
+  return { success: true };
+}
+
+// ─── Fetch single list item ───────────────────────────────────────────────
+
+export async function fetchListItemById(siteUrl, accessToken, itemId) {
+  const headers = buildHeaders(accessToken);
+  const res = await fetch(
+    `${siteUrl}/_api/web/lists/getByTitle('${encodeURIComponent(LIST_NAME)}')/items(${itemId})`,
+    { method: 'GET', headers }
+  );
+  if (!res.ok) throw new Error(`Failed to fetch list item (${res.status})`);
+  const data = await res.json();
+  return data.d;
+}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Model } from 'survey-core';
 import { Survey } from 'survey-react-ui';
 import 'survey-core/survey-core.min.css';
@@ -104,8 +104,22 @@ export default function FormPage() {
   const [formError, setFormError] = useState('');
   const [submitState, setSubmitState] = useState('idle');
   const [requestType, setRequestType] = useState('');
-  const [spChoices, setSpChoices] = useState(null); // null = not yet loaded
+  const [spChoices, setSpChoices] = useState(null);
   const [choicesError, setChoicesError] = useState('');
+  const sharePanelRef = useRef(null);
+
+  // Close share panel when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (sharePanelRef.current && !sharePanelRef.current.contains(event.target)) {
+        setShowSharePanel(false);
+      }
+    };
+    if (showSharePanel) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showSharePanel]);
 
   // Fetch all choices from SharePoint before rendering form
   useEffect(() => {
@@ -311,7 +325,7 @@ export default function FormPage() {
 
       {/* Share panel */}
       {showSharePanel && (
-        <div className="share-panel">
+        <div className="share-panel" ref={sharePanelRef}>
           <div className="share-panel-item" onClick={handleCopyLink}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />

@@ -135,6 +135,11 @@
 }
 
 /* ── Force SurveyJS inputs to always be light ── */
+.survey-light-wrapper {
+  width: 100%;
+  max-width: 100%;
+}
+
 .survey-light-wrapper,
 .survey-light-wrapper .sd-root-modern,
 .survey-light-wrapper .sd-container-modern {

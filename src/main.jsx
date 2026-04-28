@@ -7,6 +7,7 @@ import { msalConfig } from './authConfig';
 import { ThemeProvider } from './context/ThemeContext';
 import App from './App';
 import './index.css';
+import './App.css';
 
 async function bootstrap() {
   const msalInstance = new PublicClientApplication(msalConfig);

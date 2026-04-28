@@ -41,7 +41,3 @@ export const sharePointRequest = {
     'https://pmwgroupcom.sharepoint.com/AllSites.Manage',
   ],
 };
-
-export const graphConfig = {
-  graphMeEndpoint: 'https://graph.microsoft.com/v1.0/me',
-};

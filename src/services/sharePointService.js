@@ -181,18 +181,6 @@ async function ensureColumns(siteUrl, accessToken, formDigest) {
   }
 }
 
-async function getListItemType(siteUrl, accessToken) {
-  const headers = buildHeaders(accessToken);
-  const res = await fetch(
-    `${siteUrl}/_api/web/lists/getByTitle('${encodeURIComponent(LIST_NAME)}')?$select=ListItemEntityTypeFullName`,
-    { method: 'GET', headers }
-  );
-  if (!res.ok) throw new Error(`Failed to get list item type (${res.status})`);
-  const data = await res.json();
-  console.log('[SP] itemType:', data.d.ListItemEntityTypeFullName);
-  return data.d.ListItemEntityTypeFullName;
-}
-
 async function addListItem(siteUrl, accessToken, formDigest, itemData) {
   // Use nometadata for list items - simpler, no __metadata needed
   const headers = buildItemHeaders(accessToken, formDigest);

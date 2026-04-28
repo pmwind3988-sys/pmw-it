@@ -17,8 +17,7 @@
     "react-dom": "^19.2.5",
     "react-router-dom": "^7.14.2",
     "survey-core": "^2.5.21",
-    "survey-react-ui": "^2.5.21",
-    "surveyjs": "^4.0.2"
+    "survey-react-ui": "^2.5.21"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

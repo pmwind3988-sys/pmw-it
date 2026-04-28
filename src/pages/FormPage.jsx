@@ -8,6 +8,8 @@ import { useTheme } from '../context/ThemeContext';
 import { submitEmployeesToSharePoint, fetchAllColumnChoices } from '../services/sharePointService';
 import { sharePointRequest } from '../authConfig';
 import QRCode from 'qrcode';
+import { LayeredLightPanelless } from "survey-core/themes";
+
 
 const SHAREPOINT_SITE_URL =
   import.meta.env.VITE_SHAREPOINT_SITE_URL ||
@@ -34,21 +36,14 @@ const getSurveyJson = (requestType, choices = {}) => {
             type: 'panel',
             name: 'personalInfo',
             title: 'Personal Information',
-            colCount: 2,
+            colCount: 2,  // ← this works inside paneldynamic
             elements: [
               { type: 'text', name: 'fullName', title: 'Full Name (As per IC)', isRequired: true, placeholder: 'Enter full name' },
               { type: 'text', name: 'callingName', title: 'Calling Name', placeholder: 'Nickname (optional)' },
               { type: 'text', name: 'position', title: 'Position/Title', isRequired: true, placeholder: 'Enter position' },
-              {
-                type: 'dropdown', name: 'entity', title: 'Entity', isRequired: true,
-                choices: toChoices(choices['Entity'] || []),
-              },
-              { type: 'text', name: 'employeeId', title: 'Employee ID', isRequired: true, placeholder: 'Enter employee ID' },
-              {
-                type: 'text', name: 'joinDate',
-                title: requestType?.toLowerCase() === 'onboarding' ? 'Join Date' : 'Last Working Date',  // ← updated
-                isRequired: true, inputType: 'date', defaultValueExpression: 'today()',
-              },
+              { type: 'dropdown', name: 'entity', title: 'Entity', isRequired: true, choices: toChoices(choices['Entity'] || []) },
+              { type: 'text', name: 'employeeId', title: 'Employee ID', placeholder: 'Enter employee ID (optional)' },
+              { type: 'text', name: 'joinDate', title: requestType?.toLowerCase() === 'onboarding' ? 'Join Date' : 'Last Working Date', isRequired: true, inputType: 'date', defaultValueExpression: 'today()' },
             ],
           },
           {
@@ -96,6 +91,9 @@ export default function FormPage() {
   const { instance } = useMsal();
   const [retryCount, setRetryCount] = useState(0);
 
+  useEffect(() => {
+    document.title = 'IT ONBOARDING FORM';
+  }, []);
 
   const isAuthenticated = useIsAuthenticated();
   const { isDarkMode, toggleTheme } = useTheme();
@@ -348,28 +346,33 @@ export default function FormPage() {
             </div>
 
           ) : submitState === 'success' ? (
-            <div className="success-screen">
-              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2">
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
-              </svg>
+            <div className="result-card success-card">
+              <div className="result-icon success-icon">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
+                </svg>
+              </div>
               <h2>Form Submitted Successfully</h2>
               <p>Your request has been saved to SharePoint.</p>
               <button className="ms-button" onClick={() => window.location.reload()}>Submit Another Request</button>
             </div>
 
           ) : submitState === 'error' ? (
-            <div className="error-screen">
-              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2">
-                <circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
-              </svg>
+            <div className="result-card error-card">
+              <div className="result-icon error-icon">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2.5">
+                  <circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
+                </svg>
+              </div>
               <h2>Submission Failed</h2>
               <p className="error-message">{formError}</p>
               <button className="ms-button" onClick={handleRetry}>Try Again</button>
             </div>
 
           ) : submitState === 'submitting' ? (
-            <div className="success-screen">
-              <p style={{ fontSize: 16, color: '#666' }}>Submitting to SharePoint…</p>
+            <div className="result-card loading-card">
+              <div className="spinner"></div>
+              <p>Submitting to SharePoint…</p>
             </div>
 
           ) : (

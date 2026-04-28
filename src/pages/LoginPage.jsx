@@ -7,6 +7,10 @@ export default function LoginPage() {
   const { instance, inProgress } = useMsal();
   const isAuthenticated = useIsAuthenticated();
 
+  useEffect(() => {
+    document.title = 'PMW IT - Sign In';
+  }, []);
+
   // If already signed in, skip straight to the form
   useEffect(() => {
     if (inProgress !== InteractionStatus.None) return;
@@ -26,8 +30,11 @@ export default function LoginPage() {
         <p>Sign in with your Microsoft 365 account to continue</p>
         <button className="ms-button" onClick={handleLogin}
           disabled={inProgress !== InteractionStatus.None}>
-          <svg viewBox="0 0 21 21" fill="currentColor">
-            <path d="M11.6 0h-3.2v10.4h3.2V0zm-1.6 10.4c0-.9.7-1.5.1.6-1.5.9 0 1.6.6 1.6 1.5 0 .9-.7 1.6-1.6 1.6-.9.1-1.6-.7-1.6-1.6zm7.8-5.2H6.4v5.2h3.2V10h1.6V5.2h1.6V0h-1.6zM3.2 0H0v10.4h3.2V0z"/>
+          <svg width="20" height="20" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
+            <rect x="1" y="1" width="9" height="9" fill="#F25022"/>
+            <rect x="11" y="1" width="9" height="9" fill="#7FBA00"/>
+            <rect x="1" y="11" width="9" height="9" fill="#00A4EF"/>
+            <rect x="11" y="11" width="9" height="9" fill="#FFB900"/>
           </svg>
           Sign in with Microsoft
         </button>

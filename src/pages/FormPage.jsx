@@ -186,6 +186,57 @@ export default function FormPage() {
     return new Model(getSurveyJson(requestType, spChoices, !!editItemId));
   }, [requestType, spChoices, editItemId]);
 
+// Disable add/remove panels in edit mode after survey is created
+  useEffect(() => {
+    if (!survey || !editItemId) return;
+    
+    // Set paneldynamic to view-only mode via JS after survey renders
+    survey.onCurrentPageChanged = () => {
+      const panel = survey.getPanelByName('employeeRequests');
+      if (panel) {
+        panel.allowAddPanel = false;
+        panel.allowRemovePanel = false;
+        panel.maxPanelCount = 1;
+        panel.minPanelCount = 1;
+      }
+    };
+    
+    // Also apply immediately
+    const panel = survey.getPanelByName('employeeRequests');
+    if (panel) {
+      panel.allowAddPanel = false;
+      panel.allowRemovePanel = false;
+      panel.maxPanelCount = 1;
+      panel.minPanelCount = 1;
+    }
+    
+    // Direct DOM hiding after render
+    const hideButtons = () => {
+      setTimeout(() => {
+        const allButtons = document.querySelectorAll('button');
+        allButtons.forEach(el => {
+          const text = (el.textContent || '').toLowerCase().trim();
+          if (text === 'add employee' || text === '+ add employee') {
+            el.style.display = 'none';
+            el.style.visibility = 'hidden';
+            el.style.height = '0';
+            el.style.padding = '0';
+            el.style.overflow = 'hidden';
+          }
+          if (text === 'remove') {
+            el.style.display = 'none';
+          }
+        });
+      }, 100);
+    };
+    
+    hideButtons();
+    const interval = setInterval(hideButtons, 500);
+    setTimeout(() => clearInterval(interval), 3000);
+    
+    return () => clearInterval(interval);
+  }, [survey, editItemId]);
+
   // Restore draft from localStorage or populate edit data
   useEffect(() => {
     if (!survey) return;
@@ -486,7 +537,7 @@ export default function FormPage() {
             </div>
 
           ) : (
-            <div className="survey-light-wrapper">
+            <div className={`survey-light-wrapper ${editItemId ? 'panel-edit-mode' : ''}`}>
               <Survey model={survey} style={{ padding: '20px' }} />
             </div>
           )}

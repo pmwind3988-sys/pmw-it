@@ -524,3 +524,29 @@
   display: block !important;
   margin: 24px auto !important;
 }
+
+/* Hide add employee button in edit mode */
+.panel-edit-mode .sv-dynamic-panel .sv-dynamic-panel__add-btn,
+.panel-edit-mode .sv-paneldynamic-panel .sv-paneldynamic-panel__add-btn,
+.panel-edit-mode .sv-dynamic-panel__add-btn,
+.panel-edit-mode [data-name="employeeRequests"] + .sv-dynamic-panel__add-btn,
+.panel-edit-mode > div > .sv-paneldynamic__add-btn,
+.panel-edit-mode button.sv-dynamic-panel__add-btn,
+.panel-edit-mode .sd-element__question .sv-dynamic-panel__add-btn,
+.panel-edit-mode .sv-question__content .sv-dynamic-panel__add-btn,
+.panel-edit-mode div.sv-dynamic-panel button,
+.panel-edit-mode .sd-action-bar .sd-action-bar__item {
+  display: none !important;
+}
+
+/* Alternative selectors */
+.panel-edit-mode button:empty + button:empty {
+  display: none !important;
+}
+
+/* Remove button in edit mode */
+.panel-edit-mode .sv-dynamic-panel__remove-btn,
+.panel-edit-mode button:empty,
+.panel-edit-mode .sv-dynamic-panel__remove-container {
+  display: none !important;
+}

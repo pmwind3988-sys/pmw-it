@@ -11,6 +11,9 @@ const REQUIRED_COLUMNS = [
   { StaticName: 'Calling_x0020_Name', Title: 'Calling Name', FieldTypeKind: 2, spType: 'SP.Field' },
   { StaticName: 'Position', Title: 'Position', FieldTypeKind: 2, spType: 'SP.Field' },
   {
+    StaticName: 'Department', Title: 'Department', FieldTypeKind: 6, spType: 'SP.FieldChoice',
+  },
+  {
     StaticName: 'Entity', Title: 'Entity', FieldTypeKind: 6, spType: 'SP.FieldChoice',
     choices: ['pmw', 'pmw-ss', 'pmw-th']
   },
@@ -229,6 +232,7 @@ export async function submitEmployeesToSharePoint(siteUrl, accessToken, employee
 
     // Only add fields that have values (SharePoint rejects null for some types)
     if (emp.entity) itemData.Entity = emp.entity;
+    if (emp.department) itemData.Department = emp.department;
     if (joinDateFormatted) itemData.Join_x0020__x002f__x0020_Last_x0 = joinDateFormatted;
     if (emp.equipmentItems?.length) itemData.Equipment_x0020_Items = toMultiChoice(emp.equipmentItems);
     if (emp.softwareLicenses?.length) itemData.Software_x0020_Licenses = toMultiChoice(emp.softwareLicenses);

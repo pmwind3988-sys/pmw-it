@@ -183,15 +183,25 @@
 /* ── List Table ── */
 .list-table {
   background: var(--surface);
-  border: 1px solid var(--border);
+  border:1px solid var(--border);
   border-radius: 12px;
-  overflow: hidden;
+  overflow-x: hidden;
   margin-top: 24px;
+  width:100%;
+}
+
+
+
+/* ── Wide List Page Content ── */
+.list-page-wide {
+  max-width: 100% !important;
+  width: 100%;
 }
 
 .list-table table {
-  width: 100%;
+  width:100%;
   border-collapse: collapse;
+  table-layout: auto;
 }
 
 .list-table th,
@@ -240,6 +250,14 @@
 .employee-info {
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+}
+
+.employee-name,
+.employee-callname {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .employee-name {

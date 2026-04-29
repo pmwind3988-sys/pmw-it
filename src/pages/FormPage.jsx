@@ -15,7 +15,7 @@ const SHAREPOINT_SITE_URL =
   import.meta.env.VITE_SHAREPOINT_SITE_URL ||
   'https://pmwgroupcom.sharepoint.com/sites/IThelpdesk';
 
-const CHOICE_COLUMNS = ['Entity', 'Equipment_x0020_Items', 'Software_x0020_Licenses', 'Request_x0020_Type'];
+const CHOICE_COLUMNS = ['Entity', 'Equipment_x0020_Items', 'Software_x0020_Licenses', 'Request_x0020_Type', 'Department'];
 
 const getSurveyJson = (requestType, choices = {}, isEditMode = false) => {
 
@@ -47,8 +47,9 @@ const getSurveyJson = (requestType, choices = {}, isEditMode = false) => {
               { type: 'text', name: 'fullName', title: 'Full Name (As per IC)', isRequired: true, placeholder: 'Enter full name' },
               { type: 'text', name: 'callingName', title: 'Calling Name', placeholder: 'Nickname (optional)' },
               { type: 'text', name: 'position', title: 'Position/Title', isRequired: true, placeholder: 'Enter position' },
-              { type: 'dropdown', name: 'entity', title: 'Entity', isRequired: true, choices: toChoices(choices['Entity'] || []) },
-              { type: 'text', name: 'employeeId', title: 'Employee ID', placeholder: 'Enter employee ID (optional)' },
+               { type: 'dropdown', name: 'entity', title: 'Entity', isRequired: true, choices: toChoices(choices['Entity'] || []) },
+               { type: 'dropdown', name: 'department', title: 'Department', isRequired: true, choices: toChoices(choices['Department'] || []) },
+               { type: 'text', name: 'employeeId', title: 'Employee ID', placeholder: 'Enter employee ID (optional)' },
               { type: 'text', name: 'joinDate', title: requestType?.toLowerCase() === 'onboarding' ? 'Join Date' : 'Last Working Date', isRequired: true, inputType: 'date', defaultValueExpression: 'today()' },
             ],
           },
@@ -247,8 +248,9 @@ export default function FormPage() {
         fullName: editItemData.Title || '',
         callingName: editItemData.Calling_x0020_Name || '',
         position: editItemData.Position || '',
-        entity: editItemData.Entity || '',
-        employeeId: editItemData.Employee_x0020_ID || '',
+             entity: editItemData.Entity || '',
+             department: editItemData.Department || '',
+             employeeId: editItemData.Employee_x0020_ID || '',
         joinDate: editItemData.Join_x0020__x002f__x0020_Last_x0 ? editItemData.Join_x0020__x002f__x0020_Last_x0.split('T')[0] : '',
         equipmentItems: editItemData.Equipment_x0020_Items ? editItemData.Equipment_x0020_Items.results : [],
         equipmentRemarks: editItemData.Equipment_x0020_Remarks || '',
@@ -307,8 +309,9 @@ export default function FormPage() {
             Title: emp.fullName || '',
             Calling_x0020_Name: emp.callingName || '',
             Position: emp.position || '',
-            Entity: emp.entity || '',
-            Employee_x0020_ID: emp.employeeId || '',
+         Entity: emp.entity || '',
+         Department: emp.department || '',
+         Employee_x0020_ID: emp.employeeId || '',
             Equipment_x0020_Remarks: emp.equipmentRemarks || '',
             Special_x0020_Permission: emp.specialPermission || '',
           };
@@ -412,7 +415,7 @@ export default function FormPage() {
           )}
         </div>
         <div className="auth-banner-right">
-          <select value={requestType} onChange={(e) => setRequestType(e.target.value)} className="type-select" disabled={!spChoices}>
+          <select value={requestType} onChange={(e) => setRequestType(e.target.value)} className="type-select" disabled={!spChoices || !!editItemId}>
             {!spChoices ? (
               <option value=''>Loading...</option>
             ) : (

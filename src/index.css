@@ -274,17 +274,16 @@ body {
 
 /* ── Form Content ── */
 .form-content {
-  flex: 1;
+  flex:1;
   padding: 24px;
   max-width: 800px;
-  margin: 0 auto;
-  width: 100%;
+  margin:0 auto;
+  width:100%;
 }
 
 .form-container {
   width: 100%;
   max-width: 100%;
-  overflow-x: hidden;
 }
 
 .form-header {

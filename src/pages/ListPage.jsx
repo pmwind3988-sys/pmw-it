@@ -9,7 +9,7 @@ const SHAREPOINT_SITE_URL =
   import.meta.env.VITE_SHAREPOINT_SITE_URL ||
   'https://pmwgroupcom.sharepoint.com/sites/IThelpdesk';
 
-const CHOICE_COLUMNS = ['Entity', 'Equipment_x0020_Items', 'Software_x0020_Licenses', 'Request_x0020_Type'];
+const CHOICE_COLUMNS = ['Entity', 'Equipment_x0020_Items', 'Software_x0020_Licenses', 'Request_x0020_Type', 'Department'];
 
 export default function ListPage() {
   const { instance } = useMsal();
@@ -33,6 +33,7 @@ export default function ListPage() {
   const [sortBy, setSortBy] = useState('newest');
   const [filterEntity, setFilterEntity] = useState('');
   const [filterType, setFilterType] = useState('');
+const [filterDepartment, setFilterDepartment] = useState('');
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
   const [showFilters, setShowFilters] = useState(false);
@@ -116,8 +117,9 @@ export default function ListPage() {
         (item.Title || '').toLowerCase().includes(q) ||
         (item.Position || '').toLowerCase().includes(q) ||
         (item.Entity || '').toLowerCase().includes(q) ||
-        (item.Calling_x0020_Name || '').toLowerCase().includes(q)
-      );
+         (item.Calling_x0020_Name || '').toLowerCase().includes(q) ||
+         (item.Department || '').toLowerCase().includes(q)
+       );
     }
     
     // Entity filter
@@ -125,10 +127,15 @@ export default function ListPage() {
       result = result.filter(item => item.Entity === filterEntity);
     }
     
-    // Request Type filter
-    if (filterType) {
-      result = result.filter(item => item.Request_x0020_Type === filterType);
-    }
+     // Request Type filter
+     if (filterType) {
+       result = result.filter(item => item.Request_x0020_Type === filterType);
+     }
+     
+     // Department filter
+     if (filterDepartment) {
+       result = result.filter(item => item.Department === filterDepartment);
+     }
     
     // Date from filter
     if (filterDateFrom) {
@@ -172,7 +179,7 @@ export default function ListPage() {
   }, [items, searchQuery, sortBy, filterEntity, filterType, filterDateFrom, filterDateTo]);
 
   // Active filters count
-  const activeFiltersCount = [filterEntity, filterType, filterDateFrom, filterDateTo].filter(Boolean).length;
+  const activeFiltersCount = [filterEntity, filterType, filterDateFrom, filterDateTo, filterDepartment].filter(Boolean).length;
 
   if (!isAuthenticated) {
     return (
@@ -190,8 +197,8 @@ export default function ListPage() {
 
   const account = instance.getActiveAccount();
 
-  return (
-    <div className="form-page">
+   return (
+    <div className="form-page" style={{width: '100%'}}>
       <div className="auth-banner">
         <div className="auth-banner-left">
           {account && (
@@ -247,7 +254,7 @@ export default function ListPage() {
         </div>
       )}
 
-      <div className="form-content">
+       <div className="form-content" style={{maxWidth: '100%', width: '100%'}}>
         <div className="form-header">
           <h1>IT Request Form</h1>
           <p>View and manage submitted requests</p>
@@ -302,15 +309,25 @@ export default function ListPage() {
               </select>
             </div>
             
-            <div className="filter-group">
-              <label>Request Type</label>
-              <select value={filterType} onChange={(e) => setFilterType(e.target.value)}>
-                <option value="">All Types</option>
-                {(spChoices['Request_x0020_Type'] || []).map(t => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
-            </div>
+       <div className="filter-group">
+         <label>Request Type</label>
+         <select value={filterType} onChange={(e) => setFilterType(e.target.value)}>
+           <option value="">All Types</option>
+           {(spChoices['Request_x0020_Type'] || []).map(t => (
+             <option key={t} value={t}>{t}</option>
+           ))}
+         </select>
+       </div>
+       
+       <div className="filter-group">
+         <label>Department</label>
+         <select value={filterDepartment} onChange={(e) => setFilterDepartment(e.target.value)}>
+           <option value="">All Departments</option>
+           {(spChoices['Department'] || []).map(d => (
+             <option key={d} value={d}>{d}</option>
+           ))}
+         </select>
+       </div>
             
             <div className="filter-group">
               <label>Date From</label>
@@ -322,12 +339,13 @@ export default function ListPage() {
               <input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} />
             </div>
             
-            <button className="clear-filters-btn" onClick={() => {
-              setFilterEntity('');
-              setFilterType('');
-              setFilterDateFrom('');
-              setFilterDateTo('');
-            }}>
+               <button className="clear-filters-btn" onClick={() => {
+               setFilterEntity('');
+               setFilterType('');
+               setFilterDateFrom('');
+               setFilterDateTo('');
+               setFilterDepartment('');
+             }}>
               Clear All
             </button>
           </div>
@@ -379,16 +397,17 @@ export default function ListPage() {
           </div>
         ) : (
           <div className="list-table">
-            <table>
+            <table style={{width: '100%', tableLayout: 'auto'}}>
               <thead>
-                <tr>
-                  <th>Employee</th>
-                  <th>Position</th>
-                  <th>Entity</th>
-                  <th>Request Type</th>
-                  <th>Date</th>
-                  <th>Actions</th>
-                </tr>
+               <tr>
+                 <th>Employee</th>
+                 <th>Position</th>
+                 <th>Entity</th>
+                 <th>Department</th>
+                 <th>Request Type</th>
+                 <th>Date</th>
+                 <th>Actions</th>
+               </tr>
               </thead>
               <tbody>
                 {filteredItems.map((item) => (
@@ -403,14 +422,16 @@ export default function ListPage() {
                       </div>
                     </td>
                     <td>{item.Position || '-'}</td>
-                    <td>{item.Entity || '-'}</td>
-                    <td><span className={`badge badge-${item.Request_x0020_Type?.toLowerCase()}`}>{item.Request_x0020_Type || '-'}</span></td>
+                     <td>{item.Entity || '-'}</td>
+                     <td>{item.Department || '-'}</td>
+                     <td><span className={`badge badge-${item.Request_x0020_Type?.toLowerCase()}`}>{item.Request_x0020_Type || '-'}</span></td>
                     <td>{formatDate(item.Join_x0020__x002f__x0020_Last_x0)}</td>
                     <td>
                       <div className="action-buttons">
-                        <button className="action-btn view-btn" onClick={() => window.location.href = `/it-boarding-form?edit=${item.ID}`} title="View">
+                        <button className="action-btn edit-btn" onClick={() => window.location.href = `/it-boarding-form?edit=${item.ID}`} title="Edit">
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                           </svg>
                         </button>
                       </div>

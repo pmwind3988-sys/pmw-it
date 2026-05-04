@@ -6,7 +6,8 @@ export function ThemeProvider({ children }) {
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const saved = localStorage.getItem('theme');
     if (saved) return saved === 'dark';
-    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    // Default to light mode (ignore system preference)
+    return false;
   });
 
   useEffect(() => {

@@ -1,0 +1,1107 @@
+/* ---------------------------------------------------------------------------
+   Application shell — tokens, the branded surface, the nav/header frame, and
+   the small set of UI primitives every page is built from.
+
+   Ported from the SI CMMS shell so the two internal portals read as one family:
+   a branded column on the left, a sticky bar above the content, and a canvas
+   the cards sit on. The maintenance-specific pieces (work orders, machines,
+   priorities, SLA) have no counterpart here and were left behind.
+
+   Everything is plain CSS on `data-theme` — this app has no Tailwind and no
+   CSS-in-JS, and adding either just to move a layout across would have been a
+   far larger change than the layout itself.
+--------------------------------------------------------------------------- */
+
+:root {
+  /* PMW blue, the same brand the OSHE portal signs in with. */
+  --it-brand: #0078d4;
+  --it-brand-deep: #004e86;
+  --it-brand-mid: #1a88de;
+  --it-brand-line: #2e97e8;
+  --it-brand-wash: #eaf4fd;
+
+  --it-canvas: #f4f7fb;
+  --it-panel: #ffffff;
+  --it-ink: #101828;
+  --it-ink-soft: #64748b;
+  --it-line: #e3e9f0;
+
+  --it-accent: #f59e0b;
+  --it-accent-wash: #fffbeb;
+  --it-good: #12a150;
+  --it-good-wash: #e9f7ef;
+  --it-danger: #dc2626;
+  --it-danger-wash: #fdecec;
+
+  /* Ink used *on* the brand surface: the nav column and the sign-in poster. */
+  --it-on-brand: #ffffff;
+  --it-on-brand-dim: #bcd9f4;
+
+  --it-card-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.05);
+  --it-radius: 12px;
+
+  /* The tokens the pre-Shell stylesheets already read are re-pointed at the new
+     palette, so the screens still written against them (the form, the asset
+     checklist, the records table) land on the same ground as the shell without
+     being restyled one rule at a time. `--accent` is deliberately not among
+     them: it is the fill of `.ms-button`, whose text colour is `--bg`, and
+     re-pointing one without the other puts pale text on a pale fill. */
+  --bg: #f4f7fb;
+  --surface: #ffffff;
+  --border: #e3e9f0;
+  --text-primary: #101828;
+  --text-secondary: #64748b;
+}
+
+[data-theme='dark'] {
+  --it-brand: #2f9bea;
+  --it-brand-deep: #071b2c;
+  --it-brand-mid: #12283c;
+  --it-brand-line: #1d3648;
+  --it-brand-wash: #12222f;
+
+  --it-canvas: #0b1017;
+  --it-panel: #151b24;
+  --it-ink: #f1f5f9;
+  --it-ink-soft: #94a3b8;
+  --it-line: #242d3a;
+
+  --it-accent: #fbbf24;
+  --it-accent-wash: #241d0c;
+  --it-good: #34d399;
+  --it-good-wash: #0f241c;
+  --it-danger: #f87171;
+  --it-danger-wash: #2a1414;
+
+  --it-on-brand: #f8fafc;
+  --it-on-brand-dim: #93b4cf;
+
+  --it-card-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 18px rgba(0, 0, 0, 0.35);
+
+  --bg: #0b1017;
+  --surface: #151b24;
+  --border: #242d3a;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+}
+
+/* ---------------------------------------------------------------------------
+   The branded surface — the nav column and the sign-in poster share it, so the
+   two cannot drift apart. A steep gradient with two slow highlights drifting
+   over it.
+
+   The highlights animate `background-position` rather than a transform: the nav
+   column scrolls, and a transformed overlay large enough to drift visibly would
+   push its scroll extent out and hand it a stray scrollbar.
+--------------------------------------------------------------------------- */
+.it-brand-surface {
+  position: relative;
+  isolation: isolate;
+  background: linear-gradient(160deg, var(--it-brand) 0%, var(--it-brand-deep) 100%);
+}
+
+.it-brand-surface::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    radial-gradient(38% 30% at 18% 12%, rgba(245, 158, 11, 0.2), transparent 70%),
+    radial-gradient(44% 34% at 84% 84%, rgba(147, 197, 253, 0.24), transparent 72%);
+  background-repeat: no-repeat;
+  background-size: 170% 170%, 180% 180%;
+  animation: itSheenDrift 22s ease-in-out infinite;
+}
+
+@keyframes itSheenDrift {
+  0%,
+  100% {
+    background-position: 0% 0%, 100% 100%;
+  }
+  50% {
+    background-position: 34% 24%, 66% 72%;
+  }
+}
+
+/* `both` matters: without it the element paints at full opacity for the frame
+   before the animation starts, which reads as a flicker, not an entrance. */
+@keyframes itRiseIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.rise {
+  animation: itRiseIn 0.4s ease both;
+}
+
+.rise-slow {
+  animation: itRiseIn 0.55s ease both;
+}
+
+/* ---------------------------------------------------------------------------
+   Shell frame.
+
+   Two layouts from one tree, switched at 1024px. Below it the nav is an
+   off-canvas drawer behind a hamburger; at and above it the same element is a
+   sticky column. The switch is pure CSS so there is no flash of the wrong
+   layout on first paint.
+--------------------------------------------------------------------------- */
+.shell {
+  min-height: 100dvh;
+  display: flex;
+  background: var(--it-canvas);
+  color: var(--it-ink);
+}
+
+.shell-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(2, 8, 20, 0.5);
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.shell-nav {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  width: 260px;
+  max-width: 82vw;
+  padding: calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));
+  overflow-y: auto;
+  transform: translateX(-100%);
+  transition: transform 200ms ease-out;
+}
+
+.shell-nav.open {
+  transform: translateX(0);
+  box-shadow: 0 24px 60px rgba(2, 8, 20, 0.45);
+}
+
+.shell-brand {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 24px;
+  padding: 0 4px;
+}
+
+.shell-brand-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  min-width: 0;
+}
+
+/* The brand mark is a blue logo, and the column behind it is blue — it needs a
+   white chip under it or it disappears into the gradient. */
+.shell-logo-chip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: #fff;
+}
+
+.shell-brand-name {
+  display: block;
+  font-size: 15.5px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--it-on-brand);
+}
+
+.shell-brand-sub {
+  display: block;
+  margin-top: 3px;
+  font-size: 9px;
+  line-height: 1;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--it-on-brand-dim);
+}
+
+.shell-navclose {
+  background: none;
+  border: 0;
+  padding: 4px;
+  color: var(--it-on-brand-dim);
+  cursor: pointer;
+  display: flex;
+}
+
+.shell-navclose:hover {
+  color: var(--it-on-brand);
+}
+
+.shell-navlist {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.shell-navitem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--it-on-brand-dim);
+  text-decoration: none;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  font-family: inherit;
+}
+
+.shell-navitem:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--it-on-brand);
+}
+
+.shell-navitem.active {
+  background: rgba(255, 255, 255, 0.22);
+  color: var(--it-on-brand);
+}
+
+.shell-navitem svg {
+  flex-shrink: 0;
+}
+
+.shell-navsection {
+  margin: 18px 0 6px;
+  padding: 0 10px;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--it-on-brand-dim);
+  opacity: 0.75;
+}
+
+.shell-navfoot {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.shell-navuser {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  min-width: 0;
+}
+
+.shell-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: var(--it-accent);
+  color: #1a1200;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.shell-navuser-text {
+  min-width: 0;
+}
+
+.shell-navuser-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--it-on-brand);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shell-navuser-mail {
+  font-size: 10.5px;
+  color: var(--it-on-brand-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shell-signout {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: none;
+  border: 0;
+  padding: 0;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--it-on-brand-dim);
+  cursor: pointer;
+}
+
+.shell-signout:hover {
+  color: var(--it-on-brand);
+}
+
+.shell-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Sticky rather than static: the page itself scrolls (there is no inner scroll
+   container), so the bar has to follow it. */
+.shell-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  border-bottom: 1px solid var(--it-line);
+  background: var(--it-panel);
+  padding-top: env(safe-area-inset-top);
+}
+
+.shell-headerrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+}
+
+.shell-hamburger {
+  display: flex;
+  background: none;
+  border: 0;
+  padding: 6px;
+  margin-left: -6px;
+  color: var(--it-ink-soft);
+  cursor: pointer;
+}
+
+.shell-headerbrand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  min-width: 0;
+  text-decoration: none;
+  color: var(--it-ink);
+}
+
+.shell-headerbrand span {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.shell-search {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  max-width: 320px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  background: var(--it-canvas);
+  border: 1px solid transparent;
+}
+
+.shell-search:focus-within {
+  border-color: var(--it-brand);
+}
+
+.shell-search svg {
+  flex-shrink: 0;
+  color: var(--it-ink-soft);
+}
+
+.shell-search input {
+  width: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13.5px;
+  color: var(--it-ink);
+}
+
+.shell-headeractions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.shell-iconbtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--it-line);
+  background: var(--it-panel);
+  color: var(--it-ink-soft);
+  cursor: pointer;
+}
+
+.shell-iconbtn:hover {
+  background: var(--it-canvas);
+  color: var(--it-ink);
+}
+
+.shell-body {
+  flex: 1;
+  padding: 16px;
+  padding-bottom: calc(32px + env(safe-area-inset-bottom));
+}
+
+.shell-pagehead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.shell-pagehead h1 {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--it-ink);
+  margin: 0 0 3px;
+}
+
+.shell-pagehead p {
+  font-size: 13px;
+  color: var(--it-ink-soft);
+  margin: 0;
+}
+
+.shell-pagehead-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+@media (min-width: 640px) {
+  .shell-search {
+    display: flex;
+  }
+  .shell-headerrow {
+    gap: 12px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .shell-nav {
+    position: sticky;
+    bottom: auto;
+    z-index: auto;
+    height: 100dvh;
+    width: 232px;
+    max-width: none;
+    flex-shrink: 0;
+    transform: translateX(0);
+    box-shadow: none;
+  }
+  .shell-backdrop,
+  .shell-hamburger,
+  .shell-navclose,
+  .shell-headerbrand {
+    display: none;
+  }
+  .shell-headerrow {
+    padding: 12px 24px;
+  }
+  .shell-body {
+    padding: 24px;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   UI primitives.
+--------------------------------------------------------------------------- */
+.ui-card {
+  background: var(--it-panel);
+  border: 1px solid var(--it-line);
+  border-radius: var(--it-radius);
+  box-shadow: var(--it-card-shadow);
+}
+
+.ui-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
+  white-space: nowrap;
+}
+
+.ui-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ui-btn-md {
+  font-size: 13.5px;
+  padding: 9px 16px;
+}
+
+.ui-btn-sm {
+  font-size: 12.5px;
+  padding: 6px 12px;
+}
+
+.ui-btn-primary {
+  background: var(--it-brand);
+  color: #fff;
+}
+
+.ui-btn-primary:hover:not(:disabled) {
+  background: var(--it-brand-deep);
+}
+
+.ui-btn-ghost {
+  background: var(--it-panel);
+  color: var(--it-ink);
+  border-color: var(--it-line);
+}
+
+.ui-btn-ghost:hover:not(:disabled) {
+  background: var(--it-canvas);
+}
+
+.ui-btn-subtle {
+  background: var(--it-canvas);
+  color: var(--it-ink);
+}
+
+.ui-btn-subtle:hover:not(:disabled) {
+  background: var(--it-brand-wash);
+}
+
+.ui-btn-danger {
+  background: var(--it-danger-wash);
+  color: var(--it-danger);
+}
+
+.ui-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  border: 1px solid transparent;
+}
+
+.ui-pill span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 12px;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border: 1px solid color-mix(in srgb, var(--it-danger) 35%, transparent);
+  border-radius: 8px;
+  background: var(--it-danger-wash);
+  color: var(--it-danger);
+  font-size: 13px;
+}
+
+.ui-error button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: 0;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: inherit;
+  cursor: pointer;
+}
+
+.ui-empty {
+  padding: 44px 20px;
+  text-align: center;
+  color: var(--it-ink-soft);
+  font-size: 13px;
+}
+
+.ui-skeleton {
+  height: 26px;
+  width: 64px;
+  border-radius: 6px;
+  background: var(--it-canvas);
+  animation: itPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes itPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Dashboard.
+--------------------------------------------------------------------------- */
+.stat-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.stat-card {
+  display: flex;
+  flex-direction: column;
+  padding: 14px;
+  border-radius: var(--it-radius);
+  border: 1px solid var(--it-line);
+  background: var(--it-panel);
+  box-shadow: var(--it-card-shadow);
+  font-family: inherit;
+  text-align: left;
+  width: 100%;
+}
+
+button.stat-card {
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+button.stat-card:hover {
+  background: var(--it-canvas);
+}
+
+button.stat-card:focus-visible {
+  outline: 2px solid var(--it-brand);
+  outline-offset: 2px;
+}
+
+.stat-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.stat-card-label {
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--it-ink-soft);
+  overflow-wrap: break-word;
+}
+
+/* `margin-top: auto` is the point of the flex column: labels wrap to one or two
+   lines depending on width, and without it the numbers across a row sat at
+   different heights. */
+.stat-card-value {
+  margin-top: auto;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.stat-card-number {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--it-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-card-unit {
+  font-size: 12px;
+  color: var(--it-ink-soft);
+}
+
+.stat-card-chevron {
+  color: var(--it-ink-soft);
+  transition: transform 150ms ease;
+}
+
+button.stat-card:hover .stat-card-chevron {
+  transform: translateX(2px);
+}
+
+.chart-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+.chart-grid > * {
+  min-width: 0;
+}
+
+.chart-card {
+  padding: 16px;
+}
+
+.chart-head {
+  margin-bottom: 14px;
+}
+
+.chart-head h3 {
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0 0 2px;
+  color: var(--it-ink);
+}
+
+.chart-head p {
+  font-size: 12px;
+  color: var(--it-ink-soft);
+  margin: 0;
+}
+
+/* Horizontal bars — one row per category. */
+.bar-row {
+  display: grid;
+  grid-template-columns: minmax(72px, 34%) 1fr auto;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 9px;
+}
+
+.bar-row:last-child {
+  margin-bottom: 0;
+}
+
+/* A row is a button wherever there is a slice of the list behind it. */
+.bar-row-btn {
+  width: 100%;
+  padding: 3px 0;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.bar-row-btn:hover .bar-label,
+.bar-row-btn:hover .bar-value {
+  color: var(--it-brand);
+}
+
+.bar-row-btn:focus-visible {
+  outline: 2px solid var(--it-brand);
+  outline-offset: 2px;
+}
+
+.bar-label {
+  font-size: 12px;
+  color: var(--it-ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bar-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--it-canvas);
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--it-brand);
+  transform-origin: left center;
+  animation: itBarGrow 0.5s ease both;
+}
+
+@keyframes itBarGrow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.bar-value {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--it-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Vertical bars — the monthly trend. */
+.column-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 148px;
+  padding-top: 12px;
+}
+
+.column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  height: 100%;
+  min-width: 0;
+}
+
+.column-bar {
+  width: 100%;
+  max-width: 42px;
+  min-height: 3px;
+  border-radius: 6px 6px 0 0;
+  background: linear-gradient(180deg, var(--it-brand-mid), var(--it-brand));
+  transform-origin: bottom center;
+  animation: itColumnGrow 0.5s ease both;
+}
+
+@keyframes itColumnGrow {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+.column-count {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--it-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.column-label {
+  font-size: 10.5px;
+  color: var(--it-ink-soft);
+  white-space: nowrap;
+}
+
+/* Recent activity. */
+.activity-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 4px;
+  border: 0;
+  border-top: 1px solid var(--it-line);
+  background: none;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.activity-row:first-of-type {
+  border-top: 0;
+}
+
+.activity-row:hover {
+  background: var(--it-canvas);
+}
+
+.activity-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.activity-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--it-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activity-meta {
+  font-size: 11.5px;
+  color: var(--it-ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (min-width: 340px) {
+  .stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 640px) {
+  .stat-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .stat-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  .chart-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   The shell's own gate — what stands in for a page while there is no account
+   to draw one for.
+--------------------------------------------------------------------------- */
+.shell-gate {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+  background: var(--it-canvas);
+  color: var(--it-ink-soft);
+}
+
+.shell-gate h2 {
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--it-ink);
+  margin: 0;
+}
+
+.shell-gate p {
+  font-size: 13.5px;
+  margin: 0;
+  max-width: 320px;
+}
+
+/* Below 400px the account name is what pushes the header row past the viewport,
+   so anything wearing this gives up its text and leaves its mark. */
+.hide-below-xs {
+  display: none;
+}
+
+@media (min-width: 400px) {
+  .hide-below-xs {
+    display: inline;
+  }
+}
+
+/* The header's search box appears at 640px. Below that the records screen shows
+   its own copy of the same control, so exactly one is on screen at a time. */
+.only-narrow-flex {
+  display: flex;
+}
+
+@media (min-width: 640px) {
+  .only-narrow-flex {
+    display: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   The pre-Shell screens, once they are inside the shell.
+
+   The form, the asset checklist and the records table were each written as a
+   whole page: their own padding, their own centred heading, their own bar. The
+   bar and the heading are the shell's job now, so what is left is to stop them
+   paying for the page chrome twice.
+--------------------------------------------------------------------------- */
+.shell-body .form-content {
+  padding: 0;
+  max-width: 880px;
+}
+
+.shell-body .form-header {
+  margin-top: 0;
+}
+
+.shell-body .mode-selector {
+  padding: 0 0 24px;
+}
+
+.shell-body .mode-selector-card {
+  max-width: 720px;
+}
+
+.shell-body .toolbar,
+.shell-body .filter-panel,
+.shell-body .list-table {
+  margin-top: 0;
+}
+
+/* Seven columns do not fit a phone. The table scrolls inside its own box rather
+   than being clipped by it, and the page itself never scrolls sideways. */
+.shell-body .list-table {
+  overflow-x: auto;
+}
+
+.shell-body .list-table table {
+  min-width: 720px;
+}
+
+/* Decoration only — nothing here carries meaning, so switching it off costs the
+   reader nothing. */
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .rise-slow,
+  .it-brand-surface::before,
+  .bar-fill,
+  .column-bar,
+  .ui-skeleton {
+    animation: none;
+  }
+}

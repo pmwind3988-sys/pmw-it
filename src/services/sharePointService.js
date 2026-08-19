@@ -199,6 +199,251 @@ async function addListItem(siteUrl, accessToken, formDigest, itemData) {
   return await res.json();
 }
 
+// ─── Asset Checklist Form ────────────────────────────────────────────────────
+
+const ASSET_LIST_NAME = 'Asset Checklist Form';
+const SIGNATURE_LIBRARY_NAME = 'Signatures';
+
+const ASSET_REQUIRED_COLUMNS = [
+  { StaticName: 'FormMode', Title: 'Form Mode', FieldTypeKind: 6, spType: 'SP.FieldChoice', choices: ['In', 'Out', 'Individual Request'] },
+  { StaticName: 'EmployeeName', Title: 'Employee Name', FieldTypeKind: 2, spType: 'SP.Field' },
+  { StaticName: 'EmployeeNo', Title: 'Employee No', FieldTypeKind: 2, spType: 'SP.Field' },
+  { StaticName: 'Position', Title: 'Position', FieldTypeKind: 2, spType: 'SP.Field' },
+  { StaticName: 'Entity', Title: 'Entity', FieldTypeKind: 6, spType: 'SP.FieldChoice', choices: ['pmw', 'pmw-ss', 'pmw-th'] },
+  { StaticName: 'SubmissionDate', Title: 'Submission Date', FieldTypeKind: 4, spType: 'SP.FieldDateTime' },
+  { StaticName: 'AssetMatrix', Title: 'Asset Matrix', FieldTypeKind: 3, spType: 'SP.Field' },
+  { StaticName: 'SignatureUrl', Title: 'Signature URL', FieldTypeKind: 2, spType: 'SP.Field' },
+];
+
+async function ensureAssetList(siteUrl, accessToken, formDigest) {
+  const headers = buildHeaders(accessToken, formDigest);
+  const listApiUrl = `${siteUrl}/_api/web/lists`;
+
+  const checkRes = await fetch(
+    `${listApiUrl}/getByTitle('${encodeURIComponent(ASSET_LIST_NAME)}')`,
+    { method: 'GET', headers }
+  );
+
+  if (checkRes.ok) {
+    const data = await checkRes.json();
+    console.log('[SP] Asset list already exists:', ASSET_LIST_NAME);
+    return data.d;
+  }
+
+  if (checkRes.status !== 404) {
+    const text = await checkRes.text();
+    throw new Error(`Unexpected error checking asset list (${checkRes.status}): ${text}`);
+  }
+
+  console.log('[SP] Creating asset list:', ASSET_LIST_NAME);
+  const createRes = await fetch(listApiUrl, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      __metadata: { type: 'SP.List' },
+      BaseTemplate: 100,
+      Title: ASSET_LIST_NAME,
+      Description: 'Asset checklist submissions (IN/OUT/Individual Request)',
+    }),
+  });
+
+  if (!createRes.ok && createRes.status !== 201) {
+    const text = await createRes.text();
+    throw new Error(`Failed to create asset list (${createRes.status}): ${text}`);
+  }
+
+  const created = await createRes.json();
+  console.log('[SP] Asset list created:', created.d?.Id);
+  return created.d;
+}
+
+async function getExistingAssetFieldNames(siteUrl, accessToken) {
+  const headers = buildHeaders(accessToken);
+  const res = await fetch(
+    `${siteUrl}/_api/web/lists/getByTitle('${encodeURIComponent(ASSET_LIST_NAME)}')/fields?$select=StaticName`,
+    { method: 'GET', headers }
+  );
+  if (!res.ok) throw new Error(`Failed to fetch asset fields (${res.status})`);
+  const data = await res.json();
+  return new Set((data.d?.results || []).map(f => f.StaticName));
+}
+
+async function ensureAssetColumns(siteUrl, accessToken, formDigest) {
+  const headers = buildHeaders(accessToken, formDigest);
+  const existingFields = await getExistingAssetFieldNames(siteUrl, accessToken);
+  const fieldsUrl = `${siteUrl}/_api/web/lists/getByTitle('${encodeURIComponent(ASSET_LIST_NAME)}')/fields`;
+
+  for (const col of ASSET_REQUIRED_COLUMNS) {
+    if (existingFields.has(col.StaticName)) {
+      console.log('[SP] Asset column exists, skipping:', col.StaticName);
+      continue;
+    }
+
+    console.log('[SP] Creating asset column:', col.StaticName);
+
+    const body = {
+      __metadata: { type: col.spType === 'SP.FieldDateTime' ? 'SP.FieldDateTime' : 'SP.Field' },
+      Title: col.Title,
+      StaticName: col.StaticName,
+      FieldTypeKind: col.FieldTypeKind,
+      Required: false,
+    };
+
+    if (col.spType === 'SP.FieldDateTime') {
+      body.DisplayFormat = 0;
+    }
+
+    if (col.choices) {
+      body.Choices = { results: col.choices };
+    }
+
+    const res = await fetch(fieldsUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      if (res.status === 409) {
+        console.warn('[SP] Asset column conflict (race condition), skipping:', col.StaticName);
+        continue;
+      }
+      const text = await res.text();
+      throw new Error(`Failed to create asset column "${col.StaticName}" (${res.status}): ${text}`);
+    }
+
+    console.log('[SP] Asset column created:', col.StaticName);
+  }
+}
+
+async function ensureSignatureLibrary(siteUrl, accessToken, formDigest) {
+  const headers = buildHeaders(accessToken, formDigest);
+  const listApiUrl = `${siteUrl}/_api/web/lists`;
+
+  const checkRes = await fetch(
+    `${listApiUrl}/getByTitle('${encodeURIComponent(SIGNATURE_LIBRARY_NAME)}')`,
+    { method: 'GET', headers }
+  );
+
+  if (checkRes.ok) {
+    console.log('[SP] Signature library already exists:', SIGNATURE_LIBRARY_NAME);
+    return;
+  }
+
+  if (checkRes.status !== 404) {
+    const text = await checkRes.text();
+    throw new Error(`Unexpected error checking signature library (${checkRes.status}): ${text}`);
+  }
+
+  console.log('[SP] Creating signature library:', SIGNATURE_LIBRARY_NAME);
+  const createRes = await fetch(listApiUrl, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      __metadata: { type: 'SP.List' },
+      BaseTemplate: 101,
+      Title: SIGNATURE_LIBRARY_NAME,
+      Description: 'Stores signature images from asset checklist forms',
+    }),
+  });
+
+  if (!createRes.ok && createRes.status !== 201) {
+    const text = await createRes.text();
+    throw new Error(`Failed to create signature library (${createRes.status}): ${text}`);
+  }
+
+  console.log('[SP] Signature library created');
+}
+
+function dataURLToBlob(dataUrl) {
+  const parts = dataUrl.split(',');
+  const mime = parts[0].match(/:(.*?);/)[1];
+  const bytes = atob(parts[1]);
+  const arr = new Uint8Array(bytes.length);
+  for (let i = 0; i < bytes.length; i++) {
+    arr[i] = bytes.charCodeAt(i);
+  }
+  return new Blob([arr], { type: mime });
+}
+
+async function uploadSignatureToSP(siteUrl, accessToken, formDigest, imageDataUrl, fileName) {
+  const blob = dataURLToBlob(imageDataUrl);
+
+  const headers = {
+    'Authorization': `Bearer ${accessToken}`,
+    'X-RequestDigest': formDigest,
+    'Content-Type': 'image/png',
+  };
+
+  const res = await fetch(
+    `${siteUrl}/_api/web/lists/getByTitle('${encodeURIComponent(SIGNATURE_LIBRARY_NAME)}')/rootfolder/files/add(url='${fileName}', overwrite=true)`,
+    {
+      method: 'POST',
+      headers,
+      body: blob,
+    }
+  );
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to upload signature (${res.status}): ${text}`);
+  }
+
+  const data = await res.json();
+  const serverRelativeUrl = data.d.ServerRelativeUrl;
+  return `${siteUrl}${serverRelativeUrl}`;
+}
+
+export async function submitAssetChecklistToSharePoint(siteUrl, accessToken, formData) {
+  if (!accessToken) throw new Error('No access token');
+  if (!siteUrl) throw new Error('SharePoint site URL not configured');
+  if (!formData) throw new Error('No form data to submit');
+
+  const formDigest = await getFormDigest(siteUrl, accessToken);
+  await ensureAssetList(siteUrl, accessToken, formDigest);
+  await ensureAssetColumns(siteUrl, accessToken, formDigest);
+  await ensureSignatureLibrary(siteUrl, accessToken, formDigest);
+
+  // Upload signature if present
+  let signatureUrl = '';
+  if (formData.signatureDataUrl) {
+    const fileName = `${formData.formMode}-${formData.submissionDateISO}-${formData.entity}-${formData.employeeName}.png`
+      .replace(/[/\\?%*:|"<>]/g, '-') // sanitize filename
+      .replace(/\s+/g, '_');
+    signatureUrl = await uploadSignatureToSP(siteUrl, accessToken, formDigest, formData.signatureDataUrl, fileName);
+  }
+
+  const submissionDate = new Date(formData.submissionDateISO);
+  const itemData = {
+    FormMode: formData.formMode || '',
+    EmployeeName: formData.employeeName || '',
+    EmployeeNo: formData.employeeNo || '',
+    Position: formData.position || '',
+    AssetMatrix: JSON.stringify(formData.assetMatrix || []),
+    SignatureUrl: signatureUrl || '',
+  };
+
+  if (formData.entity) itemData.Entity = formData.entity;
+  if (!isNaN(submissionDate.getTime())) itemData.SubmissionDate = submissionDate.toISOString();
+
+  const headers = buildItemHeaders(accessToken, formDigest);
+  const res = await fetch(
+    `${siteUrl}/_api/web/lists/getByTitle('${encodeURIComponent(ASSET_LIST_NAME)}')/items`,
+    {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(itemData),
+    }
+  );
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to submit asset checklist (${res.status}): ${text}`);
+  }
+
+  return await res.json();
+}
+
 export async function submitEmployeesToSharePoint(siteUrl, accessToken, employees, requestType) {
   if (!accessToken) throw new Error('No access token');
   if (!siteUrl) throw new Error('SharePoint site URL not configured');

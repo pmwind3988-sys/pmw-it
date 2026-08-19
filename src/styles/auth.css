@@ -1,0 +1,534 @@
+/* ---------------------------------------------------------------------------
+   Sign-in landing.
+
+   Same composition as the OSHE portal's sign-in: an editorial split — a poster
+   column carrying the wordmark, an idle animation and a footnote, and a card
+   column with the one door in. On a phone there is no room for a column, so
+   rather than drop the animation it becomes a wash behind the card.
+
+   The animation itself is this app's own — a board and a chip relaying packets
+   out to four nodes, rather than OSHE's rotating frames. Nothing in it turns,
+   which is what keeps the two screens from reading as the same picture.
+--------------------------------------------------------------------------- */
+
+.auth-page {
+  --auth-ink: #101010;
+  --auth-muted: #5f646d;
+  --auth-panel: #ffffff;
+  --auth-border: #dde4ec;
+  --auth-accent: #0078d4;
+  --auth-hair: rgba(16, 16, 16, 0.14);
+  --auth-dot: rgba(16, 16, 16, 0.16);
+
+  position: relative;
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: 1fr;
+  background: var(--auth-panel);
+  color: var(--auth-ink);
+}
+
+[data-theme='dark'] .auth-page {
+  --auth-ink: #f1f5f9;
+  --auth-muted: #94a3b8;
+  --auth-panel: #0f141b;
+  --auth-border: #26303c;
+  --auth-accent: #3ba3ec;
+  --auth-hair: rgba(226, 232, 240, 0.16);
+  --auth-dot: rgba(226, 232, 240, 0.18);
+}
+
+/* Phone only: the same animation, dimmed to a backdrop rather than lost. */
+.auth-backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  pointer-events: none;
+  opacity: 0.4;
+  z-index: 0;
+}
+
+.auth-poster {
+  display: none;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 40px;
+  border-right: 1px solid var(--auth-border);
+}
+
+.auth-poster-name {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.auth-poster-kicker {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--auth-muted);
+}
+
+.auth-poster-foot {
+  font-size: 11px;
+  color: var(--auth-muted);
+}
+
+.auth-panelcol {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 420px;
+  padding: 28px 24px;
+  text-align: center;
+  background: var(--auth-panel);
+  border: 1px solid var(--auth-border);
+  border-radius: 14px;
+  /* Only the phone needs the lift: there the card floats over the animation,
+     and a hairline alone leaves it sitting in the texture. */
+  box-shadow: 0 24px 60px rgba(16, 16, 16, 0.18);
+}
+
+.auth-logo {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto 16px;
+}
+
+.auth-card h1 {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0;
+  color: var(--auth-ink);
+}
+
+.auth-card .auth-sub {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--auth-muted);
+}
+
+.auth-ms-btn {
+  margin-top: 22px;
+  width: 100%;
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--auth-accent);
+  color: #fff;
+  font-family: inherit;
+  font-size: 14.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 150ms ease;
+}
+
+.auth-ms-btn:hover:not(:disabled) {
+  filter: brightness(0.92);
+}
+
+.auth-ms-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.auth-divider {
+  margin: 24px 0 16px;
+  border: 0;
+  border-top: 1px solid var(--auth-border);
+}
+
+.auth-note {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--auth-muted);
+  margin: 0;
+}
+
+.auth-note a {
+  color: var(--auth-ink);
+  font-weight: 700;
+}
+
+.auth-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: authSpin 0.7s linear infinite;
+}
+
+@keyframes authSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (min-width: 900px) {
+  .auth-page {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .auth-poster {
+    display: flex;
+  }
+  .auth-backdrop {
+    display: none;
+  }
+  .auth-card {
+    box-shadow: none;
+    padding: 32px;
+  }
+  .auth-panelcol {
+    padding: 40px;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   The idle animation: a board, a chip, and packets relayed out to four nodes.
+   Pure CSS on plain divs — nothing here needs exporting as an asset, and no
+   frame of it carries meaning, so it is held still under reduced motion.
+--------------------------------------------------------------------------- */
+.idle {
+  position: relative;
+  flex: 1;
+  margin: 40px 0;
+  overflow: hidden;
+}
+
+.auth-backdrop .idle {
+  margin: 0;
+}
+
+/* The board: a dot matrix that fades in and out as a whole rather than moving,
+   so it stays texture and never becomes the thing you watch. */
+.idle-dots {
+  position: absolute;
+  inset: 0;
+  color: var(--auth-dot);
+  background-image: radial-gradient(currentColor 1px, transparent 1.4px);
+  background-size: 22px 22px;
+  animation: idleDots 8s ease-in-out infinite;
+}
+
+@keyframes idleDots {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.idle-stage {
+  position: relative;
+  height: 100%;
+  display: grid;
+  place-items: center;
+}
+
+.idle-board {
+  position: relative;
+  width: min(340px, 100%);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+}
+
+/* Traces out of the chip to each edge node. */
+.idle-trace {
+  position: absolute;
+  background: var(--auth-hair);
+}
+
+.idle-trace.v {
+  left: 50%;
+  width: 1px;
+  margin-left: -0.5px;
+}
+
+.idle-trace.h {
+  top: 50%;
+  height: 1px;
+  margin-top: -0.5px;
+}
+
+.idle-trace.up {
+  top: 6%;
+  height: 44%;
+}
+
+.idle-trace.down {
+  bottom: 6%;
+  height: 44%;
+}
+
+.idle-trace.left {
+  left: 6%;
+  width: 44%;
+}
+
+.idle-trace.right {
+  right: 6%;
+  width: 44%;
+}
+
+/* A packet per trace, each leaving on its own beat. */
+.idle-packet {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: var(--auth-accent);
+}
+
+.idle-packet.up,
+.idle-packet.down {
+  left: 50%;
+  margin-left: -3.5px;
+}
+
+.idle-packet.left,
+.idle-packet.right {
+  top: 50%;
+  margin-top: -3.5px;
+}
+
+.idle-packet.up {
+  animation: idlePacketUp 3.4s ease-in-out infinite;
+}
+
+.idle-packet.down {
+  animation: idlePacketDown 3.4s ease-in-out infinite;
+  animation-delay: 0.85s;
+}
+
+.idle-packet.left {
+  animation: idlePacketLeft 3.4s ease-in-out infinite;
+  animation-delay: 1.7s;
+}
+
+.idle-packet.right {
+  animation: idlePacketRight 3.4s ease-in-out infinite;
+  animation-delay: 2.55s;
+}
+
+@keyframes idlePacketUp {
+  0% {
+    top: 47%;
+    opacity: 0;
+  }
+  18%,
+  72% {
+    opacity: 1;
+  }
+  100% {
+    top: 5%;
+    opacity: 0;
+  }
+}
+
+@keyframes idlePacketDown {
+  0% {
+    top: 47%;
+    opacity: 0;
+  }
+  18%,
+  72% {
+    opacity: 1;
+  }
+  100% {
+    top: 89%;
+    opacity: 0;
+  }
+}
+
+@keyframes idlePacketLeft {
+  0% {
+    left: 47%;
+    opacity: 0;
+  }
+  18%,
+  72% {
+    opacity: 1;
+  }
+  100% {
+    left: 5%;
+    opacity: 0;
+  }
+}
+
+@keyframes idlePacketRight {
+  0% {
+    left: 47%;
+    opacity: 0;
+  }
+  18%,
+  72% {
+    opacity: 1;
+  }
+  100% {
+    left: 89%;
+    opacity: 0;
+  }
+}
+
+/* The node each packet is bound for, lighting up as it lands. */
+.idle-node {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--auth-accent);
+  border-radius: 2px;
+  opacity: 0.35;
+  animation: idleNode 3.4s ease-in-out infinite;
+}
+
+.idle-node.up,
+.idle-node.down {
+  left: 50%;
+  margin-left: -5px;
+}
+
+.idle-node.left,
+.idle-node.right {
+  top: 50%;
+  margin-top: -5px;
+}
+
+.idle-node.up {
+  top: 3%;
+}
+
+.idle-node.down {
+  bottom: 3%;
+  animation-delay: 0.85s;
+}
+
+.idle-node.left {
+  left: 3%;
+  animation-delay: 1.7s;
+}
+
+.idle-node.right {
+  right: 3%;
+  animation-delay: 2.55s;
+}
+
+@keyframes idleNode {
+  0%,
+  70% {
+    opacity: 0.3;
+    background: transparent;
+  }
+  86% {
+    opacity: 1;
+    background: var(--auth-accent);
+  }
+  100% {
+    opacity: 0.3;
+    background: transparent;
+  }
+}
+
+/* Two ripples leaving the chip, half a cycle apart. */
+.idle-ripple {
+  position: absolute;
+  inset: 36%;
+  border: 1px solid var(--auth-accent);
+  border-radius: 10px;
+  animation: idleRipple 3.6s ease-out infinite;
+}
+
+.idle-ripple.b {
+  animation-delay: 1.8s;
+}
+
+@keyframes idleRipple {
+  0% {
+    transform: scale(0.55);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+.idle-chip {
+  position: absolute;
+  inset: 37%;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid var(--auth-hair);
+  border-radius: 8px;
+  background: var(--auth-panel);
+}
+
+.idle-core {
+  width: 42%;
+  height: 42%;
+  border-radius: 3px;
+  background: var(--auth-accent);
+  animation: idleCore 4.4s ease-in-out infinite;
+}
+
+@keyframes idleCore {
+  0%,
+  100% {
+    transform: scale(0.78);
+    opacity: 0.55;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+}
+
+/* The chip's pins — four per side, drawn as a repeating gradient so the count
+   scales with the chip rather than needing sixteen elements. */
+.idle-pins {
+  position: absolute;
+  inset: 33%;
+  border-radius: 10px;
+  background:
+    repeating-linear-gradient(to right, var(--auth-hair) 0 2px, transparent 2px 14px) top / 100% 4px no-repeat,
+    repeating-linear-gradient(to right, var(--auth-hair) 0 2px, transparent 2px 14px) bottom / 100% 4px no-repeat,
+    repeating-linear-gradient(to bottom, var(--auth-hair) 0 2px, transparent 2px 14px) left / 4px 100% no-repeat,
+    repeating-linear-gradient(to bottom, var(--auth-hair) 0 2px, transparent 2px 14px) right / 4px 100% no-repeat;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .idle-dots,
+  .idle-packet,
+  .idle-node,
+  .idle-ripple,
+  .idle-core,
+  .auth-spinner {
+    animation: none;
+  }
+  .idle-packet {
+    opacity: 0.85;
+  }
+  .idle-ripple {
+    opacity: 0.35;
+  }
+}

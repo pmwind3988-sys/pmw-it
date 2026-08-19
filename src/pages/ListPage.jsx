@@ -1,448 +1,379 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useMsal, useIsAuthenticated } from '@azure/msal-react';
-import { InteractionRequiredAuthError } from '@azure/msal-browser';
-import { useTheme } from '../context/ThemeContext';
-import { fetchAllListItems, fetchAllColumnChoices, updateListItem } from '../services/sharePointService';
-import { sharePointRequest } from '../authConfig';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import AppShell from '../components/AppShell';
+import { initialsOf } from '../utils/initials';
+import Button from '../components/ui/Button';
+import { EmptyState, ErrorBanner } from '../components/ui/Surfaces';
+import { RequestTypeBadge } from '../components/ui/Badges';
+import { Search, Filter, Plus, RefreshCw, Pencil, Copy, Inbox } from '../components/ui/Icons';
+import { useRequests, requestDate, formatDate, toChoiceArray } from '../hooks/useRequests';
 
-const SHAREPOINT_SITE_URL =
-  import.meta.env.VITE_SHAREPOINT_SITE_URL ||
-  'https://pmwgroupcom.sharepoint.com/sites/IThelpdesk';
+/**
+ * The records screen: every request, and the ways of cutting it down.
+ *
+ * The filters live in the query string rather than in component state alone,
+ * which is what lets a dashboard card open its own slice of this list — and
+ * what makes "Copy link" worth having, since the link carries the view.
+ */
 
-const CHOICE_COLUMNS = ['Entity', 'Equipment_x0020_Items', 'Software_x0020_Licenses', 'Request_x0020_Type', 'Department'];
+const SORTS = [
+  { value: 'newest', label: 'Newest first' },
+  { value: 'oldest', label: 'Oldest first' },
+  { value: 'name', label: 'Name A–Z' },
+  { value: 'position', label: 'Position' },
+  { value: 'entity', label: 'Entity' },
+];
 
 export default function ListPage() {
-  const { instance } = useMsal();
-  const isAuthenticated = useIsAuthenticated();
-  const { isDarkMode, toggleTheme } = useTheme();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { items, choices, loading, error, reload } = useRequests();
 
   useEffect(() => {
-    document.title = 'IT REQUEST FORM';
+    document.title = 'PMW IT — Requests';
   }, []);
 
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [spChoices, setSpChoices] = useState({});
-  const [editingItem, setEditingItem] = useState(null);
-  const [showSharePanel, setShowSharePanel] = useState(false);
-  const sharePanelRef = useRef(null);
-  
-  // Search, sort, filter states
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState('newest');
-  const [filterEntity, setFilterEntity] = useState('');
-  const [filterType, setFilterType] = useState('');
-const [filterDepartment, setFilterDepartment] = useState('');
-  const [filterDateFrom, setFilterDateFrom] = useState('');
-  const [filterDateTo, setFilterDateTo] = useState('');
+  // Read once, on mount: after that this screen owns the values and writes them
+  // back out. Reading them continuously would fight the inputs.
+  const [query, setQuery] = useState(() => searchParams.get('q') || '');
+  const [sortBy, setSortBy] = useState(() => searchParams.get('sort') || 'newest');
+  const [entity, setEntity] = useState(() => searchParams.get('entity') || '');
+  const [type, setType] = useState(() => searchParams.get('type') || '');
+  const [department, setDepartment] = useState(() => searchParams.get('department') || '');
+  const [dateFrom, setDateFrom] = useState(() => searchParams.get('from') || '');
+  const [dateTo, setDateTo] = useState(() => searchParams.get('to') || '');
+  const [range, setRange] = useState(() => searchParams.get('range') || '');
+  const [equipmentOnly, setEquipmentOnly] = useState(() => searchParams.get('equipment') === 'yes');
   const [showFilters, setShowFilters] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  const getToken = async () => {
-    const account = instance.getActiveAccount();
-    if (!account) throw new Error('No signed-in account');
-    try {
-      return await instance.acquireTokenSilent({ ...sharePointRequest, account });
-    } catch (e) {
-      if (e instanceof InteractionRequiredAuthError) {
-        return await instance.acquireTokenPopup({ ...sharePointRequest, account });
-      }
-      throw e;
-    }
-  };
-
+  // Push the current view back into the URL so it can be linked to. `replace`
+  // keeps a filter session out of the back button's history.
   useEffect(() => {
-    if (!isAuthenticated) return;
-    let cancelled = false;
+    const next = new URLSearchParams();
+    if (query) next.set('q', query);
+    if (sortBy && sortBy !== 'newest') next.set('sort', sortBy);
+    if (entity) next.set('entity', entity);
+    if (type) next.set('type', type);
+    if (department) next.set('department', department);
+    if (dateFrom) next.set('from', dateFrom);
+    if (dateTo) next.set('to', dateTo);
+    if (range) next.set('range', range);
+    if (equipmentOnly) next.set('equipment', 'yes');
+    setSearchParams(next, { replace: true });
+  }, [query, sortBy, entity, type, department, dateFrom, dateTo, range, equipmentOnly, setSearchParams]);
 
-    async function loadData() {
-      setLoading(true);
-      setError('');
-      try {
-        const tokenRes = await getToken();
-        const [itemsData, choices] = await Promise.all([
-          fetchAllListItems(SHAREPOINT_SITE_URL, tokenRes.accessToken),
-          fetchAllColumnChoices(SHAREPOINT_SITE_URL, tokenRes.accessToken, CHOICE_COLUMNS),
-        ]);
-        if (!cancelled) {
-          setItems(itemsData);
-          setSpChoices(choices);
-        }
-      } catch (err) {
-        if (!cancelled) setError(err.message || 'Failed to load data');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    loadData();
-    return () => { cancelled = true; };
-  }, [isAuthenticated]);
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (sharePanelRef.current && !sharePanelRef.current.contains(event.target)) {
-        setShowSharePanel(false);
-      }
-    };
-    if (showSharePanel) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [showSharePanel]);
-
-  const logout = () => instance.logoutRedirect({ postLogoutRedirectUri: import.meta.env.VITE_REDIRECT_URI || 'http://localhost:5173' });
-
-  const getInitials = (name) => {
-    if (!name) return 'U';
-    const parts = name.split(' ');
-    return parts.length >= 2 ? (parts[0][0] + parts[1][0]).toUpperCase() : name.substring(0, 2).toUpperCase();
+  const clearAll = () => {
+    setEntity('');
+    setType('');
+    setDepartment('');
+    setDateFrom('');
+    setDateTo('');
+    setRange('');
+    setEquipmentOnly(false);
   };
 
-  const formatDate = (dateStr) => {
-    if (!dateStr) return '-';
-    const d = new Date(dateStr);
-    return isNaN(d.getTime()) ? '-' : d.toLocaleDateString();
-  };
-
-  const formatChoices = (arr) => Array.isArray(arr) ? arr.join(', ') : '-';
-
-  // Filter and sort items
-  const filteredItems = React.useMemo(() => {
+  const filtered = useMemo(() => {
     let result = [...items];
-    
-    // Search filter
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter(item => 
-        (item.Title || '').toLowerCase().includes(q) ||
-        (item.Position || '').toLowerCase().includes(q) ||
-        (item.Entity || '').toLowerCase().includes(q) ||
-         (item.Calling_x0020_Name || '').toLowerCase().includes(q) ||
-         (item.Department || '').toLowerCase().includes(q)
-       );
+
+    if (query) {
+      const q = query.toLowerCase();
+      result = result.filter((item) =>
+        [item.Title, item.Position, item.Entity, item.Calling_x0020_Name, item.Department, item.Employee_x0020_ID]
+          .some((field) => String(field || '').toLowerCase().includes(q))
+      );
     }
-    
-    // Entity filter
-    if (filterEntity) {
-      result = result.filter(item => item.Entity === filterEntity);
-    }
-    
-     // Request Type filter
-     if (filterType) {
-       result = result.filter(item => item.Request_x0020_Type === filterType);
-     }
-     
-     // Department filter
-     if (filterDepartment) {
-       result = result.filter(item => item.Department === filterDepartment);
-     }
-    
-    // Date from filter
-    if (filterDateFrom) {
-      const fromDate = new Date(filterDateFrom);
-      result = result.filter(item => {
-        if (!item.Join_x0020__x002f__x0020_Last_x0) return false;
-        const itemDate = new Date(item.Join_x0020__x002f__x0020_Last_x0);
-        return itemDate >= fromDate;
+
+    if (entity) result = result.filter((item) => item.Entity === entity);
+    if (type) result = result.filter((item) => item.Request_x0020_Type === type);
+    if (department) result = result.filter((item) => item.Department === department);
+    if (equipmentOnly) result = result.filter((item) => toChoiceArray(item.Equipment_x0020_Items).length > 0);
+
+    if (range) {
+      const now = new Date();
+      const floor =
+        range === 'week'
+          ? new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+          : new Date(now.getFullYear(), now.getMonth(), 1);
+      result = result.filter((item) => {
+        const d = requestDate(item);
+        return d && d >= floor;
       });
     }
-    
-    // Date to filter
-    if (filterDateTo) {
-      const toDate = new Date(filterDateTo);
-      result = result.filter(item => {
-        if (!item.Join_x0020__x002f__x0020_Last_x0) return false;
-        const itemDate = new Date(item.Join_x0020__x002f__x0020_Last_x0);
-        return itemDate <= toDate;
+
+    if (dateFrom) {
+      const from = new Date(dateFrom);
+      result = result.filter((item) => {
+        const d = requestDate(item);
+        return d && d >= from;
       });
     }
-    
-    // Sort
+
+    if (dateTo) {
+      const to = new Date(dateTo);
+      result = result.filter((item) => {
+        const d = requestDate(item);
+        return d && d <= to;
+      });
+    }
+
     result.sort((a, b) => {
       switch (sortBy) {
-        case 'newest':
-          return new Date(b.Join_x0020__x002f__x0020_Last_x0) - new Date(a.Join_x0020__x002f__x0020_Last_x0);
         case 'oldest':
-          return new Date(a.Join_x0020__x002f__x0020_Last_x0) - new Date(b.Join_x0020__x002f__x0020_Last_x0);
+          return (requestDate(a)?.getTime() || 0) - (requestDate(b)?.getTime() || 0);
         case 'name':
-          return (a.Title || '').localeCompare(b.Title || '');
+          return String(a.Title || '').localeCompare(String(b.Title || ''));
         case 'position':
-          return (a.Position || '').localeCompare(b.Position || '');
+          return String(a.Position || '').localeCompare(String(b.Position || ''));
         case 'entity':
-          return (a.Entity || '').localeCompare(b.Entity || '');
+          return String(a.Entity || '').localeCompare(String(b.Entity || ''));
+        case 'newest':
         default:
-          return 0;
+          return (requestDate(b)?.getTime() || 0) - (requestDate(a)?.getTime() || 0);
       }
     });
-    
+
     return result;
-  }, [items, searchQuery, sortBy, filterEntity, filterType, filterDateFrom, filterDateTo]);
+  }, [items, query, sortBy, entity, type, department, dateFrom, dateTo, range, equipmentOnly]);
 
-  // Active filters count
-  const activeFiltersCount = [filterEntity, filterType, filterDateFrom, filterDateTo, filterDepartment].filter(Boolean).length;
+  const activeFilters = [entity, type, department, dateFrom, dateTo, range, equipmentOnly ? 'yes' : ''].filter(
+    Boolean
+  ).length;
 
-  if (!isAuthenticated) {
-    return (
-      <div className="login-required">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="12" cy="12" r="10" />
-          <path d="M12 16v-4M12 8h.01" />
-        </svg>
-        <h2>Sign in Required</h2>
-        <p>Please log in to access this page.</p>
-        <button className="ms-button" onClick={() => window.location.href = '/login'}>Sign In</button>
-      </div>
-    );
-  }
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard access can be refused (an insecure origin, a locked-down
+      // browser). Nothing here is worth an error dialog over.
+      setCopied(false);
+    }
+  };
 
-  const account = instance.getActiveAccount();
+  return (
+    <AppShell
+      title="Requests"
+      subtitle={
+        loading ? 'Loading the request list…' : `Showing ${filtered.length} of ${items.length} requests`
+      }
+      search={{ value: query, onChange: setQuery, placeholder: 'Search name, position, entity…' }}
+      actions={
+        <>
+          <Button variant="ghost" icon={Copy} onClick={copyLink}>
+            {copied ? 'Link copied' : 'Copy link'}
+          </Button>
+          <Button variant="ghost" icon={RefreshCw} onClick={reload} disabled={loading}>
+            Refresh
+          </Button>
+          <Button icon={Plus} onClick={() => navigate('/it-boarding-form')}>
+            New request
+          </Button>
+        </>
+      }
+    >
+      {error && <ErrorBanner message={error} onRetry={reload} />}
 
-   return (
-    <div className="form-page" style={{width: '100%'}}>
-      <div className="auth-banner">
-        <div className="auth-banner-left">
-          {account && (
-            <>
-              <div className="user-avatar">{getInitials(account.name)}</div>
-              <span className="user-name">{account.name}</span>
-            </>
+      <div className="toolbar">
+        {/* The bar carries this control from 640px up; below that it is hidden,
+            and this is the one on screen. */}
+        <div className="search-box only-narrow-flex">
+          <Search size={18} />
+          <input
+            type="text"
+            placeholder="Search name, position, entity…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          {query && (
+            <button type="button" className="clear-btn" onClick={() => setQuery('')} aria-label="Clear search">
+              ×
+            </button>
           )}
         </div>
-        <div className="auth-banner-right">
-          <button className="icon-btn" onClick={() => window.location.href = '/it-boarding-form'} title="Add New">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" />
-            </svg>
+
+        <div className="toolbar-actions">
+          <button
+            type="button"
+            className={`filter-btn ${showFilters ? 'active' : ''}`}
+            onClick={() => setShowFilters((v) => !v)}
+            aria-expanded={showFilters}
+          >
+            <Filter size={18} />
+            Filters
+            {activeFilters > 0 && <span className="filter-badge">{activeFilters}</span>}
           </button>
-          <button className="icon-btn" onClick={() => setShowSharePanel((v) => !v)} title="Share">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
-              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
-            </svg>
-          </button>
-          <button className="icon-btn" onClick={toggleTheme} title={isDarkMode ? 'Light Mode' : 'Dark Mode'}>
-            {isDarkMode ? (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" />
-                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-                <line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" />
-                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-              </svg>
-            ) : (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-              </svg>
-            )}
-          </button>
-          <button className="icon-btn" onClick={logout} title="Logout">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-              <polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
-            </svg>
-          </button>
+
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="sort-select"
+            aria-label="Sort requests"
+          >
+            {SORTS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
-      {showSharePanel && (
-        <div className="share-panel" ref={sharePanelRef}>
-          <div className="share-panel-item" onClick={async () => { await navigator.clipboard.writeText(window.location.href); setShowSharePanel(false); }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-            </svg>
-            <span>Copy Link</span>
+      {showFilters && (
+        <div className="filter-panel">
+          <div className="filter-group">
+            <label htmlFor="filter-entity">Entity</label>
+            <select id="filter-entity" value={entity} onChange={(e) => setEntity(e.target.value)}>
+              <option value="">All entities</option>
+              {(choices.Entity || []).map((value) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
           </div>
+
+          <div className="filter-group">
+            <label htmlFor="filter-type">Request type</label>
+            <select id="filter-type" value={type} onChange={(e) => setType(e.target.value)}>
+              <option value="">All types</option>
+              {(choices.Request_x0020_Type || []).map((value) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="filter-group">
+            <label htmlFor="filter-department">Department</label>
+            <select id="filter-department" value={department} onChange={(e) => setDepartment(e.target.value)}>
+              <option value="">All departments</option>
+              {(choices.Department || []).map((value) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="filter-group">
+            <label htmlFor="filter-range">Period</label>
+            <select id="filter-range" value={range} onChange={(e) => setRange(e.target.value)}>
+              <option value="">Any time</option>
+              <option value="week">Last 7 days</option>
+              <option value="month">This month</option>
+            </select>
+          </div>
+
+          <div className="filter-group">
+            <label htmlFor="filter-from">Date from</label>
+            <input
+              id="filter-from"
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+            />
+          </div>
+
+          <div className="filter-group">
+            <label htmlFor="filter-to">Date to</label>
+            <input id="filter-to" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+          </div>
+
+          <button type="button" className="clear-filters-btn" onClick={clearAll}>
+            Clear all
+          </button>
         </div>
       )}
 
-       <div className="form-content" style={{maxWidth: '100%', width: '100%'}}>
-        <div className="form-header">
-          <h1>IT Request Form</h1>
-          <p>View and manage submitted requests</p>
+      {loading ? (
+        <div className="loading-card">
+          <div className="spinner" />
+          <p>Loading requests…</p>
         </div>
-
-        {/* Search and Filter Toolbar */}
-        <div className="toolbar">
-          <div className="search-box">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
-            <input 
-              type="text" 
-              placeholder="Search by name, position, entity..." 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            {searchQuery && (
-              <button className="clear-btn" onClick={() => setSearchQuery('')}>×</button>
-            )}
-          </div>
-          
-          <div className="toolbar-actions">
-            <button className={`filter-btn ${showFilters ? 'active' : ''}`} onClick={() => setShowFilters(!showFilters)}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-              </svg>
-              Filters
-              {activeFiltersCount > 0 && <span className="filter-badge">{activeFiltersCount}</span>}
-            </button>
-            
-            <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="sort-select">
-              <option value="newest">Newest First</option>
-              <option value="oldest">Oldest First</option>
-              <option value="name">Name A-Z</option>
-              <option value="position">Position</option>
-              <option value="entity">Entity</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Filter Panel */}
-        {showFilters && (
-          <div className="filter-panel">
-            <div className="filter-group">
-              <label>Entity</label>
-              <select value={filterEntity} onChange={(e) => setFilterEntity(e.target.value)}>
-                <option value="">All Entities</option>
-                {(spChoices['Entity'] || []).map(e => (
-                  <option key={e} value={e}>{e}</option>
-                ))}
-              </select>
+      ) : filtered.length === 0 ? (
+        <div className="ui-card">
+          <EmptyState>
+            <Inbox size={40} style={{ marginBottom: 10 }} />
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--it-ink)', marginBottom: 4 }}>
+              {items.length === 0 ? 'No requests yet' : 'Nothing matches this view'}
             </div>
-            
-       <div className="filter-group">
-         <label>Request Type</label>
-         <select value={filterType} onChange={(e) => setFilterType(e.target.value)}>
-           <option value="">All Types</option>
-           {(spChoices['Request_x0020_Type'] || []).map(t => (
-             <option key={t} value={t}>{t}</option>
-           ))}
-         </select>
-       </div>
-       
-       <div className="filter-group">
-         <label>Department</label>
-         <select value={filterDepartment} onChange={(e) => setFilterDepartment(e.target.value)}>
-           <option value="">All Departments</option>
-           {(spChoices['Department'] || []).map(d => (
-             <option key={d} value={d}>{d}</option>
-           ))}
-         </select>
-       </div>
-            
-            <div className="filter-group">
-              <label>Date From</label>
-              <input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)} />
-            </div>
-            
-            <div className="filter-group">
-              <label>Date To</label>
-              <input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} />
-            </div>
-            
-               <button className="clear-filters-btn" onClick={() => {
-               setFilterEntity('');
-               setFilterType('');
-               setFilterDateFrom('');
-               setFilterDateTo('');
-               setFilterDepartment('');
-             }}>
-              Clear All
-            </button>
-          </div>
-        )}
-
-        {/* Results Count */}
-        <div className="results-info">
-          Showing {filteredItems.length} of {items.length} requests
-        </div>
-
-        {loading ? (
-          <div className="loading-card">
-            <div className="spinner"></div>
-            <p>Loading requests…</p>
-          </div>
-        ) : error ? (
-          <div className="error-screen">
-            <p className="error-message">{error}</p>
-            <button className="ms-button" onClick={() => window.location.reload()}>Retry</button>
-          </div>
-        ) : filteredItems.length === 0 ? (
-          <div className="empty-list">
+            <p style={{ margin: '0 0 14px' }}>
+              {items.length === 0
+                ? 'Raise the first onboarding or offboarding request to get started.'
+                : 'Try a different search, or clear the filters.'}
+            </p>
             {items.length === 0 ? (
-              <>
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                  <polyline points="14 2 14 8 20 8" /><line x1="12" y1="18" x2="12" y2="12" /><line x1="9" y1="15" x2="15" y2="15" />
-                </svg>
-                <h2>No Requests Yet</h2>
-                <p>Click the + button to add a new request</p>
-                <button className="ms-button" onClick={() => window.location.href = '/it-boarding-form'}>Add Request</button>
-              </>
+              <Button icon={Plus} onClick={() => navigate('/it-boarding-form')}>
+                New request
+              </Button>
             ) : (
-              <>
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-                </svg>
-                <h2>No Results Found</h2>
-                <p>Try adjusting your search or filters</p>
-                <button className="ms-button" onClick={() => {
-                  setSearchQuery('');
-                  setFilterEntity('');
-                  setFilterType('');
-                  setFilterDateFrom('');
-                  setFilterDateTo('');
-                }}>Clear All</button>
-              </>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setQuery('');
+                  clearAll();
+                }}
+              >
+                Clear search and filters
+              </Button>
             )}
-          </div>
-        ) : (
-          <div className="list-table">
-            <table style={{width: '100%', tableLayout: 'auto'}}>
-              <thead>
-               <tr>
-                 <th>Employee</th>
-                 <th>Position</th>
-                 <th>Entity</th>
-                 <th>Department</th>
-                 <th>Request Type</th>
-                 <th>Date</th>
-                 <th>Actions</th>
-               </tr>
-              </thead>
-              <tbody>
-                {filteredItems.map((item) => (
-                  <tr key={item.ID}>
-                    <td>
-                      <div className="employee-cell">
-                        <div className="employee-avatar">{getInitials(item.Title)}</div>
-                        <div className="employee-info">
-                          <span className="employee-name">{item.Title || '-'}</span>
-                          <span className="employee-callname">{item.Calling_x0020_Name || ''}</span>
-                        </div>
+          </EmptyState>
+        </div>
+      ) : (
+        <div className="list-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Employee</th>
+                <th>Position</th>
+                <th>Entity</th>
+                <th>Department</th>
+                <th>Request type</th>
+                <th>Date</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((item) => (
+                <tr key={item.ID}>
+                  <td>
+                    <div className="employee-cell">
+                      <div className="employee-avatar">{initialsOf(item.Title)}</div>
+                      <div className="employee-info">
+                        <span className="employee-name">{item.Title || '-'}</span>
+                        <span className="employee-callname">{item.Calling_x0020_Name || ''}</span>
                       </div>
-                    </td>
-                    <td>{item.Position || '-'}</td>
-                     <td>{item.Entity || '-'}</td>
-                     <td>{item.Department || '-'}</td>
-                     <td><span className={`badge badge-${item.Request_x0020_Type?.toLowerCase()}`}>{item.Request_x0020_Type || '-'}</span></td>
-                    <td>{formatDate(item.Join_x0020__x002f__x0020_Last_x0)}</td>
-                    <td>
-                      <div className="action-buttons">
-                        <button className="action-btn edit-btn" onClick={() => window.location.href = `/it-boarding-form?edit=${item.ID}`} title="Edit">
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                          </svg>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </div>
+                    </div>
+                  </td>
+                  <td>{item.Position || '-'}</td>
+                  <td>{item.Entity || '-'}</td>
+                  <td>{item.Department || '-'}</td>
+                  <td>
+                    <RequestTypeBadge type={item.Request_x0020_Type} />
+                  </td>
+                  <td>{formatDate(requestDate(item))}</td>
+                  <td>
+                    <div className="action-buttons">
+                      <button
+                        type="button"
+                        className="action-btn edit-btn"
+                        onClick={() => navigate(`/it-boarding-form?edit=${item.ID}`)}
+                        title="Edit request"
+                        aria-label={`Edit the request for ${item.Title || 'this employee'}`}
+                      >
+                        <Pencil size={16} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </AppShell>
   );
 }

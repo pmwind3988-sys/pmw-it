@@ -4,7 +4,11 @@ import { Survey } from 'survey-react-ui';
 import 'survey-core/survey-core.min.css';
 import { useMsal, useIsAuthenticated } from '@azure/msal-react';
 import { InteractionRequiredAuthError } from '@azure/msal-browser';
+import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
+import AppShell from '../components/AppShell';
+import Button from '../components/ui/Button';
+import { ArrowLeft, Share2, Copy, Download } from '../components/ui/Icons';
 import { submitEmployeesToSharePoint, fetchAllColumnChoices, fetchListItemById, updateListItem } from '../services/sharePointService';
 import { sharePointRequest } from '../authConfig';
 import QRCode from 'qrcode';
@@ -99,11 +103,14 @@ export default function FormPage() {
   const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
-    document.title = 'IT ONBOARDING FORM';
+    document.title = 'PMW IT — Request form';
   }, []);
 
   const isAuthenticated = useIsAuthenticated();
-  const { isDarkMode, toggleTheme } = useTheme();
+  // The QR code is drawn to match the current theme; the toggle itself lives in
+  // the shell's bar now, not on this page.
+  const { isDarkMode } = useTheme();
+  const navigate = useNavigate();
 
   const [showSharePanel, setShowSharePanel] = useState(false);
   const [qrCodeUrl, setQrCodeUrl] = useState('');
@@ -362,12 +369,6 @@ export default function FormPage() {
   }, [showSharePanel, isDarkMode]);
 
   const handleRetry = () => { setSubmitState('idle'); setFormError(''); };
-  const logout = () => instance.logoutRedirect({ postLogoutRedirectUri: import.meta.env.VITE_REDIRECT_URI || 'http://localhost:5173' });
-  const getInitials = (name) => {
-    if (!name) return 'U';
-    const parts = name.split(' ');
-    return parts.length >= 2 ? (parts[0][0] + parts[1][0]).toUpperCase() : name.substring(0, 2).toUpperCase();
-  };
   const handleCopyLink = async () => {
     try { await navigator.clipboard.writeText(window.location.href); setToast('Link copied to clipboard!'); }
     catch (_) { setToast('Copy failed'); }
@@ -383,116 +384,60 @@ export default function FormPage() {
     setTimeout(() => setToast(''), 3000);
   };
 
-  if (!isAuthenticated) {
-    return (
-      <div className="login-required">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="12" cy="12" r="10" />
-          <path d="M12 16v-4M12 8h.01" />
-        </svg>
-        <h2>Sign in Required</h2>
-        <p>Please log in to access this page.</p>
-        <button className="ms-button" onClick={() => window.location.href = '/login'}>Sign In</button>
-      </div>
-    );
-  }
-
-  const account = instance.getActiveAccount();
-
-  // Loading state
   const isLoading = spChoices === null && !choicesError;
 
   return (
-    <div className="form-page">
-      {/* Top banner */}
-      <div className="auth-banner">
-        <div className="auth-banner-left">
-          {account && (
-            <>
-              <div className="user-avatar">{getInitials(account.name)}</div>
-              <span className="user-name">{account.name}</span>
-            </>
+    <AppShell
+      title={editItemId ? 'Request details' : 'New request'}
+      subtitle={requestType ? `${requestType} request` : 'Pick a request type to begin'}
+      actions={
+        <>
+          {editItemId && (
+            <Button variant="ghost" icon={ArrowLeft} onClick={() => navigate('/requests')}>
+              Back to requests
+            </Button>
           )}
-        </div>
-        <div className="auth-banner-right">
-          <select value={requestType} onChange={(e) => setRequestType(e.target.value)} className="type-select" disabled={!spChoices || !!editItemId}>
+          {/* The request type decides which form is rendered, so it belongs with
+              the page rather than in the shell's bar. It is locked while editing
+              — an existing record's type is not this form's to change. */}
+          <select
+            value={requestType}
+            onChange={(e) => setRequestType(e.target.value)}
+            className="type-select"
+            aria-label="Request type"
+            disabled={!spChoices || !!editItemId}
+          >
             {!spChoices ? (
-              <option value=''>Loading...</option>
+              <option value="">Loading…</option>
             ) : (
-              (spChoices?.Request_x0020_Type ?? []).map(v => (
-                <option key={v} value={v}>{v}</option>
+              (spChoices?.Request_x0020_Type ?? []).map((v) => (
+                <option key={v} value={v}>
+                  {v}
+                </option>
               ))
             )}
           </select>
-          <button className="icon-btn" onClick={() => setShowSharePanel((v) => !v)} title="Share">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
-              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
-            </svg>
-          </button>
-          <button className="icon-btn" onClick={toggleTheme} title={isDarkMode ? 'Light Mode' : 'Dark Mode'}>
-            {isDarkMode ? (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" />
-                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-                <line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" />
-                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-              </svg>
-            ) : (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-              </svg>
-            )}
-          </button>
-          <button className="icon-btn" onClick={logout} title="Logout">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-              <polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      {/* Share panel */}
+          <Button variant="ghost" icon={Share2} onClick={() => setShowSharePanel((v) => !v)}>
+            Share
+          </Button>
+        </>
+      }
+    >
       {showSharePanel && (
         <div className="share-panel" ref={sharePanelRef}>
           <div className="share-panel-item" onClick={handleCopyLink}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-            </svg>
-            <span>Copy Link</span>
+            <Copy size={20} />
+            <span>Copy link</span>
           </div>
           <div className="share-panel-item" onClick={handleDownloadQR}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
+            <Download size={20} />
             <span>Download QR</span>
           </div>
-          {qrCodeUrl && <img src={qrCodeUrl} alt="QR Code" className="share-qr-image" />}
+          {qrCodeUrl && <img src={qrCodeUrl} alt="QR code for this form" className="share-qr-image" />}
         </div>
       )}
 
-      {/* Main form */}
-      <div className="form-container">
-        <div className="form-header">
-          <div className="header-row">
-            {editItemId && (
-              <button className="back-btn" onClick={() => window.location.href = '/list'}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M19 12H5M12 19l-7-7 7-7" />
-                </svg>
-                Back to List
-              </button>
-            )}
-          </div>
-          <h1>{editItemId ? 'View Request' : 'IT Request Form'}</h1>
-          <p>{requestType ? `${requestType} Request` : ''}</p>
-        </div>
-
-        <div className="form-content">
+      <div className="form-content">
           {isLoading ? (
             <div className="success-screen">
               <p style={{ fontSize: 16, color: '#666' }}>Loading form options from SharePoint…</p>
@@ -545,10 +490,9 @@ export default function FormPage() {
               <Survey model={survey} style={{ padding: '20px' }} />
             </div>
           )}
-        </div>
       </div>
 
       {toast && <div className="toast">{toast}</div>}
-    </div>
+    </AppShell>
   );
 }

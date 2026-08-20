@@ -92,6 +92,24 @@ describe('toEpochMs', () => {
     expect(toEpochMs(null)).toBeNaN();
     expect(toEpochMs('')).toBeNaN();
   });
+
+  it('rejects a day that does not exist in that month', () => {
+    expect(toEpochMs('31/02/2024', { order: 'dmy' })).toBeNaN();
+    expect(toEpochMs('32/01/2024', { order: 'dmy' })).toBeNaN();
+  });
+
+  it('accepts a real leap day', () => {
+    expect(toEpochMs('29/02/2024', { order: 'dmy' })).toBe(Date.UTC(2024, 1, 29));
+  });
+
+  it('rejects a leap day in a non-leap year', () => {
+    expect(toEpochMs('29/02/2023', { order: 'dmy' })).toBeNaN();
+  });
+
+  it('still shifts a valid late-evening time across midnight', () => {
+    expect(toEpochMs('15/01/2024 23:30', { order: 'dmy', sourceZone: 'utc' }))
+      .toBe(Date.UTC(2024, 0, 16, 7, 30));
+  });
 });
 
 describe('formatMYT', () => {

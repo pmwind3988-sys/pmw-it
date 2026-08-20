@@ -104,7 +104,30 @@ function parseOrderedDateString(value, order) {
   const seconds = ss ? Number(ss) : 0;
 
   const ms = Date.UTC(year, month - 1, day, hours, minutes, seconds);
-  return Number.isNaN(ms) ? NaN : ms;
+  if (Number.isNaN(ms)) return NaN;
+
+  // Round-trip validation: Date.UTC silently rolls invalid components over
+  // into the next day/month/hour instead of rejecting them (e.g. day=32
+  // becomes the 1st of the following month). Reading the components back
+  // off the constructed instant and comparing them to what was parsed
+  // catches any date that does not actually exist -- e.g. 31 February, or
+  // 29 February in a non-leap year -- and does so before the caller (in
+  // toEpochMs) applies any sourceZone shift, so a valid late-evening time
+  // that crosses midnight after shifting is never mistaken for one of
+  // these.
+  const check = new Date(ms);
+  if (
+    check.getUTCFullYear() !== year ||
+    check.getUTCMonth() !== month - 1 ||
+    check.getUTCDate() !== day ||
+    check.getUTCHours() !== hours ||
+    check.getUTCMinutes() !== minutes ||
+    check.getUTCSeconds() !== seconds
+  ) {
+    return NaN;
+  }
+
+  return ms;
 }
 
 export function toEpochMs(value, opts = {}) {

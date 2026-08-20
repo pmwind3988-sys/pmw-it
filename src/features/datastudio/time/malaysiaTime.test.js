@@ -110,6 +110,10 @@ describe('toEpochMs', () => {
     expect(toEpochMs('15/01/2024 23:30', { order: 'dmy', sourceZone: 'utc' }))
       .toBe(Date.UTC(2024, 0, 16, 7, 30));
   });
+
+  it('rejects an out-of-range month', () => {
+    expect(toEpochMs('13/01/2024', { order: 'mdy' })).toBeNaN();
+  });
 });
 
 describe('formatMYT', () => {

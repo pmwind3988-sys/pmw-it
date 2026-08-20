@@ -1,7 +1,7 @@
 # PROJECT KNOWLEDGE BASE
 
 **Generated:** 2026-05-04
-**Updated:** 2026-08-19
+**Updated:** 2026-08-20
 **Project:** PMW IT Service Portal (formerly "IT Onboarding Portal")
 
 ## OVERVIEW
@@ -20,17 +20,23 @@ pmw-it/
 │   │   ├── AppShell.jsx      # nav column + sticky bar + main; the one auth gate
 │   │   ├── IdleAnimation.jsx # the sign-in screen's chip/packet animation
 │   │   ├── Logo.jsx          # PMW mark (src/assets/logo-*.png)
+│   │   ├── SessionDialog.jsx # what a timed-out session looks like being fixed
+│   │   ├── SignInTransition.jsx # post-sign-in veil, fades into the dashboard
 │   │   ├── SignatureDialog.jsx
 │   │   └── ui/               # Icons, Button, Surfaces, StatCard, Badges
-│   ├── hooks/useRequests.js  # the one SharePoint read + row helpers
+│   ├── hooks/
+│   │   ├── useRequests.js    # the one SharePoint read + row helpers + token
+│   │   └── useSession.js     # session context + phases (no component here)
 │   ├── pages/                # Homepage, LoginPage, DashboardPage, ListPage,
 │   │                         # FormPage, AssetChecklistPage
 │   ├── styles/
 │   │   ├── shell.css         # tokens, brand surface, shell, UI, dashboard
 │   │   └── auth.css          # sign-in layout + the idle animation
-│   ├── context/              # ThemeContext (dark/light mode)
+│   ├── context/              # ThemeContext (dark/light), SessionContext (auto
+│   │                         # re-sign-in + its dialog and entrance animation)
 │   ├── services/             # sharePointService.js
-│   ├── utils/                # timeout.js, initials.js
+│   ├── utils/                # timeout.js, initials.js, authErrors.js,
+│   │                         # sessionKeys.js
 │   ├── App.jsx               # Router setup
 │   ├── main.jsx              # MSAL bootstrap + providers + stylesheet order
 │   └── authConfig.js         # Azure AD + SharePoint scopes
@@ -56,6 +62,9 @@ pmw-it/
 |------|----------|
 | Auth logic | `src/main.jsx` (MSAL init), `src/authConfig.js` |
 | Auth gate for a page | `src/components/AppShell.jsx` — pages do not gate themselves |
+| Timed-out session / auto sign-in | `src/context/SessionContext.jsx` |
+| What counts as a dead session | `isInteractionRequired` in `src/utils/authErrors.js` |
+| Any SharePoint token | `useSharePointToken()` in `src/hooks/useRequests.js` |
 | Routes | `src/App.jsx` |
 | Nav items | `NAV_ITEMS` in `src/components/AppShell.jsx` |
 | Design tokens / layout | `src/styles/shell.css` |
@@ -89,6 +98,22 @@ correct and is what the shell and pages use.
 **MSAL redirect handling**: always await `handleRedirectPromise()` before
 rendering. Silent `no_token_request_cache_error` is normal on fresh load.
 
+**Session guard** (`src/context/SessionContext.jsx`): a timed-out session signs
+itself back in. Two rules keep it from disturbing anyone who is still signed in:
+
+1. Nothing is on a clock — no idle timer, no expiry watcher. A recovery starts
+   only on proof (an `InteractionRequiredAuthError`, or MSAL's silent renewal
+   coming back `timed_out`), or when the account has vanished from the cache on
+   a page that needs one. Network failures and SharePoint errors stay errors.
+2. A recovery tries `ssoSilent` first. A live Azure AD session comes back in
+   about a second and nobody leaves the page; only a second refusal escalates to
+   `loginRedirect`, guarded by a one-shot `sessionStorage` flag so a sign-in that
+   keeps failing cannot bounce the browser in a loop.
+
+`/login` is exempt, and sign-out clears the stored login hint *before* the
+redirect — leaving it would let the guard read a deliberate sign-out as a
+timeout and undo it. Sign out through `useSession().signOut()` for that reason.
+
 **SharePoint scopes**: use ROOT domain only, never site paths.
 - ✅ `https://pmwgroupcom.sharepoint.com/AllSites.Write`
 - ❌ `https://pmwgroupcom.sharepoint.com/sites/IThelpdesk/AllSites.Write`
@@ -99,6 +124,14 @@ No icon package is installed — add a glyph there rather than a dependency.
 ## ANTI-PATTERNS (THIS PROJECT)
 - Don't use `navigate()` in useEffect — causes infinite loops
 - Don't add SharePoint scopes to loginRequest — separate request required
+- Don't call `acquireTokenSilent` / `acquireTokenPopup` from a page. Use
+  `useSharePointToken()`, which routes through the session guard. The popup
+  fallback this replaced is where the "it just stopped loading" reports came
+  from: a popup opened from an expired timer is not a user gesture, so browsers
+  block it and the page waits forever on a window nobody was shown.
+- Don't widen `isInteractionRequired` to catch more errors. Signing someone back
+  in who never lost their session is worse than the error they were going to
+  see; ambiguous codes belong on the "not a timeout" side.
 - Don't use `useNavigate` for auth redirects — use window.location
 - Don't add `assetsInclude: ['**/*.html']` to vite.config.js. It matches
   index.html itself, so Vite stops treating it as the HTML entry and emits it as

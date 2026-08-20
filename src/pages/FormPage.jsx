@@ -2,15 +2,14 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Model } from 'survey-core';
 import { Survey } from 'survey-react-ui';
 import 'survey-core/survey-core.min.css';
-import { useMsal, useIsAuthenticated } from '@azure/msal-react';
-import { InteractionRequiredAuthError } from '@azure/msal-browser';
+import { useIsAuthenticated } from '@azure/msal-react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import AppShell from '../components/AppShell';
 import Button from '../components/ui/Button';
 import { ArrowLeft, Share2, Copy, Download } from '../components/ui/Icons';
 import { submitEmployeesToSharePoint, fetchAllColumnChoices, fetchListItemById, updateListItem } from '../services/sharePointService';
-import { sharePointRequest } from '../authConfig';
+import { useSharePointToken } from '../hooks/useRequests';
 import QRCode from 'qrcode';
 import { LayeredLightPanelless } from "survey-core/themes";
 
@@ -99,7 +98,9 @@ const getSurveyJson = (requestType, choices = {}, isEditMode = false) => {
 };
 
 export default function FormPage() {
-  const { instance } = useMsal();
+  // Every token on this page comes through the session guard, so an expiry
+  // mid-form is a dialog and a silent re-sign-in rather than a dead submit.
+  const getSharePointToken = useSharePointToken();
   const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
@@ -155,16 +156,8 @@ export default function FormPage() {
       setSpChoices(null);
       setChoicesError('');
       try {
-        const account = instance.getActiveAccount();
-        let tokenRes;
-        try {
-          tokenRes = await instance.acquireTokenSilent({ ...sharePointRequest, account });
-        } catch (e) {
-          if (e instanceof InteractionRequiredAuthError) {
-            tokenRes = await instance.acquireTokenPopup({ ...sharePointRequest, account });
-          } else throw e;
-        }
-        
+        const tokenRes = await getSharePointToken();
+
         const choices = await fetchAllColumnChoices(SHAREPOINT_SITE_URL, tokenRes.accessToken, CHOICE_COLUMNS);
         
         let itemData = null;
@@ -187,7 +180,7 @@ export default function FormPage() {
     }
     loadChoices();
     return () => { cancelled = true; };
-  }, [isAuthenticated, retryCount]);
+  }, [isAuthenticated, retryCount, getSharePointToken]);
 
   const survey = useMemo(() => {
     if (!spChoices) return null;
@@ -274,21 +267,6 @@ export default function FormPage() {
     }
   }, [requestType, survey, editItemData, editItemId]);
 
-  const getSharePointToken = async () => {
-    const account = instance.getActiveAccount();
-    if (!account) throw new Error('No signed-in account found. Please log in first.');
-    try {
-      const result = await instance.acquireTokenSilent({ ...sharePointRequest, account });
-      return result.accessToken;
-    } catch (error) {
-      if (error instanceof InteractionRequiredAuthError) {
-        const result = await instance.acquireTokenPopup({ ...sharePointRequest, account });
-        return result.accessToken;
-      }
-      throw error;
-    }
-  };
-
   // Autosave + submit
   useEffect(() => {
     if (!survey) return;
@@ -307,8 +285,8 @@ export default function FormPage() {
       setSubmitState('submitting');
       setFormError('');
       try {
-        const accessToken = await getSharePointToken();
-        
+        const { accessToken } = await getSharePointToken();
+
         if (editItemId) {
           // Update existing item
           const emp = employees[0];
@@ -357,7 +335,7 @@ export default function FormPage() {
       survey.onValueChanged.remove(handleValueChanged);
       survey.onComplete.remove(handleComplete);
     };
-  }, [survey, requestType, editItemId]);
+  }, [survey, requestType, editItemId, getSharePointToken]);
 
   // QR Code
   useEffect(() => {

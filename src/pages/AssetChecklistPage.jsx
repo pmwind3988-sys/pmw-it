@@ -2,10 +2,8 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { Model } from 'survey-core';
 import { Survey } from 'survey-react-ui';
 import 'survey-core/survey-core.min.css';
-import { useMsal } from '@azure/msal-react';
-import { InteractionRequiredAuthError } from '@azure/msal-browser';
 import { submitAssetChecklistToSharePoint } from '../services/sharePointService';
-import { sharePointRequest } from '../authConfig';
+import { useSharePointToken } from '../hooks/useRequests';
 import SignatureDialog from '../components/SignatureDialog';
 import AppShell from '../components/AppShell';
 import Button from '../components/ui/Button';
@@ -111,9 +109,11 @@ const getSurveyJson = (formMode) => ({
 });
 
 export default function AssetChecklistPage() {
-  const { instance } = useMsal();
   // Signing in, the theme toggle and signing out all belong to the shell now;
-  // this page only needs the token it acquires for the submission.
+  // this page only needs the token it acquires for the submission — and that
+  // comes through the session guard, so a checklist filled in over a long
+  // handover still submits after the token behind it has aged out.
+  const getSharePointToken = useSharePointToken();
 
   const [formMode, setFormMode] = useState(null);
   const [survey, setSurvey] = useState(null);
@@ -173,21 +173,6 @@ export default function AssetChecklistPage() {
     }
   }, [surveyModel]);
 
-  const getSharePointToken = async () => {
-    const account = instance.getActiveAccount();
-    if (!account) throw new Error('No signed-in account found. Please log in first.');
-    try {
-      const result = await instance.acquireTokenSilent({ ...sharePointRequest, account });
-      return result.accessToken;
-    } catch (error) {
-      if (error instanceof InteractionRequiredAuthError) {
-        const result = await instance.acquireTokenPopup({ ...sharePointRequest, account });
-        return result.accessToken;
-      }
-      throw error;
-    }
-  };
-
   // Signature saved callback
   const handleSignatureSave = useCallback((dataUrl) => {
     signatureValueRef.current = dataUrl;
@@ -223,7 +208,7 @@ export default function AssetChecklistPage() {
       setFormError('');
 
       try {
-        const accessToken = await getSharePointToken();
+        const { accessToken } = await getSharePointToken();
         const now = new Date();
 
         const formPayload = {
@@ -257,7 +242,7 @@ export default function AssetChecklistPage() {
     return () => {
       survey.onComplete.remove(handleComplete);
     };
-  }, [survey, formMode]);
+  }, [survey, formMode, getSharePointToken]);
 
   const modeLabel =
     formMode === 'Individual Request'

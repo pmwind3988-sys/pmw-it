@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useMsal, useIsAuthenticated } from '@azure/msal-react';
 import { InteractionStatus } from '@azure/msal-browser';
 import { useTheme } from '../context/ThemeContext';
+import { useSession } from '../hooks/useSession';
 import { initialsOf } from '../utils/initials';
 import Logo from './Logo';
 import { AccountBadge } from './ui/Badges';
@@ -45,6 +46,10 @@ export default function AppShell({ title, subtitle, actions, search, children })
   const { instance, inProgress } = useMsal();
   const isAuthenticated = useIsAuthenticated();
   const { isDarkMode, toggleTheme } = useTheme();
+  // Signing out belongs to the session guard: it has to forget who was here
+  // before the redirect, or the automatic sign-in reads the sign-out as a
+  // timeout and puts the user straight back in.
+  const { signOut, recovering } = useSession();
   const location = useLocation();
   const navigate = useNavigate();
   const [navOpen, setNavOpen] = useState(false);
@@ -76,11 +81,6 @@ export default function AppShell({ title, subtitle, actions, search, children })
 
   const account = instance.getActiveAccount();
 
-  const signOut = () =>
-    instance.logoutRedirect({
-      postLogoutRedirectUri: import.meta.env.VITE_REDIRECT_URI || 'http://localhost:5173',
-    });
-
   // The shell is the one auth gate: every screen inside it needs an account, so
   // each page used to carry its own copy of this block.
   if (inProgress !== InteractionStatus.None && !isAuthenticated) {
@@ -88,6 +88,18 @@ export default function AppShell({ title, subtitle, actions, search, children })
       <div className="shell-gate">
         <div className="spinner" />
         <p>Checking your sign-in…</p>
+      </div>
+    );
+  }
+
+  // A timed-out session is being put right — the guard's dialog is over this,
+  // saying so. Announcing "sign in required" underneath it would contradict it,
+  // and the button would race the recovery.
+  if (!isAuthenticated && recovering) {
+    return (
+      <div className="shell-gate">
+        <div className="spinner" />
+        <p>Restoring your session…</p>
       </div>
     );
   }

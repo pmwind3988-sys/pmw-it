@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useMsal, useIsAuthenticated } from '@azure/msal-react';
-import { InteractionRequiredAuthError } from '@azure/msal-browser';
+import { useIsAuthenticated } from '@azure/msal-react';
 import { fetchAllListItems, fetchAllColumnChoices } from '../services/sharePointService';
 import { sharePointRequest } from '../authConfig';
+import { useSession } from './useSession';
 
 export const SHAREPOINT_SITE_URL =
   import.meta.env.VITE_SHAREPOINT_SITE_URL || 'https://pmwgroupcom.sharepoint.com/sites/IThelpdesk';
@@ -16,24 +16,18 @@ export const CHOICE_COLUMNS = [
 ];
 
 /**
- * One SharePoint token, acquired the same way everywhere: silently, falling
- * back to a popup only when Azure AD says interaction is actually required.
+ * One SharePoint token, acquired the same way everywhere: through the session
+ * guard, which tries silently and — only when Azure AD says the session itself
+ * is gone — signs the user back in behind its dialog and retries.
+ *
+ * This used to fall back to `acquireTokenPopup`, which is where the "it just
+ * stopped loading" reports came from: a popup opened from an expired timer is
+ * not a user gesture, so browsers block it and the page waits forever on a
+ * window nobody was shown.
  */
 export function useSharePointToken() {
-  const { instance } = useMsal();
-
-  return useCallback(async () => {
-    const account = instance.getActiveAccount();
-    if (!account) throw new Error('No signed-in account');
-    try {
-      return await instance.acquireTokenSilent({ ...sharePointRequest, account });
-    } catch (e) {
-      if (e instanceof InteractionRequiredAuthError) {
-        return await instance.acquireTokenPopup({ ...sharePointRequest, account });
-      }
-      throw e;
-    }
-  }, [instance]);
+  const { acquireToken } = useSession();
+  return useCallback(() => acquireToken(sharePointRequest), [acquireToken]);
 }
 
 /**

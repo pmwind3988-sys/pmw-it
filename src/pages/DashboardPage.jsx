@@ -17,6 +17,7 @@ import {
   ChevronRight,
 } from '../components/ui/Icons';
 import { useRequests, requestDate, formatDate, toChoiceArray } from '../hooks/useRequests';
+import { useSession } from '../hooks/useSession';
 
 /**
  * The landing screen: what the list adds up to, and a way into the rows behind
@@ -116,10 +117,19 @@ function ColumnChart({ title, blurb, columns }) {
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { items, loading, error, loadedAt, reload } = useRequests();
+  const { markContentReady } = useSession();
 
   useEffect(() => {
     document.title = 'PMW IT — Dashboard';
   }, []);
+
+  // The screen someone lands on after signing in, so it is the screen the
+  // entrance animation waits for: it holds until the figures behind it are real
+  // rather than fading out over a page of skeletons. A failed load counts as
+  // ready too — the error belongs on the dashboard, not under a veil.
+  useEffect(() => {
+    if (!loading) markContentReady();
+  }, [loading, markContentReady]);
 
   const stats = useMemo(() => {
     const now = new Date();

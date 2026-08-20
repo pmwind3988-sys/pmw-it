@@ -1105,3 +1105,353 @@ button.stat-card:hover .stat-card-chevron {
     animation: none;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Session guard — the dialog that runs while a timed-out session is being put
+   right, and (below) the entrance animation that plays once one has been.
+--------------------------------------------------------------------------- */
+
+/* Announced, not drawn. The animations here are decoration over content that is
+   already on the page, so their live region has no visual counterpart. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.session-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(8, 15, 26, 0.5);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: sessionIn 220ms ease-out both;
+}
+
+/* A recovery that worked should look like it finished rather than like it was
+   cut off, so the success beat fades itself out on the way to idle. */
+.session-scrim.out {
+  animation: sessionOut 800ms ease-in 260ms both;
+}
+
+[data-theme='dark'] .session-scrim {
+  background: rgba(2, 6, 12, 0.66);
+}
+
+.session-dialog {
+  width: min(380px, 100%);
+  padding: 30px 26px 26px;
+  border-radius: 18px;
+  border: 1px solid var(--it-line);
+  background: var(--it-panel);
+  box-shadow: 0 24px 60px rgba(8, 15, 26, 0.28);
+  text-align: center;
+  animation: sessionRise 320ms cubic-bezier(0.16, 0.84, 0.44, 1) both;
+}
+
+.session-dialog h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--it-ink);
+}
+
+.session-dialog p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--it-ink-soft);
+}
+
+.session-mark {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--it-brand-wash);
+  color: var(--it-brand);
+}
+
+/* Two rings a beat apart: enough motion to read as work in progress, not so
+   much that a dialog nobody asked for starts demanding attention. */
+.session-pulse {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--it-brand);
+  opacity: 0;
+  animation: sessionPulse 1.9s ease-out infinite;
+}
+
+.session-pulse.b {
+  animation-delay: 0.95s;
+}
+
+.session-orbit {
+  position: absolute;
+  inset: -7px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  border-top-color: var(--it-brand);
+  animation: spin 0.95s linear infinite;
+}
+
+.session-tick,
+.session-warn {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  animation: sessionPop 420ms cubic-bezier(0.16, 0.84, 0.44, 1) both;
+}
+
+.session-tick {
+  background: var(--it-good-wash);
+  color: var(--it-good);
+}
+
+.session-warn {
+  background: var(--it-accent-wash);
+  color: var(--it-accent);
+}
+
+.session-btn {
+  margin-top: 20px;
+  width: 100%;
+  padding: 11px 16px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--it-brand);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: filter 140ms ease, transform 140ms ease;
+}
+
+.session-btn:hover {
+  filter: brightness(1.06);
+}
+
+.session-btn:active {
+  transform: translateY(1px);
+}
+
+.session-btn:focus-visible {
+  outline: 2px solid var(--it-brand);
+  outline-offset: 2px;
+}
+
+@keyframes sessionIn {
+  from { opacity: 0; }
+}
+
+@keyframes sessionOut {
+  to { opacity: 0; }
+}
+
+@keyframes sessionRise {
+  from { opacity: 0; transform: translateY(10px) scale(0.965); }
+}
+
+@keyframes sessionPulse {
+  0%   { opacity: 0.55; transform: scale(0.72); }
+  100% { opacity: 0; transform: scale(1.32); }
+}
+
+@keyframes sessionPop {
+  from { opacity: 0; transform: scale(0.72); }
+}
+
+/* ---------------------------------------------------------------------------
+   The entrance — what covers the gap between a successful sign-in and the
+   dashboard having its figures. It sits on the canvas colour rather than over a
+   dimmed page, because on that first paint there is nothing behind it worth
+   showing, and it leaves by dissolving so the dashboard appears to have been
+   there all along.
+--------------------------------------------------------------------------- */
+.signin-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--it-canvas);
+  transition:
+    opacity 620ms ease,
+    transform 620ms cubic-bezier(0.4, 0, 0.2, 1),
+    filter 620ms ease;
+}
+
+.signin-veil.leaving {
+  opacity: 0;
+  transform: scale(1.03);
+  filter: blur(8px);
+  pointer-events: none;
+}
+
+.signin-glow {
+  position: absolute;
+  width: min(620px, 130vw);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0, 120, 212, 0.18), rgba(0, 120, 212, 0) 62%);
+  animation: signinGlow 3.6s ease-in-out infinite;
+}
+
+[data-theme='dark'] .signin-glow {
+  background: radial-gradient(circle, rgba(47, 155, 234, 0.22), rgba(47, 155, 234, 0) 62%);
+}
+
+.signin-core {
+  position: relative;
+  width: 132px;
+  height: 132px;
+  display: grid;
+  place-items: center;
+}
+
+/* Three rings, each starting a third of the way through the one before, so the
+   mark reads as broadcasting rather than as a spinner in a costume. */
+.signin-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid var(--it-brand);
+  opacity: 0;
+  animation: signinRing 2.7s cubic-bezier(0.22, 0.61, 0.36, 1) infinite;
+}
+
+.signin-ring.b { animation-delay: 0.9s; }
+.signin-ring.c { animation-delay: 1.8s; }
+
+.signin-badge {
+  width: 78px;
+  height: 78px;
+  display: grid;
+  place-items: center;
+  border-radius: 24px;
+  background: var(--it-panel);
+  border: 1px solid var(--it-line);
+  box-shadow: var(--it-card-shadow);
+  animation: signinFloat 2.7s ease-in-out infinite;
+}
+
+.signin-title {
+  margin: 26px 0 5px;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--it-ink);
+  animation: signinEnter 620ms cubic-bezier(0.16, 0.84, 0.44, 1) both;
+}
+
+.signin-sub {
+  margin: 0 0 22px;
+  font-size: 13.5px;
+  color: var(--it-ink-soft);
+  animation: signinEnter 620ms cubic-bezier(0.16, 0.84, 0.44, 1) 90ms both;
+}
+
+.signin-bar {
+  width: 168px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--it-line);
+  overflow: hidden;
+}
+
+/* Indeterminate on purpose: the load behind it is one SharePoint read whose
+   progress this page has no way of knowing. */
+.signin-bar span {
+  display: block;
+  width: 42%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, var(--it-brand), transparent);
+  animation: signinSweep 1.3s ease-in-out infinite;
+}
+
+@keyframes signinGlow {
+  0%, 100% { opacity: 0.75; transform: scale(0.94); }
+  50%      { opacity: 1;    transform: scale(1.06); }
+}
+
+@keyframes signinRing {
+  0%   { opacity: 0; transform: scale(0.52); }
+  35%  { opacity: 0.5; }
+  100% { opacity: 0; transform: scale(1.25); }
+}
+
+@keyframes signinFloat {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-6px); }
+}
+
+@keyframes signinEnter {
+  from { opacity: 0; transform: translateY(9px); }
+}
+
+@keyframes signinSweep {
+  0%   { transform: translateX(-115%); }
+  100% { transform: translateX(265%); }
+}
+
+/* Same bargain the rest of the shell makes: nothing here carries meaning, so
+   holding it still costs the reader nothing. The veil still fades — an element
+   that covers the app has to be able to get out of the way. */
+@media (prefers-reduced-motion: reduce) {
+  .session-scrim,
+  .session-dialog,
+  .session-pulse,
+  .session-orbit,
+  .session-tick,
+  .session-warn,
+  .signin-glow,
+  .signin-ring,
+  .signin-badge,
+  .signin-title,
+  .signin-sub,
+  .signin-bar span {
+    animation: none;
+  }
+
+  .session-orbit {
+    border-color: var(--it-brand);
+    opacity: 0.35;
+  }
+
+  .signin-bar span {
+    width: 100%;
+    background: var(--it-brand);
+  }
+
+  .signin-veil {
+    transition: opacity 220ms ease;
+  }
+
+  .signin-veil.leaving {
+    transform: none;
+    filter: none;
+  }
+}

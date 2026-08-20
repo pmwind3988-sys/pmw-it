@@ -5,7 +5,15 @@ import { MsalProvider } from '@azure/msal-react';
 import { BrowserRouter } from 'react-router-dom';
 import { msalConfig } from './authConfig';
 import { ThemeProvider } from './context/ThemeContext';
+import { SessionProvider } from './context/SessionContext';
 import { withTimeout } from './utils/timeout';
+import {
+  FRESH_SIGNIN_KEY,
+  REAUTH_REDIRECT_KEY,
+  clearFlag,
+  rememberUser,
+  setFlag,
+} from './utils/sessionKeys';
 import App from './App';
 import './index.css';
 import './App.css';
@@ -32,9 +40,18 @@ async function bootstrap() {
     if (response) {
       msalInstance.setActiveAccount(response.account);
       console.log('[MSAL] Redirect login completed for:', response.account?.username);
+      // A redirect that came back with an account is the end of any re-sign-in
+      // that started one, so the loop guard is spent — and the entrance
+      // animation is owed a play, which React is not yet running to be told.
+      clearFlag(REAUTH_REDIRECT_KEY);
+      setFlag(FRESH_SIGNIN_KEY);
+      rememberUser(response.account?.username);
     } else {
       const accounts = msalInstance.getAllAccounts();
-      if (accounts.length > 0) msalInstance.setActiveAccount(accounts[0]);
+      if (accounts.length > 0) {
+        msalInstance.setActiveAccount(accounts[0]);
+        rememberUser(accounts[0].username);
+      }
     }
   } catch (error) {
     // Check for timeout errors first
@@ -60,7 +77,12 @@ async function bootstrap() {
       <MsalProvider instance={msalInstance}>
         <ThemeProvider>
           <BrowserRouter>
-            <App />
+            {/* Inside the router: the guard exempts `/login` from automatic
+                sign-in, and the entrance animation reads the path for its
+                second line. */}
+            <SessionProvider>
+              <App />
+            </SessionProvider>
           </BrowserRouter>
         </ThemeProvider>
       </MsalProvider>

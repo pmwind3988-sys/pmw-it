@@ -114,6 +114,36 @@ describe('toEpochMs', () => {
   it('rejects an out-of-range month', () => {
     expect(toEpochMs('13/01/2024', { order: 'mdy' })).toBeNaN();
   });
+
+  it('parses a plain ISO date (YYYY-MM-DD)', () => {
+    expect(toEpochMs('2024-01-15', { order: 'iso' })).toBe(Date.UTC(2024, 0, 15));
+  });
+
+  it('parses a full ISO datetime with a T separator', () => {
+    expect(toEpochMs('2024-01-15T08:00', { order: 'iso' }))
+      .toBe(Date.UTC(2024, 0, 15, 8, 0));
+  });
+
+  it('round-trip validation rejects an ISO date that does not exist', () => {
+    expect(toEpochMs('2024-02-31', { order: 'iso' })).toBeNaN();
+  });
+
+  it('never shifts a date-only ISO value even when marked UTC', () => {
+    expect(toEpochMs('2024-01-15', { order: 'iso', sourceZone: 'utc', dateOnly: true }))
+      .toBe(Date.UTC(2024, 0, 15));
+  });
+
+  it('uplifts a 2-digit year into the 2000s', () => {
+    expect(toEpochMs('15/01/24', { order: 'dmy' })).toBe(Date.UTC(2024, 0, 15));
+  });
+
+  // Decision: the uplift is unconditional (+2000 for any year < 100) -- no
+  // Excel-style century windowing (e.g. 00-29 -> 2000s, 30-99 -> 1900s).
+  // '99' therefore resolves to 2099, not 1999. See task-1-report.md for why
+  // this was kept as-is rather than windowed.
+  it('uplifts a 2-digit year of 99 to 2099 (no century windowing)', () => {
+    expect(toEpochMs('15/01/99', { order: 'dmy' })).toBe(Date.UTC(2099, 0, 15));
+  });
 });
 
 describe('formatMYT', () => {
@@ -124,6 +154,15 @@ describe('formatMYT', () => {
 
   it('formats date-only style without a time', () => {
     expect(formatMYT(Date.UTC(2024, 0, 15, 0, 0), 'date')).toBe('15/01/2024');
+  });
+
+  it('formats time-only style without a date', () => {
+    expect(formatMYT(Date.UTC(2024, 0, 15, 0, 0), 'time')).toBe('08:00');
+  });
+
+  it('formats midnight in MYT as 00:00, not 24:00', () => {
+    // 2024-01-14T16:00Z is 00:00 on the 15th in KL -- the ICU hour=24 edge case.
+    expect(formatMYT(Date.UTC(2024, 0, 14, 16, 0), 'time')).toBe('00:00');
   });
 
   it('renders NaN as an em dash rather than "Invalid Date"', () => {

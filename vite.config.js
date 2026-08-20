@@ -17,4 +17,8 @@ export default defineConfig({
   optimizeDeps: {
     entries: ['src/main.jsx'],
   },
+  test: {
+    environment: 'node',
+    include: ['src/**/*.test.js'],
+  },
 })

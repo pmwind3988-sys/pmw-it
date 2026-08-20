@@ -160,16 +160,24 @@ export function toEpochMs(value, opts = {}) {
 function getPartsMYT(epochMs, options) {
   const formatter = new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Asia/Kuala_Lumpur',
-    hour12: false,
+    // Explicit on purpose, and deliberately NOT paired with `hour12: false`:
+    // per the Intl.DateTimeFormat spec, an explicit `hour12` (true or
+    // false) overrides/nullifies any `hourCycle` option entirely -- verified
+    // on this engine, {hour12:false, hourCycle:'h24'} still resolves to
+    // 'h23', proving hourCycle is silently discarded whenever hour12 is
+    // also present. So on an engine/ICU version whose bare `hour12:false`
+    // locale default is 'h24' (rendering midnight as "24:00" -- the exact
+    // browser-observed bug this guards against), adding hourCycle:'h23'
+    // alongside hour12:false would NOT fix it; only hourCycle on its own
+    // reliably pins the 00-23 range. Do not "simplify" this by adding back
+    // `hour12: false` or removing `hourCycle` -- either one reopens the bug.
+    hourCycle: 'h23',
     ...options,
   });
   const byType = {};
   for (const part of formatter.formatToParts(new Date(epochMs))) {
     byType[part.type] = part.value;
   }
-  // hour12: false should yield 00-23, but some ICU builds still emit "24"
-  // for midnight; normalise so formatted output never shows a 24 hour.
-  if (byType.hour === '24') byType.hour = '00';
   return byType;
 }
 

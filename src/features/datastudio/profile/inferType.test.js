@@ -50,6 +50,10 @@ describe('parseNumberLike', () => {
   it('rejects non-numeric text', () => {
     expect(parseNumberLike('pending').ok).toBe(false);
   });
+
+  it('cancels a double negative from accounting parentheses', () => {
+    expect(parseNumberLike('(-5)')).toMatchObject({ ok: true, value: 5 });
+  });
 });
 
 describe('parseBooleanLike', () => {
@@ -132,6 +136,30 @@ describe('inferType', () => {
   it('leaves a conflicting date column as text for the user to resolve', () => {
     const v = inferType(['13/01/2024', '01/13/2024'], 'Join Date');
     expect(v).toMatchObject({ type: 'text', dateOrder: 'conflict' });
+  });
+
+  // A date-order conflict must only block the column when the datetime
+  // candidate would otherwise have won. Here two stray conflicting dates
+  // sit inside an otherwise-numeric column that clears the 95% bar, so
+  // the conflict is informational only -- the column should still type
+  // as numeric, not get discarded as text.
+  it('lets a numeric column win despite two conflicting stray date values, but reports the conflict', () => {
+    const values = [...Array(100).fill('10'), '13/01/2024', '01/13/2024'];
+    const v = inferType(values, 'Amount');
+    expect(v).toMatchObject({ type: 'numeric', role: 'measure', dateOrder: 'conflict' });
+  });
+
+  // C1 -- ISO-8601 is the most common machine-export date format, and the
+  // 'iso' dateOrder was previously mapped to 'dmy' before reaching
+  // toEpochMs, making every ISO date column misclassify as categorical.
+  it('types an ISO date column as temporal with dateOrder iso', () => {
+    const v = inferType(['2024-01-15', '2024-02-20', '2024-03-25'], 'Join Date');
+    expect(v).toMatchObject({ type: 'date', role: 'temporal', dateOrder: 'iso' });
+  });
+
+  it('types an ISO datetime column as temporal datetime with dateOrder iso', () => {
+    const v = inferType(['2024-01-15T08:30:00', '2024-02-20T09:00:00'], 'Created');
+    expect(v).toMatchObject({ type: 'datetime', role: 'temporal', dateOrder: 'iso' });
   });
 
   it('types an all-null column as empty', () => {

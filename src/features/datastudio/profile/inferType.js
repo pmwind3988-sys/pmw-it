@@ -18,20 +18,20 @@ export const NULL_TOKENS = new Set([
 
 // Zero-width characters that are invisible in a diff but poison parsing:
 // ZWSP (U+200B), ZWNJ (U+200C), ZWJ (U+200D), BOM/ZWNBSP (U+FEFF).
-// Non-breaking space (U+00A0) is handled separately since it collapses to
-// a regular space rather than vanishing. Written as escape sequences
-// rather than literal characters on purpose: a literal invisible
-// character in source does not survive being retyped or diffed and can
-// silently rot into a no-op.
+// Non-breaking space (U+00A0) needs no separate handling: JS's `\s` class
+// already includes it, so the generic whitespace stripping below (and
+// `String.prototype.trim()`, at the edges) covers it for free. Written as
+// escape sequences rather than literal characters on purpose: a literal
+// invisible character in source does not survive being retyped or diffed
+// and can silently rot into a no-op.
 const ZERO_WIDTH_RE = /[\u200B-\u200D\uFEFF]/g;
-const NBSP_RE = /\u00A0/g;
 
 // Normalises a raw cell value to a trimmed string for comparison/parsing.
 // `Date` objects are the one exception -- callers must check for those
 // before calling this, since stringifying a Date here would destroy it.
 function normalizeToString(value) {
   const s = String(value ?? '');
-  return s.replace(ZERO_WIDTH_RE, '').replace(NBSP_RE, ' ').trim();
+  return s.replace(ZERO_WIDTH_RE, '').trim();
 }
 
 export function isNullish(value) {
@@ -57,7 +57,7 @@ export function parseNumberLike(rawValue) {
   if (rawValue instanceof Date) return fail;
 
   const raw = String(rawValue ?? '');
-  const rawTrimmed = raw.replace(ZERO_WIDTH_RE, '').replace(NBSP_RE, ' ').trim();
+  const rawTrimmed = raw.replace(ZERO_WIDTH_RE, '').trim();
   if (rawTrimmed === '') return fail;
 
   // Leading-zero rejection must run on the string BEFORE stripping
@@ -89,7 +89,10 @@ export function parseNumberLike(rawValue) {
   // Leading '-' after stripping currency (e.g. "-RM 5" would be unusual,
   // but "-5" or "- 5" should still work).
   if (/^-/.test(s)) {
-    negative = negative || true;
+    // A leading '-' on top of an already-detected accounting negative is a
+    // double negation ("(-5)" means -(-5) = 5), so this must toggle, not
+    // just force `true`.
+    negative = !negative;
     s = s.slice(1).trim();
   } else if (/^\+/.test(s)) {
     s = s.slice(1).trim();
@@ -242,62 +245,89 @@ export function inferType(values, columnName) {
   }
 
   // --- datetime / date -------------------------------------------------
+  //
+  // 'conflict' means two values in the column disagree on day/month
+  // placement -- detectDateOrder found e.g. both a value only valid as
+  // dmy and a value only valid as mdy. That does NOT mean the column
+  // isn't full of dates; it means we cannot commit to a single order for
+  // it. The rule (binding ruling amending the brief): a conflict blocks
+  // the column ONLY when the datetime candidate would otherwise have won
+  // the cascade. If it would not have won anyway (e.g. two stray date
+  // strings in an otherwise-numeric column), the conflict is irrelevant
+  // information carried onto whatever verdict does win, not a reason to
+  // short-circuit the whole cascade.
+  const stringValues = nonNull.filter((v) => !(v instanceof Date));
+  const dateOrder = stringValues.length > 0 ? detectDateOrder(stringValues.map(normalizeToString)) : null;
+  const isConflict = dateOrder === 'conflict';
+
   {
-    const stringValues = nonNull.filter((v) => !(v instanceof Date));
-    const dateOrder = stringValues.length > 0 ? detectDateOrder(stringValues.map(normalizeToString)) : null;
+    const order = isConflict ? null : (dateOrder === null ? 'dmy' : dateOrder);
+    const casualties = [];
+    let matches = 0;
+    let anyTime = false;
 
-    // 'conflict' means two values disagree on day/month placement -- the
-    // column is left as text for the user to resolve rather than guessing.
-    if (dateOrder !== 'conflict') {
-      const order = dateOrder === 'iso' || dateOrder === null ? 'dmy' : dateOrder;
-      const casualties = [];
-      let matches = 0;
-      let anyTime = false;
-
-      for (const v of nonNull) {
-        if (v instanceof Date) {
-          matches++;
-          if (hasTimeComponent(v)) anyTime = true;
-          continue;
-        }
-        const s = normalizeToString(v);
-        const epoch = toEpochMs(s, { order, dateOnly: true });
-        if (!Number.isNaN(epoch)) {
-          matches++;
-          if (hasTimeComponent(s)) anyTime = true;
-        } else if (casualties.length < 5) {
-          casualties.push(rawLabel(v));
-        }
+    for (const v of nonNull) {
+      if (v instanceof Date) {
+        matches++;
+        if (hasTimeComponent(v)) anyTime = true;
+        continue;
       }
+      const s = normalizeToString(v);
+      let epoch;
+      if (isConflict) {
+        // The order is genuinely unresolved for this column, so this is a
+        // structural check only: does the value parse as a date under
+        // EITHER candidate order? The resulting epoch (and thus which
+        // order "wins") is never used -- a conflicting column can never
+        // commit to one order -- only whether the value looks like a date
+        // at all, to decide whether datetime would have won the cascade.
+        const dmyEpoch = toEpochMs(s, { order: 'dmy', dateOnly: true });
+        epoch = !Number.isNaN(dmyEpoch) ? dmyEpoch : toEpochMs(s, { order: 'mdy', dateOnly: true });
+      } else {
+        epoch = toEpochMs(s, { order, dateOnly: true });
+      }
+      if (!Number.isNaN(epoch)) {
+        matches++;
+        if (hasTimeComponent(s)) anyTime = true;
+      } else if (casualties.length < 5) {
+        casualties.push(rawLabel(v));
+      }
+    }
 
-      const confidence = matches / nonNullCount;
-      if (confidence >= THRESHOLD) {
+    const confidence = matches / nonNullCount;
+    if (confidence >= THRESHOLD) {
+      if (isConflict) {
+        // The datetime candidate would have won, but the order cannot be
+        // determined -- leave it as text for the user to resolve rather
+        // than silently guessing.
         return {
-          type: anyTime ? 'datetime' : 'date',
-          role: 'temporal',
-          confidence,
-          dateOrder: dateOrder ?? 'ambiguous',
+          type: 'text',
+          role: 'ignored',
+          confidence: 1,
+          dateOrder: 'conflict',
           isPercent: false,
           nullCount,
           distinctCount,
-          casualties,
-          casualtyCount: nonNullCount - matches,
+          casualties: [],
+          casualtyCount: 0,
         };
       }
-    } else {
-      // Conflict short-circuits straight to text, carrying the dateOrder.
       return {
-        type: 'text',
-        role: 'ignored',
-        confidence: 0,
-        dateOrder: 'conflict',
+        type: anyTime ? 'datetime' : 'date',
+        role: 'temporal',
+        confidence,
+        dateOrder,
         isPercent: false,
         nullCount,
         distinctCount,
-        casualties: [],
-        casualtyCount: 0,
+        casualties,
+        casualtyCount: nonNullCount - matches,
       };
     }
+    // Datetime candidate declined (below threshold). If this was a
+    // conflict, it's now irrelevant to the type decision -- fall through
+    // to numeric/categorical/text/identifier, and tag `dateOrder:
+    // 'conflict'` onto the eventual verdict purely as information.
   }
 
   // --- numeric ---------------------------------------------------------
@@ -384,6 +414,13 @@ export function inferType(values, columnName) {
         casualtyCount: 0,
       };
     }
+  }
+
+  if (isConflict) {
+    // Informational only at this point -- the datetime candidate did not
+    // win, so the conflict didn't block anything, but the user should
+    // still be told this column had a date-order disagreement.
+    verdict = { ...verdict, dateOrder: 'conflict' };
   }
 
   return verdict;

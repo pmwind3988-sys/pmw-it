@@ -1,7 +1,7 @@
 # PROJECT KNOWLEDGE BASE
 
 **Generated:** 2026-05-04
-**Updated:** 2026-08-20
+**Updated:** 2026-08-21
 **Project:** PMW IT Service Portal (formerly "IT Onboarding Portal")
 
 ## OVERVIEW
@@ -24,14 +24,18 @@ pmw-it/
 │   │   ├── SignInTransition.jsx # post-sign-in veil, fades into the dashboard
 │   │   ├── SignatureDialog.jsx
 │   │   └── ui/               # Icons, Button, Surfaces, StatCard, Badges
+│   ├── features/
+│   │   ├── datastudio/       # Excel import + profiling (in progress)
+│   │   └── devices/          # parse/ derive/ sharepoint/ stats/ ui/
 │   ├── hooks/
 │   │   ├── useRequests.js    # the one SharePoint read + row helpers + token
 │   │   └── useSession.js     # session context + phases (no component here)
 │   ├── pages/                # Homepage, LoginPage, DashboardPage, ListPage,
-│   │                         # FormPage, AssetChecklistPage
+│   │                         # FormPage, AssetChecklistPage, DevicesPage
 │   ├── styles/
 │   │   ├── shell.css         # tokens, brand surface, shell, UI, dashboard
-│   │   └── auth.css          # sign-in layout + the idle animation
+│   │   ├── auth.css          # sign-in layout + the idle animation
+│   │   └── devices.css       # the device list section
 │   ├── context/              # ThemeContext (dark/light), SessionContext (auto
 │   │                         # re-sign-in + its dialog and entrance animation)
 │   ├── services/             # sharePointService.js
@@ -56,6 +60,7 @@ pmw-it/
 | `/list` | Legacy alias, redirects to `/requests` (keeps the query) |
 | `/it-boarding-form` | SurveyJS request form (`?edit=<id>` opens a record) |
 | `/asset-checklist` | Handover checklist (IN / OUT / individual) |
+| `/devices` | Device list: fleet dashboard, register and scan-report import (`?view=`) |
 
 ## WHERE TO LOOK
 | Task | Location |
@@ -70,6 +75,11 @@ pmw-it/
 | Design tokens / layout | `src/styles/shell.css` |
 | Sign-in screen | `src/pages/LoginPage.jsx`, `src/styles/auth.css` |
 | SharePoint reads | `src/hooks/useRequests.js` |
+| Device report parsing | `src/features/devices/parse/` |
+| Device derived fields and risk | `src/features/devices/derive/` |
+| Device SharePoint schema | `src/features/devices/sharepoint/deviceSchema.js` |
+| Device fleet statistics | `src/features/devices/stats/deviceStats.js` |
+| Bar and column charts | `src/components/ui/Charts.jsx` (shared by both dashboards) |
 | SharePoint writes | `src/services/sharePointService.js` |
 | Theme | `src/context/ThemeContext.jsx`; toggle lives in the shell's bar |
 
@@ -114,6 +124,22 @@ itself back in. Two rules keep it from disturbing anyone who is still signed in:
 redirect — leaving it would let the guard read a deliberate sign-out as a
 timeout and undo it. Sign out through `useSession().signOut()` for that reason.
 
+**`src/features/<name>/`** is where a section with more than a handful of modules
+lives — `datastudio/` and `devices/` both follow it. Layering inside a feature:
+`parse/` knows nothing about the domain, `derive/` knows nothing about SharePoint,
+`sharepoint/` imports no React. Each layer is testable without the one above it.
+
+**Device report parsing keys off a known-label whitelist** (`parse/labels.js`). A
+generic `^Word:` split reads `Total Slots: 2 | Used Slots: 2` and
+`Y: | \\server\PMW\IT` as field names and moves those values out of the blocks they
+belong to. An unknown label owns the lines beneath it, so a field the scan script
+adds later surfaces in review rather than contaminating its predecessor.
+
+**`Total RAM` in a scan report is usable RAM, not installed RAM.** Windows subtracts
+the integrated GPU's reserved share, so a 16 GB laptop reports 15 GB and an 8 GB one
+reports 7 GB. Sum `RAM Slot Info` for the real figure; ranking on the reported one
+puts a 16 GB machine below an 8 GB machine.
+
 **SharePoint scopes**: use ROOT domain only, never site paths.
 - ✅ `https://pmwgroupcom.sharepoint.com/AllSites.Write`
 - ❌ `https://pmwgroupcom.sharepoint.com/sites/IThelpdesk/AllSites.Write`
@@ -137,6 +163,13 @@ No icon package is installed — add a glyph there rather than a dependency.
   index.html itself, so Vite stops treating it as the HTML entry and emits it as
   an asset — `npm run build` then produces a dist/index.html containing
   `export default "/assets/index-….html"` and no bundle at all.
+- Don't create a SharePoint DateTime column with `DisplayFormat: 0` when the time
+  matters — that is DateOnly and silently discards it. Device columns use `1`.
+- Don't create a SharePoint Note column without `RichText: false`; a rich-text Note
+  wraps stored values in `<div>` markup and will not round-trip.
+- Don't add `hour12` beside `hourCycle` in `malaysiaTime.js` — per the Intl spec an
+  explicit `hour12` nullifies `hourCycle` entirely. The 24-hour path pins `h23`, the
+  AM/PM path pins `h12`, and neither passes `hour12`.
 - Don't export a helper next to a component from the same file — it drops the
   file out of Fast Refresh (and eslint fails the build). `initialsOf` lives in
   `src/utils/initials.js` for exactly this reason.

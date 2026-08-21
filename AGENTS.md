@@ -140,6 +140,31 @@ the integrated GPU's reserved share, so a 16 GB laptop reports 15 GB and an 8 GB
 reports 7 GB. Sum `RAM Slot Info` for the real figure; ranking on the reported one
 puts a 16 GB machine below an 8 GB machine.
 
+**SharePoint column creation**, verified against the tenant on 2026-08-21 while
+provisioning the device lists. All three of these fail silently or confusingly
+if you get them wrong:
+
+1. **Create each field as its concrete type**, not the base `SP.Field`.
+   `SP.Field` does not declare `Choices`, so a choice column sent that way
+   fails with *"The property 'Choices' does not exist on type 'SP.Field'"*.
+   Use `SP.FieldChoice`, `SP.FieldNumber`, `SP.FieldDateTime`,
+   `SP.FieldMultiLineText`.
+2. **The internal name comes from the `Title` a field is CREATED with.**
+   `StaticName` in the creation body does not control it. Create
+   `Title: 'Device Type'` and the field is addressable only as
+   `Device_x0020_Type`; every item write of `DeviceType` then fails with
+   *"The property 'DeviceType' does not exist on type 'SP.Data...ListItem'"*.
+   Create under the internal name, then MERGE the display `Title` on
+   afterwards. This is what produced the hand-encoded `Calling_x0020_Name`
+   in `sharePointService.js`.
+3. **Read `InternalName`, never `StaticName`**, when checking which columns
+   already exist. The two can disagree, and a column where they disagree is
+   precisely the broken one.
+
+`ensureAssetColumns` in `src/services/sharePointService.js` still has bug 1:
+it sends `Choices` with `__metadata: SP.Field`. Its lists predate the bug, so
+nothing is broken today, but the same code on a fresh site would fail.
+
 **SharePoint scopes**: use ROOT domain only, never site paths.
 - ✅ `https://pmwgroupcom.sharepoint.com/AllSites.Write`
 - ❌ `https://pmwgroupcom.sharepoint.com/sites/IThelpdesk/AllSites.Write`
@@ -164,7 +189,12 @@ No icon package is installed — add a glyph there rather than a dependency.
   an asset — `npm run build` then produces a dist/index.html containing
   `export default "/assets/index-….html"` and no bundle at all.
 - Don't create a SharePoint DateTime column with `DisplayFormat: 0` when the time
-  matters — that is DateOnly and silently discards it. Device columns use `1`.
+  matters — that is DateOnly and silently discards it. Device columns use `1`,
+  confirmed round-tripping a real instant back out of the list.
+- Don't give `.bar-fill` anything but `display: block` in `shell.css`. It is a
+  `<span>` inside `.bar-track`, which is a plain block, so it is not blockified
+  the way a flex or grid child would be — left inline it ignores width and
+  height and every dashboard bar paints as an empty track.
 - Don't create a SharePoint Note column without `RichText: false`; a rich-text Note
   wraps stored values in `<div>` markup and will not round-trip.
 - Don't send `Choices` on a base `SP.Field`. A property exists only on the type

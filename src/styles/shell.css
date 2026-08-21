@@ -857,6 +857,12 @@ button.stat-card:hover .stat-card-chevron {
 }
 
 .bar-fill {
+  /* Load-bearing. This is a <span> inside .bar-track, which is a plain block,
+     so it is NOT blockified the way a flex or grid child would be. Left
+     inline it ignores width and height and paints nothing at all -- every bar
+     on every dashboard renders as an empty track. (.column-bar is safe: its
+     parent .column is a flex container.) */
+  display: block;
   height: 100%;
   border-radius: 999px;
   background: var(--it-brand);

@@ -88,13 +88,21 @@ describe('riskScore — bands', () => {
 });
 
 describe('riskScore — the real machines', () => {
-  it('scores DESKTOP-8SBR420 at 100 — Windows 10, Pentium, 2 GB, spinning disk', () => {
+  // These are the machines' real derived values, read back out of SharePoint
+  // after an import -- not hypotheticals. Change one only if the machine
+  // itself changed.
+  it('scores DESKTOP-8SBR420 at 130 — every rule fires at once', () => {
     const result = riskScore({
-      osSupported: false, antivirusStatus: 'Active', avProtected: true,
+      osSupported: false,
+      // Norton absent, but Defender is enabled, so the machine is protected
+      // and still fails the managed-antivirus rule.
+      antivirusStatus: 'Not Installed',
+      avProtected: true,
       installedRamGB: 2, cpuAgeBand: 'Obsolete', hasHdd: true, scanComplete: true,
     });
-    expect(result.riskScore).toBe(100);
+    expect(result.riskScore).toBe(130);
     expect(result.riskLevel).toBe('Critical');
+    expect(result.riskReasons).toHaveLength(5);
   });
 
   it('scores HPFL05 at 80 — Windows 10, 3rd gen DDR3, 8 GB', () => {

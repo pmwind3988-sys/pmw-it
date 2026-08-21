@@ -76,12 +76,15 @@ export default function SaveProgress({ state, onRetry, onDone }) {
         {saved === 0 && failures.length === 0 ? 'Nothing to save' : `${saved} saved`}
       </p>
 
+      {/* Joined rather than concatenated: appending " · " per clause left a
+          leading separator whenever the earlier clauses were all empty. */}
       <p className="sp-detail">
-        {inserted > 0 && `${inserted} added`}
-        {inserted > 0 && updated > 0 && ' · '}
-        {updated > 0 && `${updated} updated`}
-        {changeCount > 0 && ` · ${changeCount} change${changeCount === 1 ? '' : 's'} logged`}
-        {unchanged > 0 && ` · ${unchanged} already current`}
+        {[
+          inserted > 0 && `${inserted} added`,
+          updated > 0 && `${updated} updated`,
+          changeCount > 0 && `${changeCount} change${changeCount === 1 ? '' : 's'} logged`,
+          unchanged > 0 && `${unchanged} already current`,
+        ].filter(Boolean).join(' · ')}
       </p>
 
       {failures.length > 0 && (

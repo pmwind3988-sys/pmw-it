@@ -1,8 +1,11 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Card, EmptyState } from '../../../components/ui/Surfaces';
 import Button from '../../../components/ui/Button';
 import { Download, Search, X, Pencil, Check, AlertTriangle } from '../../../components/ui/Icons';
 import { formatMYT } from '../../datastudio/time/malaysiaTime';
+import { formatScalar } from '../formatValue';
+import ValueCell from './ValueCell';
 import { applyFilters, toCsv } from '../deviceFilters';
 import { EDITABLE_FIELDS } from '../sharepoint/updateDevice';
 import { DEVICE_COLUMNS } from '../sharepoint/deviceSchema';
@@ -36,9 +39,8 @@ const SCHEMA_COLUMNS = [
     .map((column) => ({
       key: keyFor(column.StaticName),
       label: column.Title,
+      kind: column.kind,
       numeric: column.kind === 'number',
-      boolean: column.kind === 'boolean',
-      date: column.kind === 'datetime',
     }))
     .filter((column) => !SKIP_KEYS.has(column.key)),
 ];
@@ -52,19 +54,11 @@ const rank = (key) => {
 const COLUMNS = [...SCHEMA_COLUMNS].sort((a, b) => rank(a.key) - rank(b.key));
 
 /**
- * A cell has to survive every kind the schema produces. `false` is the one
- * that bites: React renders a bare boolean as nothing at all, so an unprotected
- * machine would show an empty cell rather than "No".
+ * How many entries of a multi-value field a row shows before collapsing the
+ * rest into "+N more". Two is what fits beside the columns either side of it;
+ * the device page shows the lot.
  */
-function display(value, column) {
-  if (value === null || value === undefined || value === '') return '—';
-  if (column.boolean || typeof value === 'boolean') return value ? 'Yes' : 'No';
-  // A timestamp, not a number to read: `importedOn` would otherwise show as
-  // thirteen digits of epoch milliseconds.
-  if (column.date) return formatMYT(value, 'datetime12');
-  if (Array.isArray(value)) return value.length ? value.join(', ') : '—';
-  return String(value);
-}
+const CELL_ENTRIES = 2;
 
 const FILTER_LABELS = {
   risk: 'Risk', type: 'Type', department: 'Department', os: 'OS', av: 'Antivirus',
@@ -244,7 +238,18 @@ export default function DeviceTable({
                             ? `rg-risk rg-risk-${String(device.riskLevel).toLowerCase()}`
                             : undefined}
                         >
-                          {display(device[column.key], column)}
+                          {column.key === 'computerName' && device.id != null ? (
+                            <Link className="dt-link" to={`/devices/${device.id}`}>
+                              {formatScalar(device.computerName, 'text')}
+                            </Link>
+                          ) : (
+                            <ValueCell
+                              value={device[column.key]}
+                              fieldKey={column.key}
+                              kind={column.kind}
+                              limit={CELL_ENTRIES}
+                            />
+                          )}
                           {manual.has(column.key) && (
                             <span className="dt-manual" title="Set by hand — imports leave this alone">
                               edited

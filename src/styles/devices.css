@@ -526,3 +526,225 @@
   text-transform: uppercase;
   vertical-align: middle;
 }
+
+/* ---- Fields that hold more than one thing -------------------------------
+   A GPU list, the RAM sticks, the mailboxes: the scan packs several entries
+   into one field, and run together on one line they read as a single long
+   string. One chip per entry, with the parts after the first (`DDR4 | 3200
+   MHz`) as the chip's detail. */
+.mv-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.mv-item {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 5px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 2px 7px;
+  border: 1px solid var(--it-line);
+  border-radius: 999px;
+  background: var(--it-canvas);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+.mv-main {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 26ch;
+}
+
+.mv-detail {
+  min-width: 0;
+  color: var(--it-ink-soft);
+  font-size: 0.7rem;
+  /* Wraps rather than pushing the page sideways: a RAM stick's detail is
+     longer than a phone is wide. */
+  overflow-wrap: anywhere;
+}
+
+/* Inside a row the chip stays on one line and clips -- a wrapping detail
+   makes one cell twice the height of the row it sits in. The device page,
+   where the whole value matters, lets it wrap. */
+.rg .mv-item {
+  flex-wrap: nowrap;
+}
+
+.rg .mv-detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mv-more {
+  font-size: 0.72rem;
+  color: var(--it-ink-soft);
+}
+
+.dt-link {
+  color: var(--it-brand);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.dt-link:hover {
+  text-decoration: underline;
+}
+
+/* ---- One device, on its own page ---------------------------------------- */
+.dd-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 18px;
+  margin-bottom: 16px;
+}
+
+.dd-risk {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.dd-risk-score {
+  font-weight: 600;
+  opacity: 0.75;
+}
+
+.dd-scanned {
+  font-size: 0.8rem;
+  color: var(--it-ink-soft);
+}
+
+.dd-scanned-zone {
+  opacity: 0.7;
+}
+
+.dd-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  font-size: 0.78rem;
+  color: var(--it-ink-soft);
+  cursor: pointer;
+}
+
+/* Wide enough that a two-column group still fits a long value, and narrow
+   enough that three sit side by side on a desktop. */
+.dd-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+/* `.ui-card` carries no padding of its own -- every use sets what it needs. */
+.dd-group {
+  padding: 16px;
+}
+
+.dd-group-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.dd-group-hint {
+  font-size: 0.74rem;
+  font-weight: 500;
+  color: var(--it-ink-soft);
+}
+
+.dd-fields {
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.dd-field {
+  display: grid;
+  grid-template-columns: minmax(8rem, 34%) 1fr;
+  gap: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--it-line);
+}
+
+.dd-field:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.dd-field dt {
+  font-size: 0.76rem;
+  color: var(--it-ink-soft);
+}
+
+.dd-field dd {
+  margin: 0;
+  font-size: 0.82rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.dd-raw {
+  margin-top: 16px;
+  padding: 16px;
+}
+
+.dd-raw-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--it-brand);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.dd-raw-file {
+  color: var(--it-ink-soft);
+  font-size: 0.74rem;
+}
+
+.dd-raw-text {
+  margin: 12px 0 0;
+  max-height: 60vh;
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--it-line);
+  border-radius: 8px;
+  background: var(--it-canvas);
+  font-size: 0.74rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 640px) {
+  .dd-field {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .dd-toggle {
+    margin-left: 0;
+  }
+}

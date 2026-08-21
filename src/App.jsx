@@ -6,6 +6,7 @@ import AssetChecklistPage from './pages/AssetChecklistPage';
 import LoginPage from './pages/LoginPage';
 import ListPage from './pages/ListPage';
 import DevicesPage from './pages/DevicesPage';
+import DeviceDetailPage from './pages/DeviceDetailPage';
 
 /** `/list` was the records screen before it moved; links to it are still around. */
 function LegacyListRedirect() {
@@ -25,6 +26,7 @@ function App() {
         <Route path="/it-boarding-form" element={<FormPage />} />
         <Route path="/asset-checklist" element={<AssetChecklistPage />} />
         <Route path="/devices" element={<DevicesPage />} />
+        <Route path="/devices/:id" element={<DeviceDetailPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </div>

@@ -372,7 +372,7 @@ export default function DevicesPage() {
       )}
 
       {view === 'import' && stage === 'review' && (
-        <Card>
+        <Card className="rg-card">
           <div className="review-head">
             <p className="review-summary">
               {included} of {merged.length} selected

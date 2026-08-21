@@ -92,8 +92,30 @@
   color: var(--it-danger);
 }
 
+/* `.ui-card` carries no padding of its own, and both tables that live in one
+   -- the register and the import review -- sit behind this class. Without it
+   the header text, the buttons and the drop zone all run to the card edge. */
+.rg-card {
+  padding: 16px;
+}
+
+/* The table itself still reaches both edges: pulled back out of the padding,
+   with the same inset repaid on the outer cells. A table inset from the card
+   would otherwise show a strip of panel to the right of a row scrolled to its
+   end, and the sticky header would leave a gap above the first column. */
 .rg-scroll {
   overflow-x: auto;
+  margin-inline: -16px;
+}
+
+.rg th:first-child,
+.rg td:first-child {
+  padding-left: 16px;
+}
+
+.rg th:last-child,
+.rg td:last-child {
+  padding-right: 16px;
 }
 
 .rg {

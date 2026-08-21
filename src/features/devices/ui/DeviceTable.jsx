@@ -126,7 +126,7 @@ export default function DeviceTable({
         : { key, dir: 'desc' }));
 
   return (
-    <Card>
+    <Card className="rg-card">
       <div className="dt-head">
         <div className="dt-search">
           <Search size={14} />

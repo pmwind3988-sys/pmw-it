@@ -5,19 +5,41 @@ import {
 
 const FIELD_TYPE_KIND = { text: 2, note: 3, datetime: 4, choice: 6, boolean: 8, number: 9 };
 
+/**
+ * Each column is created as its own concrete type, not the base `SP.Field`.
+ * Verified against the tenant: `SP.Field` does not declare `Choices`, and
+ * sending it there fails with
+ *   "The property 'Choices' does not exist on type 'SP.Field'".
+ * The same reasoning applies to DisplayFormat, RichText and the rest — a
+ * property only exists on the type that declares it.
+ */
 const METADATA_TYPE = {
   text: 'SP.Field',
-  choice: 'SP.Field',
   boolean: 'SP.Field',
+  choice: 'SP.FieldChoice',
   note: 'SP.FieldMultiLineText',
   datetime: 'SP.FieldDateTime',
   number: 'SP.FieldNumber',
 };
 
+/**
+ * Created under the internal name, NOT the display name.
+ *
+ * SharePoint derives a field's internal name from the `Title` it is created
+ * with — `StaticName` in the creation body does not control it. So a field
+ * created as "Device Type" is addressable only as `Device_x0020_Type`, and
+ * writing `DeviceType` on the item fails with "The property 'DeviceType' does
+ * not exist on type 'SP.Data...ListItem'".
+ *
+ * Creating it as `DeviceType` and renaming it afterwards (see `renameBody`)
+ * gives a clean internal name AND a readable column header. This is the same
+ * trap that produced the hand-encoded `Calling_x0020_Name` in
+ * `src/services/sharePointService.js`.
+ */
 export function fieldBody(column) {
   const body = {
     __metadata: { type: METADATA_TYPE[column.kind] },
-    Title: column.Title,
+    Title: column.StaticName,
     StaticName: column.StaticName,
     FieldTypeKind: FIELD_TYPE_KIND[column.kind],
     Required: false,
@@ -40,6 +62,11 @@ export function fieldBody(column) {
   if (column.kind === 'choice') body.Choices = { results: column.choices };
 
   return body;
+}
+
+/** The second half of the create-then-rename dance: set the display name. */
+export function renameBody(column) {
+  return { __metadata: { type: METADATA_TYPE[column.kind] }, Title: column.Title };
 }
 
 async function ensureList(siteUrl, token, digest, title, description) {
@@ -94,6 +121,29 @@ async function ensureColumns(siteUrl, token, digest, title, columns) {
       throw new Error(
         `Could not create the "${column.Title}" column (${response.status}): `
           + `${await response.text()}`,
+      );
+    }
+
+    if (column.Title === column.StaticName) continue;
+
+    // Rename for display only. The internal name is already fixed by creation,
+    // so this cannot break the item writes.
+    const renamed = await spFetch(
+      siteUrl,
+      `${listPath(title)}/fields/getByInternalNameOrTitle('${column.StaticName}')`,
+      {
+        token,
+        digest,
+        method: 'POST',
+        body: renameBody(column),
+        headers: { 'X-HTTP-Method': 'MERGE', 'IF-MATCH': '*' },
+      },
+    );
+
+    if (!renamed.ok) {
+      throw new Error(
+        `Could not rename the "${column.StaticName}" column (${renamed.status}): `
+          + `${await renamed.text()}`,
       );
     }
   }

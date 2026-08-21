@@ -167,6 +167,17 @@ No icon package is installed — add a glyph there rather than a dependency.
   matters — that is DateOnly and silently discards it. Device columns use `1`.
 - Don't create a SharePoint Note column without `RichText: false`; a rich-text Note
   wraps stored values in `<div>` markup and will not round-trip.
+- Don't send `Choices` on a base `SP.Field`. A property exists only on the type
+  that declares it, and the tenant answers "The property 'Choices' does not exist
+  on type 'SP.Field'". Choice columns go out as `SP.FieldChoice`.
+- Don't create a SharePoint column under its display name. SharePoint derives the
+  internal name from the `Title` a field is created with — `StaticName` in the
+  creation body does not control it — so "Device Type" becomes
+  `Device_x0020_Type` and every item write then fails with "The property
+  'DeviceType' does not exist". Create the column under its internal name and
+  MERGE the display name onto it afterwards, as `provisionLists.js` does. The
+  hand-encoded `Calling_x0020_Name` in `sharePointService.js` is the same trap,
+  paid the other way.
 - Don't add `hour12` beside `hourCycle` in `malaysiaTime.js` — per the Intl spec an
   explicit `hour12` nullifies `hourCycle` entirely. The 24-hour path pins `h23`, the
   AM/PM path pins `h12`, and neither passes `hour12`.

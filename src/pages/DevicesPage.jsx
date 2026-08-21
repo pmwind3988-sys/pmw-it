@@ -75,10 +75,12 @@ export default function DevicesPage() {
     });
   }, [setParams]);
 
+  /** Open the register, optionally filtered. `key` null means "no filter". */
   const openRegister = useCallback((key, value) => {
     setParams((current) => {
       const next = new URLSearchParams(current);
       next.set('view', 'register');
+      if (!key || key === 'view') return next;
       if (value) next.set(key, value);
       else next.delete(key);
       return next;
@@ -203,7 +205,7 @@ export default function DevicesPage() {
               label="Devices"
               value={summary.total}
               loading={loading}
-              onClick={() => openRegister('view', null)}
+              onClick={() => openRegister(null, null)}
             />
             <StatCard
               icon={AlertTriangle}

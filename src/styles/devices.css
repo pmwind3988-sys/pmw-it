@@ -397,6 +397,28 @@
   }
 }
 
+.lb-card {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+}
+
+/* The list, or the empty note, takes the leftover height so the cards in a row
+   line up whatever they hold. */
+.lb-card > .lb-list,
+.lb-card > .ui-empty {
+  flex: 1;
+}
+
+/* 44px of padding is right for a full-width panel and far too much inside a
+   third-width card. */
+.lb-card > .ui-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 4px;
+}
+
 .lb-list {
   margin: 0;
   padding: 0;

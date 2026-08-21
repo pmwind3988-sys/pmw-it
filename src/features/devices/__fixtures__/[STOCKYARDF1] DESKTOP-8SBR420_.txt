@@ -1,0 +1,66 @@
+Name:
+Anydesk:
+1110604591
+Antivirus status: NORTON NOT INSTALLED
+Remarks:
+
+
+===============================
+COMPUTER INFORMATION
+===============================
+
+Computer Name:
+DESKTOP-8SBR420
+
+Computer Model:
+System Product Name
+
+Motherboard:
+ASUSTeK Computer INC. | P5GC-MX/GBL
+
+Windows Version:
+Microsoft Windows 10 Pro
+
+Processor:
+Intel(R) Pentium(R) Dual  CPU  E2160  @ 1.80GHz
+
+GPU:
+Intel(R) 82945G Express Chipset Family (Microsoft Corporation - WDDM 1.0)
+
+Total RAM:
+2 GB
+
+RAM Slot Info:
+2 GB | Unknown | 333 MHz | Manufacturer1 | PartNum1
+Total Slots: 2 | Used Slots: 
+
+Storage Drives:
+Apacer AS340 240GB | SSD | 224 GB
+WDC WD10 JPVX-60JC3T1 | Unspecified | 932 GB
+
+Network Information:
+Wi-Fi | SSID: jiva1318 | IP: 192.168.84.74 | Dynamic
+
+Antivirus:
+Windows Defender | Enabled
+
+Monitor:
+Generic PnP Monitor
+
+PMW Server and credentials:
+None
+
+Server folder:
+
+Microsoft Office:
+Standard2019Retail
+
+Adobe:
+Adobe Acrobat (64-bit) | 26.001.21745
+
+Email data files found Active or Inactive account:
+None
+
+===============================
+END OF REPORT
+===============================

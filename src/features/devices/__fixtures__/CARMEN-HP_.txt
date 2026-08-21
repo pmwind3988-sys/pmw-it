@@ -1,0 +1,47 @@
+Name:
+Anydesk:
+Antivirus status: NORTON INSTALLED (7 DAYS)
+Remarks:
+
+
+===============================
+COMPUTER INFORMATION
+===============================
+
+Computer Name:
+
+Computer Model:
+
+Motherboard:
+
+Windows Version:
+
+Processor:
+
+GPU:
+
+Total RAM:
+
+RAM Slot Info:
+
+Storage Drives:
+
+Network Information:
+
+Antivirus:
+
+Monitor:
+
+PMW Server and credentials:
+
+Server folder:
+
+Microsoft Office:
+
+Adobe:
+
+Email data files found Active or Inactive account:
+
+===============================
+END OF REPORT
+===============================

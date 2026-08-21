@@ -1,0 +1,4 @@
+# These are real scan reports, kept byte-for-byte. Several use CRLF endings and
+# the parser has a test that proves it handles them, so git must not normalise
+# them on checkout or commit.
+* -text

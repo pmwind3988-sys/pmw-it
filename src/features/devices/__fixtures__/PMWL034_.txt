@@ -1,0 +1,70 @@
+Name:
+Anydesk:
+1095771905
+Antivirus status: NORTON NOT INSTALLED
+Remarks:
+
+
+===============================
+COMPUTER INFORMATION
+===============================
+
+Computer Name:
+PMWL034
+
+Computer Model:
+Precision 3490
+
+Motherboard:
+Dell Inc. | 0JTMW8
+
+Windows Version:
+Microsoft Windows 11 Pro
+
+Processor:
+Intel(R) Core(TM) Ultra 5 125U
+
+GPU:
+Intel(R) Graphics
+
+Total RAM:
+15 GB
+
+RAM Slot Info:
+16 GB | DDR5 | 5600 MHz | 80AD000080AD | HMCG78AGBSA092N
+Total Slots: 2 | Used Slots: 
+
+Storage Drives:
+PVC10 SED SK hynix 512GB | SSD | 477 GB
+
+Network Information:
+Wi-Fi | SSID: PCI_Office | IP: 192.168.6.221 | Dynamic
+
+Antivirus:
+Windows Defender | Enabled
+
+Monitor:
+Generic PnP Monitor
+
+PMW Server and credentials:
+server | shahiran
+192.168.1.250 | shahiran
+
+Server folder:
+Y: | \\192.168.1.250\pci\PCI Sharing\Shahiran
+Z: | \\192.168.1.250\Drawing Database
+
+Microsoft Office:
+OneNoteFreeRetail,O365BusinessRetail
+
+Adobe:
+None
+
+Email data files found Active or Inactive account:
+shahiran@pmw-group.com.ost | C:\Users\Syahiran\AppData\Local\Microsoft\Outlook\shahiran@pmw-group.com.ost
+shahiran001@pmwconcrete.com.my.pst | C:\Users\Syahiran\Documents\Outlook Files\shahiran001@pmwconcrete.com.my.pst
+shahiran@pmwconcrete.com.my.pst | C:\Users\Syahiran\Documents\Outlook Files\shahiran@pmwconcrete.com.my.pst
+
+===============================
+END OF REPORT
+===============================

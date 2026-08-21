@@ -1,0 +1,73 @@
+Name:
+Anydesk:
+None
+Antivirus status:
+Remarks:
+
+
+===============================
+COMPUTER INFORMATION
+===============================
+
+Computer Name:
+ASHRAF-PC
+
+Computer Model:
+HP Laptop 15-fd0xxx
+
+Motherboard:
+HP | 8BB6
+
+Windows Version:
+Microsoft Windows 11 Pro
+
+Processor:
+13th Gen Intel(R) Core(TM) i7-1355U
+
+GPU:
+Intel(R) Iris(R) Xe Graphics
+VirtualMonitorDriver Device
+
+Total RAM:
+8 GB
+
+RAM Slot Info:
+4 GB | DDR4 | 3200 MHz | Samsung | M471A5244CB0-CWE
+4 GB | DDR4 | 3200 MHz | Samsung | M471A5244CB0-CWE
+Total Slots: 2 | Used Slots: 2
+
+Storage Drives:
+KBG50ZNV512G KIOXIA | SSD | 477 GB
+
+Network Information:
+Wi-Fi | SSID: PMW_Group 7 | IP: 192.168.1.170 | Dynamic
+
+Antivirus:
+Norton 360 | Enabled
+Windows Defender | Disabled
+
+Monitor:
+Generic PnP Monitor
+Default Monitor
+
+PMW Server and credentials:
+server | ashraf
+
+Server folder:
+Y: | \\server\emdata$\device list 2026
+Z: | \\server\PMW\IT
+
+Microsoft Office:
+O365BusinessRetail,O365HomePremRetail
+
+Adobe:
+None
+
+Email data files found Active or Inactive account:
+ashraf@pmw-group.com.ost | C:\Users\User\AppData\Local\Microsoft\Outlook\ashraf@pmw-group.com.ost
+SharePoint Lists.pst | C:\Users\User\AppData\Local\Microsoft\Outlook\SharePoint Lists.pst
+ashraf@pmw-industries.com.pst | C:\Users\User\Documents\Outlook Files\ashraf@pmw-industries.com.pst
+
+===============================
+END OF REPORT
+===============================

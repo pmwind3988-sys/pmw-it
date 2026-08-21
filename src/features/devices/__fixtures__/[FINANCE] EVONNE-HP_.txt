@@ -1,0 +1,74 @@
+Name:
+Anydesk:
+None
+Antivirus status: NORTON ACTIVATED
+Remarks:
+
+
+===============================
+COMPUTER INFORMATION
+===============================
+
+Computer Name:
+EVONNE-HP
+
+Computer Model:
+HP Pavilion Laptop 15-eg2xxx
+
+Motherboard:
+HP | 89F7
+
+Windows Version:
+Microsoft Windows 11 Home Single Language
+
+Processor:
+12th Gen Intel(R) Core(TM) i7-1255U
+
+GPU:
+NVIDIA GeForce MX550
+Intel(R) UHD Graphics
+VirtualMonitorDriver Device
+
+Total RAM:
+8 GB
+
+RAM Slot Info:
+8 GB | DDR4 | 3200 MHz | Kingston | HP32D4S2S8MR-8
+Total Slots: 2 | Used Slots: 
+
+Storage Drives:
+KBG50ZNV512G KIOXIA | SSD | 477 GB
+
+Network Information:
+Wi-Fi | SSID: PMW  3 | IP: 10.60.2.14 | Dynamic
+
+Antivirus:
+Norton 360 | Enabled
+Windows Defender | Disabled
+
+Monitor:
+Default Monitor
+Generic PnP Monitor
+Default Monitor
+
+PMW Server and credentials:
+SERVER | evonne
+
+Server folder:
+X: | \\server\PMW\CustomerUpdateRequisitionForm
+Y: | \\server\PMW\Account
+Z: | \\server\PCI
+
+Microsoft Office:
+ProjectPro2021Retail,VisioPro2021Retail,O365BusinessRetail
+
+Adobe:
+None
+
+Email data files found Active or Inactive account:
+evonne.lam@pmw-group.com.ost | C:\Users\Evonne\AppData\Local\Microsoft\Outlook\evonne.lam@pmw-group.com.ost
+evonne_lam@pmw-industries.com.pst | C:\Users\Evonne\Documents\Outlook Files\evonne_lam@pmw-industries.com.pst
+
+===============================
+END OF REPORT
+===============================

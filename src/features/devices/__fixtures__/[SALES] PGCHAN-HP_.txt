@@ -1,0 +1,87 @@
+Name:
+Anydesk:
+325379573
+Antivirus status: NORTON ACTIVATED
+Remarks:
+
+
+===============================
+COMPUTER INFORMATION
+===============================
+
+Computer Name:
+PGCHAN-HP
+
+Computer Model:
+HP Pavilion Laptop 14-dv2xxx
+
+Motherboard:
+HP | 89F3
+
+Windows Version:
+Microsoft Windows 11 Home Single Language
+
+Processor:
+12th Gen Intel(R) Core(TM) i7-1255U
+
+GPU:
+Intel(R) Iris(R) Xe Graphics
+VirtualMonitorDriver Device
+
+Total RAM:
+8 GB
+
+RAM Slot Info:
+4 GB | DDR4 | 3200 MHz | Samsung | M471A5244CB0-CWE
+4 GB | DDR4 | 3200 MHz | Samsung | M471A5244CB0-CWE
+Total Slots: 2 | Used Slots: 2
+
+Storage Drives:
+WDC PC SN530 SDBPNPZ-512G-1006 | SSD | 477 GB
+
+Network Information:
+Wi-Fi | SSID: PMW_Group | IP: 192.168.1.119 | Dynamic
+
+Antivirus:
+Norton 360 | Enabled
+Windows Defender | Disabled
+
+Monitor:
+Generic PnP Monitor
+Default Monitor
+
+PMW Server and credentials:
+server | chanpg
+
+Server folder:
+O: | \\server\PMW\CustomerUpdateRequisitionForm
+P: | \\server\PMW\EngMar
+Q: | \\SERVER\PCI\Nadia
+R: | \\SERVER\PMW\Shipping
+S: | \\SERVER\Decorpoles
+T: | \\SERVER\PMW\Decopoles (Stock Info)
+U: | \\SERVER\Marketing
+V: | \\SERVER\PCI\PCI Sharing
+W: | \\SERVER\PCI
+X: | \\SERVER\PMW\Anna Portfolio
+Y: | \\SERVER\PMW
+Z: | \\SERVER\PCI\Drawing
+
+Microsoft Office:
+O365BusinessRetail
+
+Adobe:
+Adobe Acrobat DC | 20.006.20042
+
+Email data files found Active or Inactive account:
+chanpg@pmw-group.com.ost | C:\Users\PGCHAN\AppData\Local\Microsoft\Outlook\chanpg@pmw-group.com.ost
+chanpg@decorpoles.com.my.pst | C:\Users\PGCHAN\Documents\Outlook Files\chanpg@decorpoles.com.my.pst
+chanpg@pmw-industries.com.pst | C:\Users\PGCHAN\Documents\Outlook Files\chanpg@pmw-industries.com.pst
+chanpg@winabumi.com.pst | C:\Users\PGCHAN\Documents\Outlook Files\chanpg@winabumi.com.pst
+leongmy@decorpoles.com.my.pst | C:\Users\PGCHAN\Documents\Outlook Files\leongmy@decorpoles.com.my.pst
+leongmy@pmw-industries.com.pst | C:\Users\PGCHAN\Documents\Outlook Files\leongmy@pmw-industries.com.pst
+sales@pmw-industries.com.pst | C:\Users\PGCHAN\Documents\Outlook Files\sales@pmw-industries.com.pst
+
+===============================
+END OF REPORT
+===============================

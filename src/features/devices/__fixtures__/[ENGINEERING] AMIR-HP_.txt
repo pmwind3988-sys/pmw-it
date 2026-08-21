@@ -1,0 +1,94 @@
+Name:
+Anydesk:
+913728132
+Antivirus status: NORTON ACTIVE
+Remarks:
+
+
+===============================
+COMPUTER INFORMATION
+===============================
+
+Computer Name:
+AMIR-HP
+
+Computer Model:
+HP ProBook 440 14 inch G9 Notebook PC
+
+Motherboard:
+HP | 8977
+
+Windows Version:
+Microsoft Windows 10 Pro
+
+Processor:
+12th Gen Intel(R) Core(TM) i7-1255U
+
+GPU:
+VirtualMonitorDriver Device
+Intel(R) UHD Graphics
+
+Total RAM:
+16 GB
+
+RAM Slot Info:
+16 GB | DDR4 | 3200 MHz | Samsung | M471A2G43AB2-CWE
+Total Slots: 2 | Used Slots: 
+
+Storage Drives:
+WDC WD10 JPVX-60JC3T1 | Unspecified | 932 GB
+SAMSUNG MZVLQ512HBLU-00BH1 | SSD | 477 GB
+
+Network Information:
+Wi-Fi | SSID: PMW_Group | IP: 192.168.1.131 | Dynamic
+
+Antivirus:
+HP Wolf Pro Security | Enabled
+HP Wolf Pro Security | Disabled
+HP Wolf Pro Security | Enabled
+HP Wolf Pro Security | Enabled
+HP Wolf Pro Security | Enabled
+HP Wolf Pro Security | Enabled
+HP Wolf Pro Security | Enabled
+Norton 360 | Enabled
+HP Wolf Pro Security | Enabled
+HP Wolf Pro Security | Enabled
+HP Wolf Pro Security | Enabled
+HP Wolf Pro Security | Enabled
+HP Wolf Pro Security | Enabled
+Windows Defender | Disabled
+HP Wolf Pro Security | Enabled
+HP Wolf Pro Security | Enabled
+HP Wolf Pro Security | Enabled
+HP Wolf Pro Security | Enabled
+HP Wolf Pro Security | Enabled
+HP Wolf Pro Security | Enabled
+HP Wolf Pro Security | Enabled
+HP Wolf Pro Security | Enabled
+
+Monitor:
+Default Monitor
+Generic PnP Monitor
+
+PMW Server and credentials:
+Server | amir
+
+Server folder:
+W: | \\server\PMW\EngMar
+X: | \\server\Marketing\5 - Photos
+Y: | \\server\PCI\Engineering
+Z: | \\server\PCI\Quality Assurance (QC)
+
+Microsoft Office:
+O365BusinessRetail
+
+Adobe:
+Adobe Acrobat (64-bit) | 26.001.21789
+
+Email data files found Active or Inactive account:
+amir_kh@pmw-group.com - amirahmad@pmw-industries.com.ost | C:\Users\User\AppData\Local\Microsoft\Outlook\amir_kh@pmw-group.com - amirahmad@pmw-industries.com.ost
+amirahmad@pmw-industries.com.pst | C:\Users\User\Documents\Outlook Files\amirahmad@pmw-industries.com.pst
+
+===============================
+END OF REPORT
+===============================

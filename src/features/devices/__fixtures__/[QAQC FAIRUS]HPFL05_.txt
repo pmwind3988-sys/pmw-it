@@ -1,0 +1,74 @@
+Name:
+Anydesk:
+344957809
+Antivirus status:NORTON INSTALLED (ACTIVE)
+Remarks:
+
+
+===============================
+COMPUTER INFORMATION
+===============================
+
+Computer Name:
+HPFL05
+
+Computer Model:
+HP EliteBook Folio 9470m
+
+Motherboard:
+Hewlett-Packard | 18DF
+
+Windows Version:
+Microsoft Windows 10 Pro
+
+Processor:
+Intel(R) Core(TM) i7-3667U CPU @ 2.00GHz
+
+GPU:
+Intel(R) HD Graphics 4000
+
+Total RAM:
+8 GB
+
+RAM Slot Info:
+4 GB | DDR3 | 1333 MHz | Samsung | M471B5273DH0-CH9
+4 GB | DDR3 | 1333 MHz | Samsung | M471B5273DH0-CH9
+Total Slots: 2 | Used Slots: 2
+
+Storage Drives:
+ZD256 | SSD | 238 GB
+
+Network Information:
+Wi-Fi | SSID: PMW_Group | IP: 192.168.1.70 | Dynamic
+
+Antivirus:
+Norton 360 | Enabled
+Windows Defender | Disabled
+Norton 360 | Enabled
+
+Monitor:
+Generic PnP Monitor
+
+PMW Server and credentials:
+server | huili
+192.168.1.250 | huili
+
+Server folder:
+X: | \\192.168.1.250\Drawing Database
+Y: | \\192.168.1.250\pci\PCI Sharing\Shahiran
+Z: | \\192.168.1.250\pci\Quality Assurance (QC)
+
+Microsoft Office:
+ProPlus2021Volume
+
+Adobe:
+Adobe Acrobat (64-bit) | 26.001.21771
+Asian Language And Spelling Dictionaries Support For Adobe Acrobat Reader | 22.001.20085
+
+Email data files found Active or Inactive account:
+fairus@pmw-group.com - outlook.ost | C:\Users\hp\AppData\Local\Microsoft\Outlook\fairus@pmw-group.com - outlook.ost
+fairus@pmwconcrete.com.my.pst | C:\Users\hp\Documents\Outlook Files\fairus@pmwconcrete.com.my.pst
+
+===============================
+END OF REPORT
+===============================

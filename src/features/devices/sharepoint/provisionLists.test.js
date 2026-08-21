@@ -2,6 +2,7 @@ import {
   describe, it, expect, afterEach, vi,
 } from 'vitest';
 import { fieldBody, renameBody, provisionLists } from './provisionLists.js';
+import { DEVICE_COLUMNS, CHANGE_COLUMNS } from './deviceSchema.js';
 
 describe('fieldBody', () => {
   it('creates a text column as a plain SP.Field', () => {
@@ -229,5 +230,50 @@ describe('provisionLists', () => {
     // Swallowing this would leave the column headed 'OwnerSource' with
     // nothing anywhere to say so.
     await expect(provisionLists(SITE, 'token')).rejects.toThrow(/rename/i);
+  });
+});
+
+describe('provisionLists progress', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const TOTAL = DEVICE_COLUMNS.length + CHANGE_COLUMNS.length;
+
+  it('reports one tick per column across both lists', async () => {
+    const sp = fakeSharePoint();
+    vi.stubGlobal('fetch', sp.fetch);
+
+    const seen = [];
+    await provisionLists(SITE, 'token', { onProgress: (done, total) => seen.push([done, total]) });
+
+    expect(seen).toHaveLength(TOTAL);
+    expect(seen[0]).toEqual([1, TOTAL]);
+    expect(seen.at(-1)).toEqual([TOTAL, TOTAL]);
+  });
+
+  it('ticks for columns it skips, so the bar does not stall on a second run', async () => {
+    // Everything already correct: no creates, no renames, but the caller still
+    // needs to see the work being checked off.
+    const sp = fakeSharePoint({
+      existingFields: [...DEVICE_COLUMNS, ...CHANGE_COLUMNS].map((column) => ({
+        internalName: column.StaticName, title: column.Title,
+      })),
+    });
+    vi.stubGlobal('fetch', sp.fetch);
+
+    const seen = [];
+    await provisionLists(SITE, 'token', { onProgress: (done) => seen.push(done) });
+
+    expect(createFor(sp.calls, 'DeviceType')).toBeUndefined();
+    expect(seen).toHaveLength(TOTAL);
+    expect(seen.at(-1)).toBe(TOTAL);
+  });
+
+  it('works without a progress callback at all', async () => {
+    const sp = fakeSharePoint();
+    vi.stubGlobal('fetch', sp.fetch);
+
+    await expect(provisionLists(SITE, 'token')).resolves.toBe('DIGEST');
   });
 });

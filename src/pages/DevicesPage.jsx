@@ -24,7 +24,8 @@ const SHAREPOINT_SITE_URL =
   import.meta.env.VITE_SHAREPOINT_SITE_URL || 'https://pmwgroupcom.sharepoint.com/sites/IThelpdesk';
 
 const IDLE_SAVE = {
-  done: 0, total: 0, results: null, error: null, changeCount: 0, unchanged: 0,
+  phase: 'starting', done: 0, total: 0, results: null, error: null,
+  changeCount: 0, unchanged: 0,
 };
 
 /** Everything in the query string that is a filter rather than a view switch. */
@@ -139,7 +140,8 @@ export default function DevicesPage() {
         token: tokenRes.accessToken,
         devices: toSave,
         changedBy: tokenRes.account?.username ?? '',
-        onProgress: (done, total) => setSave((current) => ({ ...current, done, total })),
+        onProgress: ({ phase, done, total }) =>
+          setSave((current) => ({ ...current, phase, done, total })),
       });
       setSave((current) => ({
         ...current,

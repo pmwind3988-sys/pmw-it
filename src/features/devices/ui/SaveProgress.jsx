@@ -1,9 +1,27 @@
 import Button from '../../../components/ui/Button';
 import { Check, AlertTriangle } from '../../../components/ui/Icons';
 
+/**
+ * What each phase is doing, in words. `counted` phases get a real bar; the
+ * others get an indeterminate one, because a bar that cannot move is worse
+ * than one that admits it does not know.
+ */
+const PHASES = {
+  starting: { text: () => 'Getting ready…', counted: false },
+  provisioning: {
+    text: (done, total) => (total
+      ? `Preparing the SharePoint columns — ${done} of ${total}…`
+      : 'Preparing the SharePoint columns…'),
+    counted: true,
+  },
+  reading: { text: () => 'Reading the current register…', counted: false },
+  writing: { text: (done, total) => `Saving ${done} of ${total}…`, counted: true },
+  logging: { text: (done, total) => `Recording ${done} of ${total} changes…`, counted: true },
+};
+
 export default function SaveProgress({ state, onRetry, onDone }) {
   const {
-    done, total, results, error, changeCount, unchanged,
+    phase, done, total, results, error, changeCount, unchanged,
   } = state;
 
   if (error) {
@@ -18,19 +36,27 @@ export default function SaveProgress({ state, onRetry, onDone }) {
   }
 
   if (results === null) {
-    const percent = total ? Math.round((done / total) * 100) : 0;
+    const step = PHASES[phase] ?? PHASES.starting;
+    const percent = step.counted && total ? Math.round((done / total) * 100) : 0;
+
     return (
       <div className="sp-status">
         <div
-          className="sp-bar"
+          className={`sp-bar${step.counted ? '' : ' sp-bar-waiting'}`}
           role="progressbar"
-          aria-valuenow={done}
-          aria-valuemin={0}
-          aria-valuemax={total}
+          aria-valuenow={step.counted ? done : undefined}
+          aria-valuemin={step.counted ? 0 : undefined}
+          aria-valuemax={step.counted ? total : undefined}
+          aria-label={step.text(done, total)}
         >
-          <span style={{ width: `${percent}%` }} />
+          <span style={step.counted ? { width: `${percent}%` } : undefined} />
         </div>
-        <p className="sp-detail">Saving {done} of {total}…</p>
+        <p className="sp-detail">{step.text(done, total)}</p>
+        {phase === 'provisioning' && (
+          <p className="sp-detail sp-aside">
+            First save only — the columns are created once, then reused.
+          </p>
+        )}
       </div>
     );
   }

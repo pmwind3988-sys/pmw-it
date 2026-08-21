@@ -39,11 +39,23 @@ export function planSync(incoming, existingIndex) {
 
 const itemPath = (listName) => `${listPath(listName)}/items`;
 
+/**
+ * Progress is reported as `{ phase, done, total }` rather than a bare pair,
+ * because the row writes are the short part. A first run spends over a minute
+ * provisioning ~70 columns before the first row moves, and a bar that sits at
+ * "0 of 3" throughout is indistinguishable from a hang.
+ */
 export async function syncDevices({ siteUrl, token, devices, changedBy, onProgress }) {
+  const report = (phase, done = 0, total = 0) => onProgress?.({ phase, done, total });
+
   // Provisioning runs first and throws on failure: a half-created list would
   // fail every row with the same unhelpful message.
-  const digest = await provisionLists(siteUrl, token);
+  report('provisioning');
+  const digest = await provisionLists(siteUrl, token, {
+    onProgress: (done, total) => report('provisioning', done, total),
+  });
 
+  report('reading');
   const existing = await readAllDevices(siteUrl, token);
   const plan = planSync(devices, indexByName(existing));
 
@@ -58,6 +70,7 @@ export async function syncDevices({ siteUrl, token, devices, changedBy, onProgre
     ...plan.updates.map((entry) => ({ ...entry, action: 'update' })),
   ];
 
+  report('writing', 0, work.length);
   const results = await runPool(
     work,
     async (entry) => {
@@ -77,10 +90,11 @@ export async function syncDevices({ siteUrl, token, devices, changedBy, onProgre
       if (!response.ok) throw new Error(`${response.status}: ${await response.text()}`);
       return entry.action;
     },
-    { concurrency: 4, onProgress },
+    { concurrency: 4, onProgress: (done, total) => report('writing', done, total) },
   );
 
   const changedOn = Date.now();
+  if (plan.changeRows.length) report('logging', 0, plan.changeRows.length);
   const changeResults = await runPool(plan.changeRows, async (row) => {
     const response = await post(itemPath(CHANGE_LIST_NAME), {
       Title: row.computerName,
@@ -94,7 +108,10 @@ export async function syncDevices({ siteUrl, token, devices, changedBy, onProgre
     });
     if (!response.ok) throw new Error(String(response.status));
     return true;
-  }, { concurrency: 4 });
+  }, {
+    concurrency: 4,
+    onProgress: (done, total) => report('logging', done, total),
+  });
 
   return {
     results: results.map((result, index) => ({

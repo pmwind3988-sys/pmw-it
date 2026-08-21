@@ -146,61 +146,84 @@ async function renameColumn(siteUrl, token, digest, title, column) {
   }
 }
 
-async function ensureColumns(siteUrl, token, digest, title, columns) {
+/** One column, from whatever state it is currently in to correct. */
+async function ensureColumn(siteUrl, token, digest, title, column, fields) {
+  if (fields.has(column.StaticName)) {
+    // Finishes a run that died between creating a column and renaming it,
+    // which would otherwise leave the header reading `DeviceType` for good.
+    if (fields.get(column.StaticName) !== column.Title) {
+      await renameColumn(siteUrl, token, digest, title, column);
+    }
+    return;
+  }
+
+  const stale = staleColumn(column, fields);
+  if (stale) {
+    throw new Error(
+      `The "${title}" list shows "${column.Title}" on a column named ${stale}, which `
+        + 'item writes cannot address. Delete that column and save again.',
+    );
+  }
+
+  const response = await spFetch(siteUrl, `${listPath(title)}/fields`, {
+    token,
+    digest,
+    method: 'POST',
+    body: fieldBody(column),
+  });
+
+  // 409 means another tab won the race. The column exists either way.
+  if (!response.ok && response.status !== 409) {
+    throw new Error(
+      `Could not create the "${column.Title}" column (${response.status}): `
+        + `${await response.text()}`,
+    );
+  }
+
+  if (column.Title === column.StaticName) return;
+
+  // Rename for display only. The internal name is already fixed by creation,
+  // so this cannot break the item writes.
+  await renameColumn(siteUrl, token, digest, title, column);
+}
+
+async function ensureColumns(siteUrl, token, digest, title, columns, onColumn) {
   const fields = await existingFields(siteUrl, token, title);
 
   for (const column of columns) {
-    if (fields.has(column.StaticName)) {
-      // Finishes a run that died between creating a column and renaming it,
-      // which would otherwise leave the header reading `DeviceType` for good.
-      if (fields.get(column.StaticName) !== column.Title) {
-        await renameColumn(siteUrl, token, digest, title, column);
-      }
-      continue;
-    }
-
-    const stale = staleColumn(column, fields);
-    if (stale) {
-      throw new Error(
-        `The "${title}" list shows "${column.Title}" on a column named ${stale}, which `
-          + 'item writes cannot address. Delete that column and save again.',
-      );
-    }
-
-    const response = await spFetch(siteUrl, `${listPath(title)}/fields`, {
-      token,
-      digest,
-      method: 'POST',
-      body: fieldBody(column),
-    });
-
-    // 409 means another tab won the race. The column exists either way.
-    if (!response.ok && response.status !== 409) {
-      throw new Error(
-        `Could not create the "${column.Title}" column (${response.status}): `
-          + `${await response.text()}`,
-      );
-    }
-
-    if (column.Title === column.StaticName) continue;
-    await renameColumn(siteUrl, token, digest, title, column);
+    await ensureColumn(siteUrl, token, digest, title, column, fields);
+    // Ticks on every path, including the skips, so the bar reflects progress
+    // through the work rather than only through the columns that were missing.
+    onColumn?.();
   }
 }
 
-export async function provisionLists(siteUrl, token) {
+/**
+ * `onProgress(done, total)` counts columns checked across both lists. On a
+ * first run this is around 70 sequential round trips and takes over a minute,
+ * which looks identical to a hang unless something says otherwise.
+ */
+export async function provisionLists(siteUrl, token, { onProgress } = {}) {
   const digest = await getFormDigest(siteUrl, token);
+
+  const total = DEVICE_COLUMNS.length + CHANGE_COLUMNS.length;
+  let done = 0;
+  const tick = () => {
+    done += 1;
+    onProgress?.(done, total);
+  };
 
   await ensureList(
     siteUrl, token, digest, DEVICE_LIST_NAME,
     'One row per machine, from the scan reports',
   );
-  await ensureColumns(siteUrl, token, digest, DEVICE_LIST_NAME, DEVICE_COLUMNS);
+  await ensureColumns(siteUrl, token, digest, DEVICE_LIST_NAME, DEVICE_COLUMNS, tick);
 
   await ensureList(
     siteUrl, token, digest, CHANGE_LIST_NAME,
     'Field-level change history for the device list',
   );
-  await ensureColumns(siteUrl, token, digest, CHANGE_LIST_NAME, CHANGE_COLUMNS);
+  await ensureColumns(siteUrl, token, digest, CHANGE_LIST_NAME, CHANGE_COLUMNS, tick);
 
   return digest;
 }

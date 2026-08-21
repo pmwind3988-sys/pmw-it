@@ -1902,7 +1902,7 @@ describe('riskScore — individual signals', () => {
 });
 
 describe('riskScore — bands', () => {
-  it('places the boundaries at 20, 40 and 60', () => {
+  it('places the boundaries at 15, 40 and 60', () => {
     expect(device({ hasHdd: true }).riskLevel).toBe('OK');            // 10
     expect(device({ cpuAgeBand: 'Obsolete' }).riskLevel).toBe('Watch'); // 25
     expect(device({ osSupported: false }).riskLevel).toBe('High');      // 40
@@ -2014,7 +2014,9 @@ const RULES = [
 function levelFor(score) {
   if (score >= 60) return 'Critical';
   if (score >= 40) return 'High';
-  if (score >= 20) return 'Watch';
+  // 15, not 20: it is the smallest charge among the four signals IT asked to
+  // flag, and at 20 a plain 8 GB machine scores OK and never shows in the mix.
+  if (score >= 15) return 'Watch';
   return 'OK';
 }
 

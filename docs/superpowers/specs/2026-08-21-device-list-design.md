@@ -348,14 +348,20 @@ explain a score rather than assert it.
 | `cpuAgeBand === 'Aging'` | 10 |
 | `hasHdd` | 10 |
 
-`riskLevel`: **Critical** ≥ 60 · **High** 40–59 · **Watch** 20–39 · **OK** < 20.
+`riskLevel`: **Critical** ≥ 60 · **High** 40–59 · **Watch** 15–39 · **OK** < 15.
+
+Watch starts at 15, not 20, because 15 is the smallest charge among the four
+signals IT asked to flag. At 20, a plain 8 GB machine scores OK and the RAM
+signal never appears in the risk mix — 11 of the 17 sample machines would
+vanish from it. The two smaller charges, a mechanical disk and an aging CPU,
+stay below the line on purpose.
 
 Machines with `scanComplete === false` get a null score, not zero — an unscanned
 machine is unknown, not healthy.
 
 Sanity check against the samples: `DESKTOP-8SBR420` 100 (Win 10, Pentium E2160, 2 GB,
 HDD), `HPFL05` 80 (Win 10, i7-3667U/DDR3, 8 GB), `AMIR-HP` 50 (Win 10, HDD),
-`ASHRAF-PC` 15 (8 GB), `PMWL034` 0.
+`ASHRAF-PC` 15 Watch (8 GB), `PMWL034` 0 OK.
 
 ## 9. SharePoint
 

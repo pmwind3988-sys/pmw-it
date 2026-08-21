@@ -43,11 +43,23 @@ describe('riskScore — individual signals', () => {
 });
 
 describe('riskScore — bands', () => {
-  it('places the boundaries at 20, 40 and 60', () => {
+  it('places the boundaries at 15, 40 and 60', () => {
     expect(device({ hasHdd: true }).riskLevel).toBe('OK');
     expect(device({ cpuAgeBand: 'Obsolete' }).riskLevel).toBe('Watch');
     expect(device({ osSupported: false }).riskLevel).toBe('High');
     expect(device({ osSupported: false, cpuAgeBand: 'Obsolete' }).riskLevel).toBe('Critical');
+  });
+
+  it('puts a plain 8 GB machine in Watch, so the RAM signal is visible', () => {
+    // At a threshold of 20 this scores OK and 11 of the 17 sample machines
+    // disappear from the risk mix entirely.
+    expect(device({ installedRamGB: 8 }).riskScore).toBe(15);
+    expect(device({ installedRamGB: 8 }).riskLevel).toBe('Watch');
+  });
+
+  it('leaves a lone aging CPU or mechanical disk below the line', () => {
+    expect(device({ cpuAgeBand: 'Aging' }).riskLevel).toBe('OK');
+    expect(device({ hasHdd: true }).riskLevel).toBe('OK');
   });
 });
 

@@ -36,10 +36,20 @@ const RULES = [
   { points: 10, reason: 'Mechanical hard disk', applies: (device) => device.hasHdd === true },
 ];
 
+/**
+ * Watch starts at 15, not 20, because 15 is the smallest charge among the four
+ * signals IT asked to be flagged (unsupported OS 40, no antivirus 30, 8 GB or
+ * less 15, obsolete CPU 25). At 20 a plain 8 GB machine scores OK and the RAM
+ * signal never appears in the risk mix at all.
+ *
+ * The two smaller charges — a mechanical disk and an aging CPU, both 10 — are
+ * deliberately left below the line: on their own they are worth noticing in a
+ * leaderboard, not worth queueing for attention.
+ */
 function levelFor(score) {
   if (score >= 60) return 'Critical';
   if (score >= 40) return 'High';
-  if (score >= 20) return 'Watch';
+  if (score >= 15) return 'Watch';
   return 'OK';
 }
 

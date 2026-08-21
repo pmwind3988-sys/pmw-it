@@ -2,12 +2,24 @@ import { useCallback, useMemo, useState } from 'react';
 import AppShell from '../components/AppShell';
 import { Card, EmptyState } from '../components/ui/Surfaces';
 import Button from '../components/ui/Button';
+import { useSharePointToken } from '../hooks/useRequests';
 import DropZone from '../features/devices/ui/DropZone';
 import ReviewGrid from '../features/devices/ui/ReviewGrid';
+import SaveProgress from '../features/devices/ui/SaveProgress';
 import { importFiles } from '../features/devices/importFiles';
 import { issuesFor } from '../features/devices/reviewIssues';
+import { syncDevices } from '../features/devices/sharepoint/syncDevices';
+
+const SHAREPOINT_SITE_URL =
+  import.meta.env.VITE_SHAREPOINT_SITE_URL || 'https://pmwgroupcom.sharepoint.com/sites/IThelpdesk';
+
+const IDLE_SAVE = {
+  done: 0, total: 0, results: null, error: null, changeCount: 0, unchanged: 0,
+};
 
 export default function DevicesPage() {
+  const getToken = useSharePointToken();
+
   const [stage, setStage] = useState('drop');
   const [devices, setDevices] = useState([]);
   const [rejected, setRejected] = useState([]);
@@ -18,6 +30,7 @@ export default function DevicesPage() {
   // file it came from.
   const [edits, setEdits] = useState({});
   const [excluded, setExcluded] = useState(new Set());
+  const [save, setSave] = useState(IDLE_SAVE);
 
   const merged = useMemo(
     () => devices.map((device) => ({ ...device, ...(edits[device.sourceFileName] ?? {}) })),
@@ -57,8 +70,49 @@ export default function DevicesPage() {
     setRejected([]);
     setEdits({});
     setExcluded(new Set());
+    setSave(IDLE_SAVE);
     setStage('drop');
   };
+
+  const handleSave = async (onlyNames) => {
+    const toSave = merged.filter(
+      (device) =>
+        !excluded.has(device.sourceFileName)
+        && (!onlyNames || onlyNames.includes(device.computerName)),
+    );
+
+    setStage('save');
+    setSave({ ...IDLE_SAVE, total: toSave.length });
+
+    try {
+      const tokenRes = await getToken();
+      const outcome = await syncDevices({
+        siteUrl: SHAREPOINT_SITE_URL,
+        token: tokenRes.accessToken,
+        devices: toSave,
+        changedBy: tokenRes.account?.username ?? '',
+        onProgress: (done, total) => setSave((current) => ({ ...current, done, total })),
+      });
+      setSave((current) => ({
+        ...current,
+        results: outcome.results,
+        changeCount: outcome.changeCount,
+        unchanged: outcome.unchanged,
+      }));
+    } catch (error) {
+      setSave((current) => ({ ...current, error: error.message }));
+    }
+  };
+
+  const rejectedList = rejected.length > 0 && (
+    <ul className="dz-rejected">
+      {rejected.map((item) => (
+        <li key={item.fileName}>
+          <strong>{item.fileName}</strong> — {item.reason}
+        </li>
+      ))}
+    </ul>
+  );
 
   return (
     <AppShell
@@ -68,15 +122,7 @@ export default function DevicesPage() {
       {stage === 'drop' && (
         <Card className="dz-card">
           <DropZone onFiles={handleFiles} busy={busy} />
-          {rejected.length > 0 && (
-            <ul className="dz-rejected">
-              {rejected.map((item) => (
-                <li key={item.fileName}>
-                  <strong>{item.fileName}</strong> — {item.reason}
-                </li>
-              ))}
-            </ul>
-          )}
+          {rejectedList}
         </Card>
       )}
 
@@ -87,7 +133,12 @@ export default function DevicesPage() {
               {included} of {merged.length} selected
               {flagged > 0 && <span className="review-flagged"> · {flagged} need attention</span>}
             </p>
-            <Button variant="secondary" size="sm" onClick={reset}>Start over</Button>
+            <div className="review-actions">
+              <Button variant="secondary" size="sm" onClick={reset}>Start over</Button>
+              <Button size="sm" disabled={included === 0} onClick={() => handleSave(null)}>
+                Save {included} to SharePoint
+              </Button>
+            </div>
           </div>
 
           {merged.length === 0 ? (
@@ -101,15 +152,17 @@ export default function DevicesPage() {
             />
           )}
 
-          {rejected.length > 0 && (
-            <ul className="dz-rejected">
-              {rejected.map((item) => (
-                <li key={item.fileName}>
-                  <strong>{item.fileName}</strong> — {item.reason}
-                </li>
-              ))}
-            </ul>
-          )}
+          {rejectedList}
+        </Card>
+      )}
+
+      {stage === 'save' && (
+        <Card>
+          <SaveProgress
+            state={save}
+            onRetry={(names) => handleSave(names)}
+            onDone={reset}
+          />
         </Card>
       )}
     </AppShell>

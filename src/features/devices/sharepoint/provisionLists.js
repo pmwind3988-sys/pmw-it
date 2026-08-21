@@ -1,0 +1,118 @@
+import { spFetch, getFormDigest, listPath } from './spClient.js';
+import {
+  DEVICE_COLUMNS, CHANGE_COLUMNS, DEVICE_LIST_NAME, CHANGE_LIST_NAME,
+} from './deviceSchema.js';
+
+const FIELD_TYPE_KIND = { text: 2, note: 3, datetime: 4, choice: 6, boolean: 8, number: 9 };
+
+const METADATA_TYPE = {
+  text: 'SP.Field',
+  choice: 'SP.Field',
+  boolean: 'SP.Field',
+  note: 'SP.FieldMultiLineText',
+  datetime: 'SP.FieldDateTime',
+  number: 'SP.FieldNumber',
+};
+
+export function fieldBody(column) {
+  const body = {
+    __metadata: { type: METADATA_TYPE[column.kind] },
+    Title: column.Title,
+    StaticName: column.StaticName,
+    FieldTypeKind: FIELD_TYPE_KIND[column.kind],
+    Required: false,
+  };
+
+  // DisplayFormat means different things per field type: on DateTime, 1 keeps
+  // the time (0 would be date-only and would discard it); on Number, 0 means
+  // zero decimal places.
+  if (column.kind === 'datetime') body.DisplayFormat = 1;
+  if (column.kind === 'number') body.DisplayFormat = 0;
+
+  if (column.kind === 'note') {
+    // A rich-text Note stores <div> markup around the value, so a multi-answer
+    // field would not round-trip.
+    body.RichText = false;
+    body.AppendOnly = false;
+    body.NumberOfLines = 6;
+  }
+
+  if (column.kind === 'choice') body.Choices = { results: column.choices };
+
+  return body;
+}
+
+async function ensureList(siteUrl, token, digest, title, description) {
+  const existing = await spFetch(siteUrl, listPath(title), { token });
+  if (existing.ok) return;
+  if (existing.status !== 404) {
+    throw new Error(`Could not check for the "${title}" list (${existing.status})`);
+  }
+
+  const created = await spFetch(siteUrl, '/_api/web/lists', {
+    token,
+    digest,
+    method: 'POST',
+    body: {
+      __metadata: { type: 'SP.List' },
+      BaseTemplate: 100,
+      Title: title,
+      Description: description,
+    },
+  });
+
+  if (!created.ok && created.status !== 201) {
+    throw new Error(
+      `Could not create the "${title}" list (${created.status}): ${await created.text()}`,
+    );
+  }
+}
+
+async function existingFieldNames(siteUrl, token, title) {
+  const response = await spFetch(siteUrl, `${listPath(title)}/fields?$select=StaticName`, { token });
+  if (!response.ok) throw new Error(`Could not read the fields of "${title}" (${response.status})`);
+
+  const data = await response.json();
+  return new Set((data.d?.results ?? []).map((field) => field.StaticName));
+}
+
+async function ensureColumns(siteUrl, token, digest, title, columns) {
+  const existing = await existingFieldNames(siteUrl, token, title);
+
+  for (const column of columns) {
+    if (existing.has(column.StaticName)) continue;
+
+    const response = await spFetch(siteUrl, `${listPath(title)}/fields`, {
+      token,
+      digest,
+      method: 'POST',
+      body: fieldBody(column),
+    });
+
+    // 409 means another tab won the race. The column exists either way.
+    if (!response.ok && response.status !== 409) {
+      throw new Error(
+        `Could not create the "${column.Title}" column (${response.status}): `
+          + `${await response.text()}`,
+      );
+    }
+  }
+}
+
+export async function provisionLists(siteUrl, token) {
+  const digest = await getFormDigest(siteUrl, token);
+
+  await ensureList(
+    siteUrl, token, digest, DEVICE_LIST_NAME,
+    'One row per machine, from the scan reports',
+  );
+  await ensureColumns(siteUrl, token, digest, DEVICE_LIST_NAME, DEVICE_COLUMNS);
+
+  await ensureList(
+    siteUrl, token, digest, CHANGE_LIST_NAME,
+    'Field-level change history for the device list',
+  );
+  await ensureColumns(siteUrl, token, digest, CHANGE_LIST_NAME, CHANGE_COLUMNS);
+
+  return digest;
+}

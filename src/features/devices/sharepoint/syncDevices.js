@@ -7,6 +7,27 @@ import { runPool, withRetry } from './writePool.js';
 import { formatMYT } from '../../datastudio/time/malaysiaTime.js';
 
 /**
+ * A field somebody corrected by hand outranks what the scan file says about
+ * it. Without this the Edit button in the register would be a trap: the next
+ * import of the same unchanged file would silently undo the correction.
+ *
+ * Only the named fields are held back, and the list itself is carried forward
+ * so that updating anything else does not wipe it.
+ */
+export function applyManualOverrides(incoming, existing) {
+  const manual = existing?.manualFields;
+  if (!Array.isArray(manual) || !manual.length) return incoming;
+
+  const merged = { ...incoming, manualFields: manual };
+  for (const field of manual) {
+    // A name left over from a field that no longer exists is skipped rather
+    // than writing `undefined` over a real value.
+    if (field in existing) merged[field] = existing[field];
+  }
+  return merged;
+}
+
+/**
  * Pure: decides what to write. Kept separate from syncDevices so that every
  * insert/update/skip decision is testable without a token or a network.
  */
@@ -18,17 +39,23 @@ export function planSync(incoming, existingIndex) {
   for (const device of incoming) {
     const key = String(device.computerName ?? '').toLowerCase();
     const existing = existingIndex.get(key);
-    const body = toListItem(device);
 
     if (!existing) {
-      inserts.push({ computerName: device.computerName, body });
+      inserts.push({ computerName: device.computerName, body: toListItem(device) });
       continue;
     }
 
-    const changes = diffDevice(existing, device);
+    // Diff and write the SAME record, so a field held back from the diff is
+    // also held back from the body.
+    const resolved = applyManualOverrides(device, existing);
+    const changes = diffDevice(existing, resolved);
     if (!changes.length) continue;
 
-    updates.push({ computerName: device.computerName, id: existing.id, body });
+    updates.push({
+      computerName: device.computerName,
+      id: existing.id,
+      body: toListItem(resolved),
+    });
     for (const change of changes) {
       changeRows.push({ computerName: device.computerName, ...change });
     }

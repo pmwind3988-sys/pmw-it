@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import AppShell from '../components/AppShell';
 import StatCard from '../components/ui/StatCard';
@@ -19,6 +19,8 @@ import { issuesFor, sortForReview } from '../features/devices/reviewIssues';
 import { useDevices } from '../features/devices/useDevices';
 import { fleetSummary } from '../features/devices/stats/deviceStats';
 import { syncDevices } from '../features/devices/sharepoint/syncDevices';
+import { updateDevice, deleteDevice } from '../features/devices/sharepoint/updateDevice';
+import { provisionLists } from '../features/devices/sharepoint/provisionLists';
 
 const SHAREPOINT_SITE_URL =
   import.meta.env.VITE_SHAREPOINT_SITE_URL || 'https://pmwgroupcom.sharepoint.com/sites/IThelpdesk';
@@ -51,6 +53,9 @@ export default function DevicesPage() {
   const [edits, setEdits] = useState({});
   const [excluded, setExcluded] = useState(new Set());
   const [save, setSave] = useState(IDLE_SAVE);
+  const [rowBusy, setRowBusy] = useState(false);
+  const [rowError, setRowError] = useState('');
+  const columnsChecked = useRef(false);
 
   const merged = useMemo(
     () => parsed.map((device) => ({ ...device, ...(edits[device.sourceFileName] ?? {}) })),
@@ -154,6 +159,45 @@ export default function DevicesPage() {
       setSave((current) => ({ ...current, error: failure.message }));
     }
   };
+
+  /** One row edited or removed in the register, rather than a whole import. */
+  const runRowAction = async (action) => {
+    setRowBusy(true);
+    setRowError('');
+    try {
+      const tokenRes = await getToken();
+
+      // Once per visit, and cheap when there is nothing to do: an edit writes
+      // columns a save would have created, so the register must not depend on
+      // somebody having run an import first.
+      if (!columnsChecked.current) {
+        await provisionLists(SHAREPOINT_SITE_URL, tokenRes.accessToken);
+        columnsChecked.current = true;
+      }
+
+      await action(tokenRes);
+      reload();
+    } catch (failure) {
+      setRowError(failure.message);
+    } finally {
+      setRowBusy(false);
+    }
+  };
+
+  const handleRowSave = (device, edits) => runRowAction((tokenRes) => updateDevice({
+    siteUrl: SHAREPOINT_SITE_URL,
+    token: tokenRes.accessToken,
+    existing: device,
+    edits,
+    changedBy: tokenRes.account?.username ?? '',
+  }));
+
+  const handleRowDelete = (device) => runRowAction((tokenRes) => deleteDevice({
+    siteUrl: SHAREPOINT_SITE_URL,
+    token: tokenRes.accessToken,
+    device,
+    changedBy: tokenRes.account?.username ?? '',
+  }));
 
   const rejectedList = rejected.length > 0 && (
     <ul className="dz-rejected">
@@ -266,7 +310,17 @@ export default function DevicesPage() {
       )}
 
       {view === 'register' && (
-        <DeviceTable devices={saved} filters={filters} onFilterChange={setParam} />
+        <>
+          {rowError && <ErrorBanner message={rowError} onRetry={() => setRowError('')} />}
+          <DeviceTable
+            devices={saved}
+            filters={filters}
+            onFilterChange={setParam}
+            onSave={handleRowSave}
+            onDelete={handleRowDelete}
+            busy={rowBusy}
+          />
+        </>
       )}
 
       {view === 'import' && stage === 'drop' && (

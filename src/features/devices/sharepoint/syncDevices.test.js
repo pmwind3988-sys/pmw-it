@@ -72,3 +72,89 @@ describe('planSync', () => {
     expect(plan.updates.map((u) => u.computerName)).toEqual(['PC1']);
   });
 });
+
+describe('planSync — fields set by hand', () => {
+  const existing = (overrides) => ({
+    ...device(), id: 7, ...overrides,
+  });
+
+  it('leaves a hand-set field alone when the file disagrees', () => {
+    // Somebody corrected the owner in the register. Re-importing the same
+    // unchanged scan file must not quietly undo that.
+    const plan = planSync(
+      [device({ owner: 'Ali' })],
+      indexByName([existing({ owner: 'Ali Bin Hassan', manualFields: ['owner'] })]),
+    );
+
+    expect(plan.updates).toHaveLength(0);
+    expect(plan.changeRows).toHaveLength(0);
+  });
+
+  it('still writes the hand-set value when something else changed', () => {
+    const plan = planSync(
+      [device({ owner: 'Ali', installedRamGB: 16 })],
+      indexByName([existing({ owner: 'Ali Bin Hassan', manualFields: ['owner'] })]),
+    );
+
+    expect(plan.updates).toHaveLength(1);
+    // The body carries the manual value, not the derived one -- otherwise the
+    // RAM update would overwrite the owner as a side effect.
+    expect(plan.updates[0].body.Owner).toBe('Ali Bin Hassan');
+    expect(plan.changeRows.map((c) => c.fieldName)).toEqual(['installedRamGB']);
+  });
+
+  it('protects only the fields named, not the whole row', () => {
+    const plan = planSync(
+      [device({ owner: 'Ali', department: 'ENGINEERING' })],
+      indexByName([existing({
+        owner: 'Ali Bin Hassan', department: 'SALES', manualFields: ['owner'],
+      })]),
+    );
+
+    expect(plan.changeRows.map((c) => c.fieldName)).toEqual(['department']);
+    expect(plan.updates[0].body.Owner).toBe('Ali Bin Hassan');
+    expect(plan.updates[0].body.Department).toBe('ENGINEERING');
+  });
+
+  it('protects several fields at once', () => {
+    const plan = planSync(
+      [device({ owner: 'Ali', department: 'ENGINEERING', deviceType: 'Desktop' })],
+      indexByName([existing({
+        owner: 'Ali Bin Hassan',
+        department: 'SALES',
+        deviceType: 'Laptop',
+        manualFields: ['owner', 'department', 'deviceType'],
+      })]),
+    );
+
+    expect(plan.updates).toHaveLength(0);
+  });
+
+  it('carries the manual list forward so it is not wiped by the update', () => {
+    const plan = planSync(
+      [device({ installedRamGB: 16 })],
+      indexByName([existing({ manualFields: ['owner'] })]),
+    );
+
+    expect(plan.updates[0].body.ManualFields).toBe('owner');
+  });
+
+  it('behaves normally when nothing is hand-set', () => {
+    const plan = planSync(
+      [device({ owner: 'Ali' })],
+      indexByName([existing({ owner: 'Ali Bin Hassan' })]),
+    );
+
+    expect(plan.changeRows.map((c) => c.fieldName)).toEqual(['owner']);
+    expect(plan.updates[0].body.Owner).toBe('Ali');
+  });
+
+  it('ignores a manual entry naming a field that no longer exists', () => {
+    const plan = planSync(
+      [device()],
+      indexByName([existing({ manualFields: ['owner', 'somethingRemoved'] })]),
+    );
+
+    expect(plan.updates).toHaveLength(0);
+  });
+});

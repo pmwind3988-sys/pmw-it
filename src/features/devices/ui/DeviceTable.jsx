@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import { Card, EmptyState } from '../../../components/ui/Surfaces';
 import Button from '../../../components/ui/Button';
-import { Download, Search, X } from '../../../components/ui/Icons';
+import { Download, Search, X, Pencil, Check, AlertTriangle } from '../../../components/ui/Icons';
 import { formatMYT } from '../../datastudio/time/malaysiaTime';
 import { applyFilters, toCsv } from '../deviceFilters';
+import { EDITABLE_FIELDS } from '../sharepoint/updateDevice';
 
 const COLUMNS = [
   { key: 'computerName', label: 'Computer' },
@@ -36,8 +37,27 @@ function download(name, text) {
   URL.revokeObjectURL(url);
 }
 
-export default function DeviceTable({ devices, filters, onFilterChange }) {
+const TYPE_OPTIONS = ['Laptop', 'Desktop', 'Unknown'];
+
+export default function DeviceTable({
+  devices, filters, onFilterChange, onSave, onDelete, busy,
+}) {
   const [sort, setSort] = useState({ key: 'riskScore', dir: 'desc' });
+  const [editingId, setEditingId] = useState(null);
+  const [draft, setDraft] = useState({});
+  const [confirming, setConfirming] = useState(null);
+
+  const startEdit = (device) => {
+    setConfirming(null);
+    setEditingId(device.id);
+    setDraft(Object.fromEntries(EDITABLE_FIELDS.map((f) => [f, device[f] ?? ''])));
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setDraft({});
+    setConfirming(null);
+  };
 
   const rows = useMemo(() => {
     const filtered = applyFilters(devices, filters);
@@ -135,24 +155,120 @@ export default function DeviceTable({ devices, filters, onFilterChange }) {
                   </th>
                 ))}
                 <th>Scanned</th>
+                <th><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((device) => (
-                <tr key={device.id ?? device.computerName}>
-                  {COLUMNS.map((column) => (
-                    <td
-                      key={column.key}
-                      className={column.key === 'riskLevel'
-                        ? `rg-risk rg-risk-${String(device.riskLevel).toLowerCase()}`
-                        : undefined}
-                    >
-                      {device[column.key] ?? '—'}
+              {rows.map((device) => {
+                const editing = editingId === device.id;
+                const manual = new Set(device.manualFields ?? []);
+
+                return (
+                  <tr key={device.id ?? device.computerName} className={editing ? 'dt-editing' : undefined}>
+                    {COLUMNS.map((column) => {
+                      const editable = EDITABLE_FIELDS.includes(column.key);
+
+                      if (editing && editable) {
+                        return (
+                          <td key={column.key} className="rg-editable">
+                            {column.key === 'deviceType' ? (
+                              <select
+                                value={draft.deviceType ?? 'Unknown'}
+                                aria-label={`Type for ${device.computerName}`}
+                                onChange={(e) => setDraft((d) => ({ ...d, deviceType: e.target.value }))}
+                              >
+                                {TYPE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+                              </select>
+                            ) : (
+                              <input
+                                type="text"
+                                value={draft[column.key] ?? ''}
+                                placeholder="from the scan"
+                                aria-label={`${column.label} for ${device.computerName}`}
+                                onChange={(e) => setDraft((d) => ({ ...d, [column.key]: e.target.value }))}
+                              />
+                            )}
+                          </td>
+                        );
+                      }
+
+                      const risky = column.key === 'riskLevel';
+                      return (
+                        <td
+                          key={column.key}
+                          className={risky
+                            ? `rg-risk rg-risk-${String(device.riskLevel).toLowerCase()}`
+                            : undefined}
+                        >
+                          {device[column.key] ?? '—'}
+                          {manual.has(column.key) && (
+                            <span className="dt-manual" title="Set by hand — imports leave this alone">
+                              edited
+                            </span>
+                          )}
+                        </td>
+                      );
+                    })}
+
+                    <td title="Malaysia time">{formatMYT(device.scannedOn, 'datetime12')}</td>
+
+                    <td className="dt-actions">
+                      {!editing && (
+                        <button
+                          type="button"
+                          className="dt-icon"
+                          onClick={() => startEdit(device)}
+                          aria-label={`Edit ${device.computerName}`}
+                        >
+                          <Pencil size={14} />
+                        </button>
+                      )}
+
+                      {editing && confirming !== device.id && (
+                        <>
+                          <button
+                            type="button"
+                            className="dt-icon dt-icon-go"
+                            disabled={busy}
+                            onClick={async () => { await onSave(device, draft); cancelEdit(); }}
+                            aria-label={`Save ${device.computerName}`}
+                          >
+                            <Check size={14} />
+                          </button>
+                          <button type="button" className="dt-icon" onClick={cancelEdit}>
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            className="dt-icon dt-icon-bad"
+                            onClick={() => setConfirming(device.id)}
+                          >
+                            Remove
+                          </button>
+                        </>
+                      )}
+
+                      {confirming === device.id && (
+                        <span className="dt-confirm">
+                          <AlertTriangle size={14} />
+                          Remove {device.computerName}?
+                          <button
+                            type="button"
+                            className="dt-icon dt-icon-bad"
+                            disabled={busy}
+                            onClick={async () => { await onDelete(device); cancelEdit(); }}
+                          >
+                            Yes, remove
+                          </button>
+                          <button type="button" className="dt-icon" onClick={() => setConfirming(null)}>
+                            Keep
+                          </button>
+                        </span>
+                      )}
                     </td>
-                  ))}
-                  <td title="Malaysia time">{formatMYT(device.scannedOn, 'datetime12')}</td>
-                </tr>
-              ))}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

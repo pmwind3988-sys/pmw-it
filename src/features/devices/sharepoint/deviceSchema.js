@@ -85,6 +85,7 @@ export const DEVICE_COLUMNS = [
   note('RiskReasons', 'Risk Reasons'),
   bool('ScanComplete', 'Scan Complete'),
   note('Remarks', 'Remarks'),
+  note('ManualFields', 'Manually Set Fields'),
   note('ExtraFields', 'Extra Fields'),
   note('RawReport', 'Raw Report'),
 ];
@@ -103,6 +104,9 @@ export const CHANGE_COLUMNS = [
  * Only these produce change-log rows. IP address, SSID and mapped drives are
  * deliberately absent: they are DHCP-assigned or session-dependent and change
  * constantly, and logging them would bury the hardware changes that matter.
+ *
+ * `manualFields` is absent for a different reason: it records how a value was
+ * set, not that the machine changed.
  */
 export const TRACKED_FIELDS = [
   'owner', 'department', 'deviceType', 'computerModel',
@@ -169,7 +173,9 @@ export function toListItem(device) {
   return item;
 }
 
-const ARRAY_COLUMNS = new Set(['GpuList', 'RiskReasons', 'MicrosoftOffice', 'AdobeProducts']);
+const ARRAY_COLUMNS = new Set([
+  'GpuList', 'RiskReasons', 'MicrosoftOffice', 'AdobeProducts', 'ManualFields',
+]);
 
 export function fromListItem(row) {
   const record = { id: row.Id ?? row.ID ?? null, computerName: row.Title ?? null };

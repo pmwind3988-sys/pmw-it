@@ -436,3 +436,71 @@
   color: var(--it-ink-soft);
   white-space: nowrap;
 }
+
+/* ── Register row editing ───────────────────────────────────────────────── */
+
+.dt-editing {
+  background: var(--it-brand-wash);
+}
+
+.dt-actions {
+  white-space: nowrap;
+}
+
+.dt-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  margin-right: 4px;
+  border: 1px solid var(--it-line);
+  border-radius: 6px;
+  background: var(--it-panel);
+  color: var(--it-ink-soft);
+  font: inherit;
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+
+.dt-icon:hover:not(:disabled) {
+  color: var(--it-ink);
+  border-color: var(--it-brand-line);
+}
+
+.dt-icon:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.dt-icon-go {
+  color: var(--it-good);
+  border-color: var(--it-good);
+}
+
+.dt-icon-bad {
+  color: var(--it-danger);
+  border-color: var(--it-danger);
+}
+
+.dt-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: var(--it-danger);
+}
+
+/* Marks a value somebody typed over. Imports leave these alone, so the badge
+   is the only thing explaining why a row stopped tracking its scan file. */
+.dt-manual {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--it-brand-wash);
+  color: var(--it-brand);
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}

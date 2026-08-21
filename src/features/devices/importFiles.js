@@ -43,7 +43,6 @@ export async function importFiles(files) {
 
     let text;
     try {
-      // eslint-disable-next-line no-await-in-loop
       text = await readTextFile(file);
     } catch (error) {
       rejected.push({ fileName: file.name, reason: `Could not read the file: ${error.message}` });

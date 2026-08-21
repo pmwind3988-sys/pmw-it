@@ -341,7 +341,14 @@ explain a score rather than assert it.
 | Signal | Points |
 |---|---|
 | `osSupported === false` | 40 |
-| `antivirusStatus` is Not Installed, or `avProtected === false` | 30 |
+| `antivirusStatus` is Not Installed or Installed — Inactive, or `avProtected === false` | 30 |
+
+Charged once, not twice. Every machine in the fleet has Windows Defender
+enabled, so a rule that only fired on "nothing enabled" would never fire at
+all, and the six machines reporting `NORTON NOT INSTALLED` would score clean.
+The managed antivirus being absent is its own finding — it is why the scan
+report carries an `Antivirus status` line separate from the `Antivirus` block.
+
 | `installedRamGB <= 4` | 25 |
 | `installedRamGB <= 8` (and > 4) | 15 |
 | `cpuAgeBand === 'Obsolete'` | 25 |

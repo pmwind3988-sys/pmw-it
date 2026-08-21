@@ -92,7 +92,10 @@ describe('deriveDevice — the awkward machines', () => {
     const device = deriveDevice(load('PMWL034_.txt'));
     expect(device.cpuGeneration).toBe('Ultra 1');
     expect(device.cpuAgeBand).toBe('Current');
-    expect(device.riskLevel).toBe('OK');
+    // Current hardware throughout: its only charge is the missing managed
+    // antivirus, which Defender being enabled does not excuse.
+    expect(device.riskReasons).toEqual(['Managed antivirus not installed or deactivated']);
+    expect(device.riskLevel).toBe('Watch');
   });
 
   it('reads the person out of a combined department bracket', () => {

@@ -17,13 +17,37 @@ describe('riskScore — individual signals', () => {
     expect(device({ osSupported: false }).riskScore).toBe(40);
   });
 
-  it('charges 30 for missing antivirus', () => {
+  it('charges 30 when nothing at all is enabled', () => {
     expect(device({ antivirusStatus: 'Not Installed', avProtected: false }).riskScore).toBe(30);
-  });
-
-  it('charges 30 when a product is installed but nothing is enabled', () => {
     expect(device({ antivirusStatus: 'Installed — Inactive', avProtected: false }).riskScore)
       .toBe(30);
+  });
+
+  it('charges 30 when the managed antivirus is missing even if Defender is on', () => {
+    // Every machine in the fleet has Defender enabled, so a rule that only
+    // fired on "nothing enabled" would never fire at all -- and six machines
+    // reporting NORTON NOT INSTALLED would score clean.
+    const result = device({ antivirusStatus: 'Not Installed', avProtected: true });
+    expect(result.riskScore).toBe(30);
+    expect(result.riskReasons).toContain('Managed antivirus not installed or deactivated');
+  });
+
+  it('charges 30 when the managed antivirus is deactivated but Defender is on', () => {
+    expect(device({ antivirusStatus: 'Installed — Inactive', avProtected: true }).riskScore)
+      .toBe(30);
+  });
+
+  it('never charges twice for antivirus', () => {
+    expect(device({ antivirusStatus: 'Not Installed', avProtected: false }).riskReasons)
+      .toEqual(['No antivirus enabled at all']);
+  });
+
+  it('charges nothing when the antivirus state could not be read', () => {
+    expect(device({ antivirusStatus: 'Unknown', avProtected: false }).riskScore).toBe(0);
+  });
+
+  it('charges nothing when a trial is running', () => {
+    expect(device({ antivirusStatus: 'Trial', avProtected: true }).riskScore).toBe(0);
   });
 
   it('charges 15 for 8 GB and 25 for 4 GB, never both', () => {

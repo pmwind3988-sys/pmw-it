@@ -213,3 +213,29 @@ export const Inbox = make('Inbox', (
 ));
 
 export const Check = make('Check', <polyline points="20 6 9 17 4 12" />);
+
+export const HardDrive = make('HardDrive', (
+  <>
+    <line x1="22" y1="12" x2="2" y2="12" />
+    <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+    <line x1="6" y1="16" x2="6.01" y2="16" />
+    <line x1="10" y1="16" x2="10.01" y2="16" />
+  </>
+));
+
+export const Cpu = make('Cpu', (
+  <>
+    <rect x="4" y="4" width="16" height="16" rx="2" />
+    <rect x="9" y="9" width="6" height="6" />
+    <path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2" />
+  </>
+));
+
+export const MemoryStick = make('MemoryStick', (
+  <>
+    <path d="M4 15V7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8" />
+    <path d="M2 15h20" />
+    <path d="M8 11V9M12 11V9M16 11V9" />
+    <path d="M6 19v-4M10 19v-4M14 19v-4M18 19v-4" />
+  </>
+));

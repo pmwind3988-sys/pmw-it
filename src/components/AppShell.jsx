@@ -20,6 +20,7 @@ import {
   Sun,
   Moon,
   ShieldCheck,
+  Laptop,
 } from './ui/Icons';
 
 /**
@@ -40,6 +41,7 @@ const NAV_ITEMS = [
   { to: '/requests', label: 'Requests', icon: ClipboardList },
   { to: '/it-boarding-form', label: 'New request', icon: FilePlus },
   { to: '/asset-checklist', label: 'Asset checklist', icon: CheckSquare },
+  { to: '/devices', label: 'Device list', icon: Laptop },
 ];
 
 export default function AppShell({ title, subtitle, actions, search, children }) {

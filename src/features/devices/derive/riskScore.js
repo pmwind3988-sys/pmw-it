@@ -14,8 +14,20 @@ const RULES = [
   },
   {
     points: 30,
-    reason: 'No active antivirus',
-    applies: (device) => device.antivirusStatus !== 'Unknown' && !device.avProtected,
+    // Two different failures, same weight, never charged twice. "Nothing
+    // enabled" is the worse one but it is rare; "Norton missing while Defender
+    // holds the fort" is the common one, and it is the whole reason the scan
+    // report carries an `Antivirus status` line of its own.
+    reason: (device) =>
+      (device.antivirusStatus !== 'Unknown' && !device.avProtected)
+        ? 'No antivirus enabled at all'
+        : 'Managed antivirus not installed or deactivated',
+    applies: (device) => {
+      if (device.antivirusStatus === 'Unknown') return false;
+      if (!device.avProtected) return true;
+      return device.antivirusStatus === 'Not Installed'
+        || device.antivirusStatus === 'Installed — Inactive';
+    },
   },
   {
     points: 25,
@@ -70,6 +82,7 @@ export function riskScore(device) {
   return {
     riskScore: score,
     riskLevel: levelFor(score),
-    riskReasons: hits.map((rule) => rule.reason),
+    riskReasons: hits.map((rule) =>
+      (typeof rule.reason === 'function' ? rule.reason(device) : rule.reason)),
   };
 }

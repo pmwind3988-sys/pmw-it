@@ -1,0 +1,173 @@
+/* Device list — drop, review, register and dashboard. Loaded after shell.css. */
+
+.dz-card {
+  padding: 0;
+}
+
+.dz {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 40px 20px;
+  border: 1px dashed var(--it-line);
+  border-radius: var(--it-radius);
+  background: var(--it-panel);
+  text-align: center;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.dz-active {
+  border-color: var(--it-brand);
+  background: var(--it-brand-wash);
+}
+
+.dz-busy {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.dz-icon {
+  color: var(--it-ink-soft);
+}
+
+.dz-title {
+  margin: 0;
+  font-weight: 600;
+  color: var(--it-ink);
+}
+
+.dz-hint {
+  margin: 0;
+  max-width: 46ch;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--it-ink-soft);
+}
+
+.dz-input {
+  display: none;
+}
+
+.dz-rejected {
+  margin: 0;
+  padding: 12px 20px 20px;
+  list-style: none;
+  font-size: 0.82rem;
+  color: var(--it-danger);
+}
+
+.dz-rejected li {
+  padding: 2px 0;
+}
+
+/* ── Review ─────────────────────────────────────────────────────────────── */
+
+.review-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.review-summary {
+  margin: 0;
+  font-weight: 600;
+  color: var(--it-ink);
+}
+
+.review-flagged {
+  font-weight: 500;
+  color: var(--it-danger);
+}
+
+.rg-scroll {
+  overflow-x: auto;
+}
+
+.rg {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.rg th,
+.rg td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--it-line);
+  text-align: left;
+}
+
+.rg th {
+  position: sticky;
+  top: 0;
+  font-weight: 600;
+  color: var(--it-ink-soft);
+  background: var(--it-panel);
+}
+
+.rg-flagged {
+  background: var(--it-brand-wash);
+}
+
+.rg-excluded {
+  opacity: 0.45;
+}
+
+.rg-check {
+  width: 32px;
+}
+
+.rg-editable input,
+.rg-editable select {
+  width: 100%;
+  min-width: 90px;
+  padding: 3px 6px;
+  border: 1px dashed var(--it-brand-line);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--it-ink);
+  font: inherit;
+}
+
+.rg-risk {
+  font-weight: 600;
+}
+
+.rg-risk-critical,
+.rg-risk-high {
+  color: var(--it-danger);
+}
+
+.rg-risk-watch {
+  color: var(--it-accent);
+}
+
+.rg-risk-ok {
+  color: var(--it-good);
+}
+
+.rg-issues {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: var(--it-ink-soft);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dz {
+    transition: none;
+  }
+}

@@ -20,6 +20,7 @@ import './App.css';
 // Last, so the shell's tokens win over the pre-Shell defaults they replace.
 import './styles/shell.css';
 import './styles/auth.css';
+import './styles/devices.css';
 
 // MSAL request timeout (30 seconds)
 const MSAL_TIMEOUT_MS = 30000;

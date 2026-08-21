@@ -169,3 +169,39 @@ describe('formatMYT', () => {
     expect(formatMYT(NaN)).toBe('—');
   });
 });
+
+describe('formatMYT - twelve-hour styles', () => {
+  // 19 Aug 2026, 01:18 UTC = 09:18 MYT
+  const morning = Date.UTC(2026, 7, 19, 1, 18);
+  // 19 Aug 2026, 09:04 UTC = 17:04 MYT
+  const evening = Date.UTC(2026, 7, 19, 9, 4);
+  // 18 Aug 2026, 16:00 UTC = 19 Aug 2026, 00:00 MYT
+  const midnight = Date.UTC(2026, 7, 18, 16, 0);
+  // 19 Aug 2026, 04:00 UTC = 12:00 MYT
+  const noon = Date.UTC(2026, 7, 19, 4, 0);
+
+  it('renders a morning time with AM', () => {
+    expect(formatMYT(morning, 'datetime12')).toBe('19/08/2026 09:18 AM');
+  });
+
+  it('renders an afternoon time with PM', () => {
+    expect(formatMYT(evening, 'datetime12')).toBe('19/08/2026 05:04 PM');
+  });
+
+  it('renders midnight as 12 AM, not 0 AM', () => {
+    expect(formatMYT(midnight, 'datetime12')).toBe('19/08/2026 12:00 AM');
+  });
+
+  it('renders noon as 12 PM', () => {
+    expect(formatMYT(noon, 'time12')).toBe('12:00 PM');
+  });
+
+  it('leaves the twenty-four hour styles untouched', () => {
+    expect(formatMYT(evening, 'datetime')).toBe('19/08/2026 17:04');
+    expect(formatMYT(midnight, 'time')).toBe('00:00');
+  });
+
+  it('returns the em dash for an unparseable value', () => {
+    expect(formatMYT(NaN, 'datetime12')).toBe('—');
+  });
+});

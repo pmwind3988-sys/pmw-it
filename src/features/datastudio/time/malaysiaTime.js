@@ -181,6 +181,26 @@ function getPartsMYT(epochMs, options) {
   return byType;
 }
 
+/**
+ * The twelve-hour twin of getPartsMYT, and it follows the same discipline for
+ * the same reason: pin the hour cycle, never pass `hour12`. 'h12' is the 1-12
+ * cycle that renders midnight as "12 AM"; 'h11' is the 0-11 cycle that would
+ * render it as "0 AM" -- the exact mirror of the "24:00" bug its sibling
+ * guards against. Do not "simplify" this by adding `hour12: true`.
+ */
+function getParts12MYT(epochMs, options) {
+  const formatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kuala_Lumpur',
+    hourCycle: 'h12',
+    ...options,
+  });
+  const byType = {};
+  for (const part of formatter.formatToParts(new Date(epochMs))) {
+    byType[part.type] = part.value;
+  }
+  return byType;
+}
+
 export function formatMYT(epochMs, style = 'datetime') {
   if (Number.isNaN(epochMs)) return '—';
 
@@ -201,7 +221,18 @@ export function formatMYT(epochMs, style = 'datetime') {
     return `${hour}:${minute}`;
   };
 
+  const timePart12 = () => {
+    const { hour, minute, dayPeriod } = getParts12MYT(epochMs, {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    // Some ICU builds separate the day period with a narrow no-break space.
+    return `${hour}:${minute} ${dayPeriod.replace(/\s/g, '').toUpperCase()}`;
+  };
+
   if (style === 'date') return datePart();
   if (style === 'time') return timePart();
+  if (style === 'time12') return timePart12();
+  if (style === 'datetime12') return `${datePart()} ${timePart12()}`;
   return `${datePart()} ${timePart()}`;
 }

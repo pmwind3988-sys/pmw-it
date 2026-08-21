@@ -78,6 +78,7 @@ pmw-it/
 | Device report parsing | `src/features/devices/parse/` |
 | Device derived fields and risk | `src/features/devices/derive/` |
 | Device SharePoint schema | `src/features/devices/sharepoint/deviceSchema.js` |
+| Device SharePoint list views | `src/features/devices/sharepoint/deviceViews.js` |
 | Device fleet statistics | `src/features/devices/stats/deviceStats.js` |
 | Bar and column charts | `src/components/ui/Charts.jsx` (shared by both dashboards) |
 | SharePoint writes | `src/services/sharePointService.js` |
@@ -160,6 +161,13 @@ if you get them wrong:
 3. **Read `InternalName`, never `StaticName`**, when checking which columns
    already exist. The two can disagree, and a column where they disagree is
    precisely the broken one.
+4. **REST-created columns join no view.** A freshly provisioned list shows
+   nothing but its Title until view fields are set explicitly, which is what
+   `deviceViews.js` is for.
+5. **`ViewQuery` is only honoured in the creation body.** A default view is
+   never created, so a filter or sort declared on one has to be MERGEd on
+   afterwards or it is silently dropped. Address the built-in view through
+   `/defaultView`, not `getByTitle('All Items')` — that title is English-only.
 
 `ensureAssetColumns` in `src/services/sharePointService.js` still has bug 1:
 it sends `Choices` with `__metadata: SP.Field`. Its lists predate the bug, so

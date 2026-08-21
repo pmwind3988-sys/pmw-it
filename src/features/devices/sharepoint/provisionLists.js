@@ -2,6 +2,7 @@ import { spFetch, getFormDigest, listPath } from './spClient.js';
 import {
   DEVICE_COLUMNS, CHANGE_COLUMNS, DEVICE_LIST_NAME, CHANGE_LIST_NAME,
 } from './deviceSchema.js';
+import { DEVICE_VIEWS } from './deviceViews.js';
 
 const FIELD_TYPE_KIND = { text: 2, note: 3, datetime: 4, choice: 6, boolean: 8, number: 9 };
 
@@ -198,6 +199,134 @@ async function ensureColumns(siteUrl, token, digest, title, columns, onColumn) {
   }
 }
 
+
+/**
+ * `defaultView` rather than a title lookup: the built-in view is called "All
+ * Items" only in English, and this has to work on a site in any locale.
+ */
+const viewPath = (view) => (view.isDefault
+  ? `${listPath(view.list)}/defaultView`
+  : `${listPath(view.list)}/views/getByTitle('${encodeURIComponent(view.title)}')`);
+
+async function viewTitles(siteUrl, token, listTitle) {
+  const response = await spFetch(siteUrl, `${listPath(listTitle)}/views?$select=Title`, { token });
+  if (!response.ok) throw new Error(`Could not read the views of "${listTitle}" (${response.status})`);
+
+  const data = await response.json();
+  return new Set((data.d?.results ?? []).map((v) => v.Title));
+}
+
+async function currentViewFields(siteUrl, token, view) {
+  const response = await spFetch(siteUrl, `${viewPath(view)}/viewfields`, { token });
+  if (!response.ok) return null;
+
+  const data = await response.json();
+  return data.d?.Items?.results ?? null;
+}
+
+async function currentViewQuery(siteUrl, token, view) {
+  const response = await spFetch(siteUrl, `${viewPath(view)}?$select=ViewQuery`, { token });
+  if (!response.ok) return null;
+
+  const data = await response.json();
+  return data.d?.ViewQuery ?? '';
+}
+
+/**
+ * ViewQuery is only accepted in the creation body, and a default view is never
+ * created -- so a filter or sort declared on one has to be merged on
+ * afterwards or it is silently ignored.
+ */
+async function setViewQuery(siteUrl, token, digest, view) {
+  const response = await spFetch(siteUrl, viewPath(view), {
+    token,
+    digest,
+    method: 'POST',
+    body: { __metadata: { type: 'SP.View' }, ViewQuery: view.query },
+    headers: { 'X-HTTP-Method': 'MERGE', 'IF-MATCH': '*' },
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Could not set the "${view.title}" view query (${response.status}): `
+        + `${await response.text()}`,
+    );
+  }
+}
+
+async function setViewFields(siteUrl, token, digest, view) {
+  const base = `${viewPath(view)}/viewfields`;
+
+  const cleared = await spFetch(siteUrl, `${base}/removeallviewfields`, {
+    token, digest, method: 'POST',
+  });
+  if (!cleared.ok) {
+    throw new Error(
+      `Could not clear the "${view.title}" view (${cleared.status}): ${await cleared.text()}`,
+    );
+  }
+
+  // One request per field, and order is the order they are added.
+  for (const field of view.fields) {
+    const added = await spFetch(siteUrl, `${base}/addviewfield('${field}')`, {
+      token, digest, method: 'POST',
+    });
+    if (!added.ok) {
+      throw new Error(
+        `Could not add "${field}" to the "${view.title}" view (${added.status}): `
+          + `${await added.text()}`,
+      );
+    }
+  }
+}
+
+async function ensureView(siteUrl, token, digest, view, existingTitles) {
+  if (!view.isDefault && !existingTitles.has(view.title)) {
+    const created = await spFetch(siteUrl, `${listPath(view.list)}/views`, {
+      token,
+      digest,
+      method: 'POST',
+      body: {
+        __metadata: { type: 'SP.View' },
+        Title: view.title,
+        ViewQuery: view.query ?? '',
+        ViewType: 'HTML',
+        RowLimit: 100,
+        PersonalView: false,
+      },
+    });
+
+    if (!created.ok && created.status !== 201) {
+      throw new Error(
+        `Could not create the "${view.title}" view (${created.status}): ${await created.text()}`,
+      );
+    }
+  }
+
+  if (view.query) {
+    const currentQuery = await currentViewQuery(siteUrl, token, view);
+    if (currentQuery !== view.query) await setViewQuery(siteUrl, token, digest, view);
+  }
+
+  // Rewriting the fields costs a request per field, so it only happens when
+  // they are actually wrong -- otherwise every save would redo the whole set.
+  const current = await currentViewFields(siteUrl, token, view);
+  if (current && current.join('|') === view.fields.join('|')) return;
+
+  await setViewFields(siteUrl, token, digest, view);
+}
+
+async function ensureViews(siteUrl, token, digest) {
+  const byList = new Map();
+
+  for (const view of DEVICE_VIEWS) {
+    if (!byList.has(view.list)) {
+      byList.set(view.list, await viewTitles(siteUrl, token, view.list));
+    }
+    await ensureView(siteUrl, token, digest, view, byList.get(view.list));
+  }
+}
+
 /**
  * `onProgress(done, total)` counts columns checked across both lists. On a
  * first run this is around 70 sequential round trips and takes over a minute,
@@ -224,6 +353,9 @@ export async function provisionLists(siteUrl, token, { onProgress } = {}) {
     'Field-level change history for the device list',
   );
   await ensureColumns(siteUrl, token, digest, CHANGE_LIST_NAME, CHANGE_COLUMNS, tick);
+
+  // Last, because a view can only show columns that already exist.
+  await ensureViews(siteUrl, token, digest);
 
   return digest;
 }

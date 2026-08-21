@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { applyFilters, toCsv, ramBucket, isStale } from './deviceFilters.js';
+import { applyFilters, toCsv, ramBucket, isStale, labelOf } from './deviceFilters.js';
 
 const rows = [
   {
@@ -14,8 +14,13 @@ const rows = [
   },
   {
     computerName: 'C', owner: null, riskLevel: 'Watch', deviceType: 'Laptop',
-    department: null, osSupported: true, storageType: 'SSD only', installedRamGB: 8,
+    department: '', osSupported: true, storageType: 'SSD only', installedRamGB: 8,
     avProtected: true, cpuAgeBand: 'Current',
+  },
+  {
+    computerName: 'D', owner: 'Dee', riskLevel: 'High', deviceType: null,
+    department: 'SALES', osSupported: true, storageType: null, installedRamGB: 16,
+    avProtected: null, cpuAgeBand: null,
   },
 ];
 
@@ -41,11 +46,26 @@ describe('isStale', () => {
 
 describe('applyFilters', () => {
   it('returns everything when no filter is set', () => {
-    expect(applyFilters(rows, {})).toHaveLength(3);
+    expect(applyFilters(rows, {})).toHaveLength(4);
   });
 
   it('ignores a filter whose value is empty', () => {
-    expect(applyFilters(rows, { risk: '' })).toHaveLength(3);
+    expect(applyFilters(rows, { risk: '' })).toHaveLength(4);
+  });
+
+  it('finds both bands behind the "Need attention" figure', () => {
+    expect(applyFilters(rows, { attention: '1' }).map((r) => r.computerName)).toEqual(['A', 'D']);
+  });
+
+  it('matches the Unassigned label the charts count under', () => {
+    expect(applyFilters(rows, { type: 'Unassigned' }).map((r) => r.computerName)).toEqual(['D']);
+    expect(applyFilters(rows, { storage: 'Unassigned' }).map((r) => r.computerName)).toEqual(['D']);
+    expect(applyFilters(rows, { cpu: 'Unassigned' }).map((r) => r.computerName)).toEqual(['D']);
+  });
+
+  it('leaves an unreadable antivirus state out of both buckets', () => {
+    expect(applyFilters(rows, { av: 'Unprotected' }).map((r) => r.computerName)).toEqual(['A']);
+    expect(applyFilters(rows, { av: 'Protected' }).map((r) => r.computerName)).toEqual(['B', 'C']);
   });
 
   it('filters by risk level', () => {
@@ -56,8 +76,14 @@ describe('applyFilters', () => {
     expect(applyFilters(rows, { type: 'Laptop' }).map((r) => r.computerName)).toEqual(['B', 'C']);
   });
 
+  it('reads a blank as Unassigned', () => {
+    expect(labelOf('')).toBe('Unassigned');
+    expect(labelOf(null)).toBe('Unassigned');
+    expect(labelOf('SALES')).toBe('SALES');
+  });
+
   it('filters by department, matching a blank one as Unassigned', () => {
-    expect(applyFilters(rows, { department: 'SALES' })).toHaveLength(1);
+    expect(applyFilters(rows, { department: 'SALES' })).toHaveLength(2);
     expect(applyFilters(rows, { department: 'Unassigned' }).map((r) => r.computerName))
       .toEqual(['C']);
   });
@@ -90,7 +116,7 @@ describe('applyFilters', () => {
   });
 
   it('ignores an unrecognised filter key rather than returning nothing', () => {
-    expect(applyFilters(rows, { nonsense: 'x' })).toHaveLength(3);
+    expect(applyFilters(rows, { nonsense: 'x' })).toHaveLength(4);
   });
 });
 

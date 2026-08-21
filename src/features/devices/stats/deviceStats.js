@@ -1,4 +1,4 @@
-import { isStale } from '../deviceFilters.js';
+import { isStale, labelOf, ATTENTION_LEVELS } from '../deviceFilters.js';
 
 /**
  * A scan that failed is not a healthy machine — it is an unknown one. Counting
@@ -14,7 +14,7 @@ export function fleetSummary(devices, now = Date.now()) {
   return {
     total: rows.length,
     needsAttention: rows.filter(
-      (device) => device.riskLevel === 'Critical' || device.riskLevel === 'High',
+      (device) => ATTENTION_LEVELS.includes(device.riskLevel),
     ).length,
     unsupportedOs: rows.filter((device) => device.osSupported === false).length,
     unprotected: rows.filter((device) => device.avProtected === false).length,
@@ -27,7 +27,7 @@ export function countBy(devices, keyFn) {
   const counts = new Map();
 
   for (const device of complete(devices)) {
-    const label = keyFn(device) ?? 'Unassigned';
+    const label = labelOf(keyFn(device));
     counts.set(label, (counts.get(label) ?? 0) + 1);
   }
 

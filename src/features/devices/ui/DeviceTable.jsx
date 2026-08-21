@@ -61,10 +61,21 @@ const COLUMNS = [...SCHEMA_COLUMNS].sort((a, b) => rank(a.key) - rank(b.key));
 const CELL_ENTRIES = 2;
 
 const FILTER_LABELS = {
-  risk: 'Risk', type: 'Type', department: 'Department', os: 'OS', av: 'Antivirus',
-  storage: 'Storage', ram: 'RAM', cpu: 'CPU age', windows: 'Windows', stale: 'Stale scans',
-  q: 'Search',
+  risk: 'Risk', attention: 'Needs attention', type: 'Type', department: 'Department',
+  os: 'OS', av: 'Antivirus', storage: 'Storage', ram: 'RAM', cpu: 'CPU age',
+  windows: 'Windows', stale: 'Stale scans', q: 'Search',
 };
+
+/**
+ * The on/off filters carry no value worth reading -- their chip is the label
+ * alone, not "Needs attention: 1".
+ */
+const FLAG_FILTERS = new Set(['attention', 'stale']);
+
+const chipText = (key, value) =>
+  (FLAG_FILTERS.has(key)
+    ? (FILTER_LABELS[key] ?? key)
+    : `${FILTER_LABELS[key] ?? key}: ${value}`);
 
 function download(name, text) {
   const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8;' }));
@@ -163,7 +174,7 @@ export default function DeviceTable({
               onClick={() => onFilterChange(key, '')}
               aria-label={`Remove the ${FILTER_LABELS[key] ?? key} filter`}
             >
-              {FILTER_LABELS[key] ?? key}: {value}
+              {chipText(key, value)}
               <X size={12} />
             </button>
           ))}

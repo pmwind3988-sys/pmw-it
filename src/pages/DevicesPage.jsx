@@ -18,6 +18,7 @@ import { importFiles, mergeImports } from '../features/devices/importFiles';
 import { issuesFor, sortForReview } from '../features/devices/reviewIssues';
 import { useDevices } from '../features/devices/useDevices';
 import { fleetSummary } from '../features/devices/stats/deviceStats';
+import { labelOf } from '../features/devices/deviceFilters';
 import { syncDevices } from '../features/devices/sharepoint/syncDevices';
 import { updateDevice, deleteDevice } from '../features/devices/sharepoint/updateDevice';
 import { provisionLists } from '../features/devices/sharepoint/provisionLists';
@@ -32,7 +33,8 @@ const IDLE_SAVE = {
 
 /** Everything in the query string that is a filter rather than a view switch. */
 const FILTER_KEYS = [
-  'risk', 'type', 'department', 'os', 'av', 'storage', 'ram', 'cpu', 'windows', 'stale', 'q',
+  'risk', 'attention', 'type', 'department', 'os', 'av',
+  'storage', 'ram', 'cpu', 'windows', 'stale', 'q',
 ];
 
 export default function DevicesPage() {
@@ -73,13 +75,13 @@ export default function DevicesPage() {
   const department = params.get('department') ?? '';
 
   const departments = useMemo(() => {
-    const names = new Set(saved.map((device) => device.department || 'Unassigned'));
+    const names = new Set(saved.map((device) => labelOf(device.department)));
     return [...names].sort((a, b) => a.localeCompare(b));
   }, [saved]);
 
   const scoped = useMemo(
     () => (department
-      ? saved.filter((device) => (device.department || 'Unassigned') === department)
+      ? saved.filter((device) => labelOf(device.department) === department)
       : saved),
     [saved, department],
   );
@@ -299,7 +301,7 @@ export default function DevicesPage() {
               value={summary.needsAttention}
               color="var(--it-danger)"
               loading={loading}
-              onClick={() => openRegister('risk', 'Critical')}
+              onClick={() => openRegister('attention', '1')}
             />
             <StatCard
               icon={ShieldCheck}

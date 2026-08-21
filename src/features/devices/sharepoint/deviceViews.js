@@ -1,4 +1,4 @@
-import { DEVICE_LIST_NAME, CHANGE_LIST_NAME } from './deviceSchema.js';
+import { DEVICE_LIST_NAME, CHANGE_LIST_NAME, DEVICE_COLUMNS } from './deviceSchema.js';
 
 /**
  * `LinkTitle` rather than `Title`: it renders the computer name as the link
@@ -7,23 +7,39 @@ import { DEVICE_LIST_NAME, CHANGE_LIST_NAME } from './deviceSchema.js';
 const NAME = 'LinkTitle';
 
 /**
+ * The whole scan, minus the report itself. `Raw Report` is the notepad file
+ * verbatim -- one cell of it is taller than the screen, and every other column
+ * on the row is already a parsed piece of it.
+ */
+const HIDDEN_FROM_ALL_ITEMS = new Set(['RawReport']);
+
+/**
+ * Built from the schema rather than typed out, so a column added to the list
+ * shows up in the default view instead of being created and never seen.
+ */
+const EVERY_DEVICE_FIELD = [
+  NAME,
+  ...DEVICE_COLUMNS
+    .map((column) => column.StaticName)
+    .filter((name) => !HIDDEN_FROM_ALL_ITEMS.has(name)),
+];
+
+/**
  * REST-created columns are not added to any view automatically, so a freshly
  * provisioned list shows nothing but its Title. These are the views worth
- * having, and the raw multi-line columns are deliberately absent from all of
- * them — one `Raw Report` cell makes a row taller than the screen.
+ * having: everything on the default view, and narrower cuts for the two jobs
+ * the register is actually used for.
  */
 export const DEVICE_VIEWS = [
   {
     list: DEVICE_LIST_NAME,
     isDefault: true,
     title: 'All Items',
-    // The same columns and order as the portal's register, so the two screens
-    // cannot tell different stories about the same machine.
-    fields: [
-      NAME, 'Owner', 'Department', 'DeviceType', 'ComputerModel', 'CpuModel',
-      'InstalledRamGB', 'StorageTotalGB', 'StorageType', 'WindowsVersion',
-      'AntivirusStatus', 'RiskLevel', 'ScannedOn',
-    ],
+    // Every field the scan produced, in schema order. Wide enough to need
+    // sideways scrolling -- which is the point: nothing read out of the report
+    // is hidden here, and the narrower views below are where you go to read a
+    // row at a glance.
+    fields: EVERY_DEVICE_FIELD,
   },
   {
     list: DEVICE_LIST_NAME,

@@ -5,22 +5,66 @@ import { Download, Search, X, Pencil, Check, AlertTriangle } from '../../../comp
 import { formatMYT } from '../../datastudio/time/malaysiaTime';
 import { applyFilters, toCsv } from '../deviceFilters';
 import { EDITABLE_FIELDS } from '../sharepoint/updateDevice';
+import { DEVICE_COLUMNS } from '../sharepoint/deviceSchema';
 
-const COLUMNS = [
-  { key: 'computerName', label: 'Computer' },
-  { key: 'owner', label: 'Owner' },
-  { key: 'department', label: 'Department' },
-  { key: 'deviceType', label: 'Type' },
-  { key: 'computerModel', label: 'Model' },
-  { key: 'cpuModel', label: 'CPU' },
-  { key: 'installedRamGB', label: 'RAM (GB)', numeric: true },
-  { key: 'storageTotalGB', label: 'Storage (GB)', numeric: true },
-  { key: 'storageType', label: 'Disks' },
-  { key: 'windowsVersion', label: 'Windows' },
-  { key: 'antivirusStatus', label: 'Antivirus' },
-  { key: 'riskScore', label: 'Score', numeric: true },
-  { key: 'riskLevel', label: 'Risk' },
+/**
+ * The columns worth seeing first, in this order. Everything else the scan
+ * produced follows in schema order -- the table is deliberately wider than the
+ * screen and scrolls sideways, because a field read out of a report and then
+ * hidden here is a field nobody knows was collected.
+ */
+const LEAD_KEYS = [
+  'computerName', 'owner', 'department', 'deviceType', 'computerModel', 'cpuModel',
+  'installedRamGB', 'storageTotalGB', 'storageType', 'windowsVersion',
+  'antivirusStatus', 'riskScore', 'riskLevel',
 ];
+
+/**
+ * `scannedOn` has its own column at the far right, formatted in Malaysia time;
+ * `scannedOnMYT` is that same instant again; `rawReport` is the whole report
+ * file, one cell of which is taller than the screen.
+ */
+const SKIP_KEYS = new Set(['scannedOn', 'scannedOnMYT', 'rawReport']);
+
+/** camelCase record key for a StaticName: first letter lowered. */
+const keyFor = (staticName) => staticName.charAt(0).toLowerCase() + staticName.slice(1);
+
+const SCHEMA_COLUMNS = [
+  // `Title` holds the computer name, so the schema never lists it.
+  { key: 'computerName', label: 'Computer' },
+  ...DEVICE_COLUMNS
+    .map((column) => ({
+      key: keyFor(column.StaticName),
+      label: column.Title,
+      numeric: column.kind === 'number',
+      boolean: column.kind === 'boolean',
+      date: column.kind === 'datetime',
+    }))
+    .filter((column) => !SKIP_KEYS.has(column.key)),
+];
+
+const rank = (key) => {
+  const lead = LEAD_KEYS.indexOf(key);
+  return lead === -1 ? LEAD_KEYS.length : lead;
+};
+
+// A stable sort, so the columns outside LEAD_KEYS keep their schema order.
+const COLUMNS = [...SCHEMA_COLUMNS].sort((a, b) => rank(a.key) - rank(b.key));
+
+/**
+ * A cell has to survive every kind the schema produces. `false` is the one
+ * that bites: React renders a bare boolean as nothing at all, so an unprotected
+ * machine would show an empty cell rather than "No".
+ */
+function display(value, column) {
+  if (value === null || value === undefined || value === '') return '—';
+  if (column.boolean || typeof value === 'boolean') return value ? 'Yes' : 'No';
+  // A timestamp, not a number to read: `importedOn` would otherwise show as
+  // thirteen digits of epoch milliseconds.
+  if (column.date) return formatMYT(value, 'datetime12');
+  if (Array.isArray(value)) return value.length ? value.join(', ') : '—';
+  return String(value);
+}
 
 const FILTER_LABELS = {
   risk: 'Risk', type: 'Type', department: 'Department', os: 'OS', av: 'Antivirus',
@@ -200,7 +244,7 @@ export default function DeviceTable({
                             ? `rg-risk rg-risk-${String(device.riskLevel).toLowerCase()}`
                             : undefined}
                         >
-                          {device[column.key] ?? '—'}
+                          {display(device[column.key], column)}
                           {manual.has(column.key) && (
                             <span className="dt-manual" title="Set by hand — imports leave this alone">
                               edited

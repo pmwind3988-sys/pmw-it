@@ -62,20 +62,38 @@ describe('DEVICE_VIEWS', () => {
     }
   });
 
-  it('keeps the multi-line columns out of the general views', () => {
-    // A single Raw Report cell is taller than the screen.
+  // The default view is the whole scan: anything read out of a report has a
+  // column there, or the register is quietly hiding what it collected.
+  it('shows every scanned column on the default device view', () => {
+    const all = DEVICE_VIEWS.find((v) => v.list === DEVICE_LIST_NAME && v.isDefault);
+    const shown = new Set(all.fields);
+
+    for (const column of DEVICE_COLUMNS) {
+      if (column.StaticName === 'RawReport') continue;
+      expect(shown, `All Items -> ${column.StaticName}`).toContain(column.StaticName);
+    }
+  });
+
+  it('keeps the report itself off the default view', () => {
+    // A single Raw Report cell is taller than the screen, and every other
+    // column on the row is a parsed piece of it.
+    const all = DEVICE_VIEWS.find((v) => v.list === DEVICE_LIST_NAME && v.isDefault);
+    expect(all.fields).not.toContain('RawReport');
+  });
+
+  it('keeps the multi-line columns out of the narrowed views', () => {
     const heavy = ['RawReport', 'RamSlotInfoRaw', 'StorageDrivesRaw', 'EmailDataFiles',
       'ServerFolders', 'ServerCredentials', 'AntivirusProducts', 'MonitorsRaw', 'ExtraFields'];
 
-    for (const view of DEVICE_VIEWS) {
+    for (const view of DEVICE_VIEWS.filter((v) => !v.isDefault)) {
       for (const field of heavy) {
         expect(view.fields, `${view.title}`).not.toContain(field);
       }
     }
   });
 
-  it('shows Risk Reasons only where the list is already narrowed to it', () => {
-    const withReasons = DEVICE_VIEWS.filter((v) => v.fields.includes('RiskReasons'));
+  it('shows Risk Reasons on the narrowed views only where the list is cut to it', () => {
+    const withReasons = DEVICE_VIEWS.filter((v) => !v.isDefault && v.fields.includes('RiskReasons'));
     expect(withReasons.map((v) => v.title)).toEqual(['Needs attention']);
     expect(withReasons[0].query).toContain('RiskLevel');
   });

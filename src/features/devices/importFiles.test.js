@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { importFiles } from './importFiles.js';
+import { importFiles, mergeImports } from './importFiles.js';
 
 const fixture = (name) =>
   readFileSync(fileURLToPath(new URL(`./__fixtures__/${name}`, import.meta.url)), 'utf8');
@@ -65,5 +65,33 @@ describe('importFiles', () => {
     expect(result.rejected).toEqual([
       { fileName: 'broken.txt', reason: 'Could not read the file: disk gone' },
     ]);
+  });
+});
+
+describe('mergeImports', () => {
+  it('adds a second drop to the first instead of replacing it', async () => {
+    const first = await importFiles([fakeFile('ASHRAF-PC_.txt', 1_760_000_000_000)]);
+    const second = await importFiles([fakeFile('PMWL034_.txt', 1_760_000_000_000)]);
+
+    const merged = mergeImports(first, second);
+    expect(merged.devices.map((d) => d.computerName).sort()).toEqual(['ASHRAF-PC', 'PMWL034']);
+  });
+
+  it('keeps the newer scan when the same machine is dropped twice', async () => {
+    const older = await importFiles([fakeFile('PMWL034_.txt', 1_760_000_000_000)]);
+    const newer = await importFiles([fakeFile('PMWL034_.txt', 1_760_000_000_000)]);
+
+    const merged = mergeImports(older, newer);
+    expect(merged.devices).toHaveLength(1);
+    expect(merged.rejected).toHaveLength(1);
+    expect(merged.rejected[0].reason).toMatch(/Duplicate of PMWL034/);
+  });
+
+  it('carries the rejections of both drops', async () => {
+    const first = await importFiles([fakeFile('report.pdf', 0, 'nonsense')]);
+    const second = await importFiles([fakeFile('other.pdf', 0, 'nonsense')]);
+
+    const merged = mergeImports(first, second);
+    expect(merged.rejected.map((r) => r.fileName)).toEqual(['report.pdf', 'other.pdf']);
   });
 });

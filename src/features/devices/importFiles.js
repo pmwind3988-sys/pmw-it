@@ -64,3 +64,13 @@ export async function importFiles(files) {
 
   return dedupe(devices, rejected);
 }
+
+/**
+ * Fold a fresh import into one already under review, so a second drop adds to
+ * the grid instead of replacing it. Runs the same duplicate rule across the
+ * combined set: the newer scan of a machine wins, whichever drop it came from.
+ */
+export function mergeImports(existing, incoming) {
+  const rejected = [...existing.rejected, ...incoming.rejected];
+  return dedupe([...existing.devices, ...incoming.devices], rejected);
+}

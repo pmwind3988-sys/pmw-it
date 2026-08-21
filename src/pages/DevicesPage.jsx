@@ -14,7 +14,7 @@ import SaveProgress from '../features/devices/ui/SaveProgress';
 import DeviceTable from '../features/devices/ui/DeviceTable';
 import DeviceCharts from '../features/devices/ui/DeviceCharts';
 import Leaderboards from '../features/devices/ui/Leaderboards';
-import { importFiles } from '../features/devices/importFiles';
+import { importFiles, mergeImports } from '../features/devices/importFiles';
 import { issuesFor, sortForReview } from '../features/devices/reviewIssues';
 import { useDevices } from '../features/devices/useDevices';
 import { fleetSummary } from '../features/devices/stats/deviceStats';
@@ -113,17 +113,21 @@ export default function DevicesPage() {
   const handleFiles = useCallback(async (files) => {
     setBusy(true);
     try {
-      const result = await importFiles(files);
-      // Sorted once, here: the grid must not reorder while somebody edits it.
+      const incoming = await importFiles(files);
+      // A second drop adds to the review rather than starting it over, so a
+      // batch that arrives in several goes still ends up as one save. Edits
+      // already made are keyed by file name and survive untouched.
+      const result = parsed.length
+        ? mergeImports({ devices: parsed, rejected: [] }, incoming)
+        : incoming;
+      // Sorted once per drop: the grid must not reorder while somebody edits it.
       setParsed(sortForReview(result.devices));
       setRejected(result.rejected);
-      setEdits({});
-      setExcluded(new Set());
-      setStage(result.devices.length ? 'review' : 'drop');
+      if (result.devices.length) setStage('review');
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [parsed]);
 
   const handleChange = (id, key, value) =>
     setEdits((current) => ({ ...current, [id]: { ...(current[id] ?? {}), [key]: value } }));
@@ -392,6 +396,8 @@ export default function DevicesPage() {
               onToggleRow={handleToggleRow}
             />
           )}
+
+          <DropZone onFiles={handleFiles} busy={busy} compact />
 
           {rejectedList}
         </Card>

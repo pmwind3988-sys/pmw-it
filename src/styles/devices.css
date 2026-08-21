@@ -17,6 +17,16 @@
   transition: border-color 120ms ease, background 120ms ease;
 }
 
+.dz-compact {
+  gap: 6px;
+  margin-top: 16px;
+  padding: 18px 16px;
+}
+
+.dz-compact .dz-title {
+  font-size: 14px;
+}
+
 .dz-active {
   border-color: var(--it-brand);
   background: var(--it-brand-wash);

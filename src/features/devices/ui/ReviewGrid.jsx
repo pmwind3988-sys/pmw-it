@@ -1,5 +1,5 @@
 import { formatMYT } from '../../datastudio/time/malaysiaTime';
-import { issuesFor, sortForReview } from '../reviewIssues';
+import { issuesFor } from '../reviewIssues';
 
 /**
  * `editable: true` marks a column whose value was DERIVED rather than read
@@ -22,8 +22,14 @@ const COLUMNS = [
   { key: 'riskLevel', label: 'Risk' },
 ];
 
+/**
+ * Row order is fixed by the caller at import time, never recomputed here.
+ * Sorting on every render would move a row out from under the cursor the
+ * moment an edit cleared its last issue -- which is exactly when someone is
+ * typing into it.
+ */
 export default function ReviewGrid({ devices, excluded, onChange, onToggleRow }) {
-  const rows = sortForReview(devices);
+  const rows = devices;
 
   return (
     <div className="rg-wrap">

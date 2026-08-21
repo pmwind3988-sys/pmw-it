@@ -15,7 +15,7 @@ import DeviceTable from '../features/devices/ui/DeviceTable';
 import DeviceCharts from '../features/devices/ui/DeviceCharts';
 import Leaderboards from '../features/devices/ui/Leaderboards';
 import { importFiles } from '../features/devices/importFiles';
-import { issuesFor } from '../features/devices/reviewIssues';
+import { issuesFor, sortForReview } from '../features/devices/reviewIssues';
 import { useDevices } from '../features/devices/useDevices';
 import { fleetSummary } from '../features/devices/stats/deviceStats';
 import { syncDevices } from '../features/devices/sharepoint/syncDevices';
@@ -91,7 +91,8 @@ export default function DevicesPage() {
     setBusy(true);
     try {
       const result = await importFiles(files);
-      setParsed(result.devices);
+      // Sorted once, here: the grid must not reorder while somebody edits it.
+      setParsed(sortForReview(result.devices));
       setRejected(result.rejected);
       setEdits({});
       setExcluded(new Set());

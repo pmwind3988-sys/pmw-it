@@ -95,19 +95,77 @@ async function ensureList(siteUrl, token, digest, title, description) {
   }
 }
 
-async function existingFieldNames(siteUrl, token, title) {
-  const response = await spFetch(siteUrl, `${listPath(title)}/fields?$select=StaticName`, { token });
+/**
+ * Keyed by internal name, because that is the name item writes address.
+ * `StaticName` is the wrong key here: it can disagree with the internal name,
+ * and a column where the two disagree is exactly the broken case below.
+ */
+async function existingFields(siteUrl, token, title) {
+  const path = `${listPath(title)}/fields?$select=InternalName,Title`;
+  const response = await spFetch(siteUrl, path, { token });
   if (!response.ok) throw new Error(`Could not read the fields of "${title}" (${response.status})`);
 
   const data = await response.json();
-  return new Set((data.d?.results ?? []).map((field) => field.StaticName));
+  return new Map((data.d?.results ?? []).map((field) => [field.InternalName, field.Title]));
+}
+
+/**
+ * A leftover from before columns were created under their internal names: the
+ * header we want, sitting on a field the item writes cannot reach.
+ *
+ * Its internal name is always an encoded one, since encoding is the only thing
+ * that makes the two names diverge. Requiring that keeps a built-in field which
+ * happens to share a display name from being mistaken for one of these.
+ */
+function staleColumn(column, fields) {
+  for (const [internalName, display] of fields) {
+    if (display === column.Title && internalName.includes('_x00')) return internalName;
+  }
+  return null;
+}
+
+/** Display name only. The internal name is fixed at creation and stays put. */
+async function renameColumn(siteUrl, token, digest, title, column) {
+  const renamed = await spFetch(
+    siteUrl,
+    `${listPath(title)}/fields/getByInternalNameOrTitle('${column.StaticName}')`,
+    {
+      token,
+      digest,
+      method: 'POST',
+      body: renameBody(column),
+      headers: { 'X-HTTP-Method': 'MERGE', 'IF-MATCH': '*' },
+    },
+  );
+
+  if (!renamed.ok) {
+    throw new Error(
+      `Could not rename the "${column.StaticName}" column (${renamed.status}): `
+        + `${await renamed.text()}`,
+    );
+  }
 }
 
 async function ensureColumns(siteUrl, token, digest, title, columns) {
-  const existing = await existingFieldNames(siteUrl, token, title);
+  const fields = await existingFields(siteUrl, token, title);
 
   for (const column of columns) {
-    if (existing.has(column.StaticName)) continue;
+    if (fields.has(column.StaticName)) {
+      // Finishes a run that died between creating a column and renaming it,
+      // which would otherwise leave the header reading `DeviceType` for good.
+      if (fields.get(column.StaticName) !== column.Title) {
+        await renameColumn(siteUrl, token, digest, title, column);
+      }
+      continue;
+    }
+
+    const stale = staleColumn(column, fields);
+    if (stale) {
+      throw new Error(
+        `The "${title}" list shows "${column.Title}" on a column named ${stale}, which `
+          + 'item writes cannot address. Delete that column and save again.',
+      );
+    }
 
     const response = await spFetch(siteUrl, `${listPath(title)}/fields`, {
       token,
@@ -125,27 +183,7 @@ async function ensureColumns(siteUrl, token, digest, title, columns) {
     }
 
     if (column.Title === column.StaticName) continue;
-
-    // Rename for display only. The internal name is already fixed by creation,
-    // so this cannot break the item writes.
-    const renamed = await spFetch(
-      siteUrl,
-      `${listPath(title)}/fields/getByInternalNameOrTitle('${column.StaticName}')`,
-      {
-        token,
-        digest,
-        method: 'POST',
-        body: renameBody(column),
-        headers: { 'X-HTTP-Method': 'MERGE', 'IF-MATCH': '*' },
-      },
-    );
-
-    if (!renamed.ok) {
-      throw new Error(
-        `Could not rename the "${column.StaticName}" column (${renamed.status}): `
-          + `${await renamed.text()}`,
-      );
-    }
+    await renameColumn(siteUrl, token, digest, title, column);
   }
 }
 

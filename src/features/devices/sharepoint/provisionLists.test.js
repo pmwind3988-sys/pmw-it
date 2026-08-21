@@ -100,11 +100,13 @@ function fakeSharePoint({ existingFields = [], renameStatus = 200 } = {}) {
       if (url.endsWith('/_api/contextinfo')) {
         return reply({ d: { GetContextWebInformation: { FormDigestValue: 'DIGEST' } } });
       }
-      if (url.includes('/fields?$select=StaticName')) {
+      if (url.includes('/fields?$select=')) {
         return reply({
           d: {
-            results: existingFields.map((name) => ({
-              StaticName: name, InternalName: name, Title: name,
+            results: existingFields.map(({ internalName, title, staticName }) => ({
+              InternalName: internalName,
+              StaticName: staticName ?? internalName,
+              Title: title,
             })),
           },
         });
@@ -162,17 +164,62 @@ describe('provisionLists', () => {
     expect(renamesFor(sp.calls, 'Owner')).toHaveLength(0);
   });
 
-  it('leaves a column that already exists alone', async () => {
-    const sp = fakeSharePoint({ existingFields: ['DeviceType'] });
+  it('renames a column left showing its internal name as its header', async () => {
+    // What a run that died between the create and the rename leaves behind.
+    // The next run has to finish the job rather than skip the column.
+    const sp = fakeSharePoint({
+      existingFields: [{ internalName: 'DeviceType', title: 'DeviceType' }],
+    });
     vi.stubGlobal('fetch', sp.fetch);
 
     await provisionLists(SITE, 'token');
 
     expect(createFor(sp.calls, 'DeviceType')).toBeUndefined();
-    // Worth knowing: a column left over from before the rename step existed
-    // keeps its internal name as its header, because this run never
-    // revisits a column it did not create.
+    const renames = renamesFor(sp.calls, 'DeviceType');
+    expect(renames).toHaveLength(1);
+    expect(renames[0].body).toEqual({
+      __metadata: { type: 'SP.FieldChoice' },
+      Title: 'Device Type',
+    });
+  });
+
+  it('costs nothing for a column that is already correct', async () => {
+    const sp = fakeSharePoint({
+      existingFields: [{ internalName: 'DeviceType', title: 'Device Type' }],
+    });
+    vi.stubGlobal('fetch', sp.fetch);
+
+    await provisionLists(SITE, 'token');
+
+    expect(createFor(sp.calls, 'DeviceType')).toBeUndefined();
     expect(renamesFor(sp.calls, 'DeviceType')).toHaveLength(0);
+  });
+
+  it('stops when the display name sits on a stale encoded column', async () => {
+    // The pre-fix code's leftover: the header we want, on a field the item
+    // writes cannot address. StaticName lies here, which is why the code
+    // reads InternalName.
+    const sp = fakeSharePoint({
+      existingFields: [{
+        internalName: 'Device_x0020_Type', staticName: 'DeviceType', title: 'Device Type',
+      }],
+    });
+    vi.stubGlobal('fetch', sp.fetch);
+
+    await expect(provisionLists(SITE, 'token')).rejects.toThrow(/Device_x0020_Type/);
+  });
+
+  it('is not fooled by an unrelated column that displays the same header', async () => {
+    // A field renamed to our header through the SharePoint UI keeps its own
+    // clean internal name, so nothing is stale here. Ours is simply absent.
+    const sp = fakeSharePoint({
+      existingFields: [{ internalName: 'Notes', title: 'Device Type' }],
+    });
+    vi.stubGlobal('fetch', sp.fetch);
+
+    await provisionLists(SITE, 'token');
+
+    expect(createFor(sp.calls, 'DeviceType')).toBeDefined();
   });
 
   it('fails loudly when a rename is rejected', async () => {

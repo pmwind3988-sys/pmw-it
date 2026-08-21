@@ -67,7 +67,24 @@ export default function DevicesPage() {
     [params],
   );
 
-  const summary = useMemo(() => fleetSummary(saved), [saved]);
+  // The dashboard reads one department at a time when asked to. It shares the
+  // register's `department` key, so a scope chosen here survives the jump into
+  // the rows behind any card.
+  const department = params.get('department') ?? '';
+
+  const departments = useMemo(() => {
+    const names = new Set(saved.map((device) => device.department || 'Unassigned'));
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }, [saved]);
+
+  const scoped = useMemo(
+    () => (department
+      ? saved.filter((device) => (device.department || 'Unassigned') === department)
+      : saved),
+    [saved, department],
+  );
+
+  const summary = useMemo(() => fleetSummary(scoped), [scoped]);
 
   const flagged = merged.filter((device) => issuesFor(device).length > 0).length;
   const included = merged.filter((device) => !excluded.has(device.sourceFileName)).length;
@@ -209,6 +226,21 @@ export default function DevicesPage() {
     </ul>
   );
 
+  const scopePicker = view === 'dashboard' && departments.length > 0 && (
+    <label className="dv-scope">
+      <span>Department</span>
+      <select
+        value={department}
+        onChange={(event) => setParam('department', event.target.value)}
+      >
+        <option value="">All departments</option>
+        {departments.map((name) => (
+          <option key={name} value={name}>{name}</option>
+        ))}
+      </select>
+    </label>
+  );
+
   const tabs = (
     <div className="dv-tabs" role="tablist">
       {[
@@ -227,13 +259,16 @@ export default function DevicesPage() {
           {label}
         </button>
       ))}
+      {scopePicker}
     </div>
   );
 
   return (
     <AppShell
       title="Device list"
-      subtitle="What every machine has, what needs attention, and what is getting old"
+      subtitle={department
+        ? `${department} — what every machine has, what needs attention, and what is getting old`
+        : 'What every machine has, what needs attention, and what is getting old'}
       actions={(
         <Button variant="secondary" size="sm" icon={RefreshCw} onClick={reload} disabled={loading}>
           Refresh
@@ -294,16 +329,18 @@ export default function DevicesPage() {
             />
           </div>
 
-          {!loading && saved.length === 0 ? (
+          {!loading && scoped.length === 0 ? (
             <Card>
               <EmptyState>
-                Nothing in the register yet. Open the Import tab and drop your scan reports.
+                {saved.length === 0
+                  ? 'Nothing in the register yet. Open the Import tab and drop your scan reports.'
+                  : `No devices are recorded against ${department}.`}
               </EmptyState>
             </Card>
           ) : (
             <>
-              <DeviceCharts devices={saved} onFilter={openRegister} />
-              <Leaderboards devices={saved} />
+              <DeviceCharts devices={scoped} onFilter={openRegister} />
+              <Leaderboards devices={scoped} />
             </>
           )}
         </>

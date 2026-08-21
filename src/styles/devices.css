@@ -300,6 +300,33 @@
   font-weight: 600;
 }
 
+/* The dashboard's department scope sits on the tab strip, pushed to the far
+   end so it reads as a lens over the tabs rather than another tab. */
+.dv-scope {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 6px auto;
+  color: var(--it-ink-soft);
+  font-size: 0.82rem;
+}
+
+.dv-scope select {
+  padding: 5px 8px;
+  border: 1px solid var(--it-line);
+  border-radius: var(--it-radius);
+  background: transparent;
+  color: var(--it-ink);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.dv-scope select:focus-visible {
+  outline: 2px solid var(--it-brand);
+  outline-offset: 1px;
+}
+
 /* ── Register ───────────────────────────────────────────────────────────── */
 
 .dt-head {

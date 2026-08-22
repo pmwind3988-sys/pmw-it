@@ -26,7 +26,7 @@ pmw-it/
 │   │   └── ui/               # Icons, Button, Surfaces, StatCard, Badges
 │   ├── features/
 │   │   ├── datastudio/       # ingest/ profile/ clean/ engine/ canvas/
-│   │   │                     # suggest/ store/ time/ worker/
+│   │   │                     # suggest/ store/ text/ time/ worker/
 │   │   └── devices/          # parse/ derive/ sharepoint/ stats/ ui/
 │   ├── hooks/
 │   │   ├── useRequests.js    # the one SharePoint read + row helpers + token
@@ -63,7 +63,7 @@ pmw-it/
 | `/it-boarding-form` | SurveyJS request form (`?edit=<id>` opens a record) |
 | `/asset-checklist` | Handover checklist (IN / OUT / individual) |
 | `/devices` | Device list: fleet dashboard, register and scan-report import (`?view=`) |
-| `/data-studio` | Import a spreadsheet, profile it, clean it, chart it. Lazy route. |
+| `/data-studio` | Import a spreadsheet, profile it, clean it, chart it. Lazy route. A Text analysis tab reads written answers locally. |
 
 ## WHERE TO LOOK
 | Task | Location |
@@ -96,6 +96,12 @@ pmw-it/
 | IndexedDB, exports, the saved library | `src/features/datastudio/store/` |
 | Malaysia time parsing and formatting | `src/features/datastudio/time/malaysiaTime.js` |
 | Data Studio state and worker lifetime | `src/features/datastudio/DataStudioContext.jsx` |
+| Multi-select column detection and encoding | `profile/inferType.js` (`detectMultiSeparator`), `engine/dataset.js` (`encodeMulti`) |
+| Splitting a written answer into issues | `src/features/datastudio/text/splitIssues.js` |
+| The analysis categories and their descriptions | `src/features/datastudio/text/buckets.js` |
+| The model, and where it is served from | `src/features/datastudio/text/embed.js`, `scripts/fetch-model.mjs` |
+| Text analysis pipeline and its worker | `text/analysis.js`, `worker/text.worker.js` |
+| The user's corrections to the analysis | `src/features/datastudio/text/overrides.js` |
 
 ## CONVENTIONS
 
@@ -278,6 +284,52 @@ No icon package is installed — add a glyph there rather than a dependency.
   difference. Use ` `, `​`, `﻿`. This is not hypothetical here:
   one such swap voided a whole test in `inferType.test.js` and was only caught
   by byte-diffing the file.
+- Don't let the analysis model or its runtime come from anywhere but this
+  app's own origin. `embed.js` sets `allowLocalModels = true`,
+  `allowRemoteModels = false`, `localModelPath` AND the runtime's `wasmPaths`.
+  The tab tells the user nothing leaves their machine; those four lines are
+  what make it true. Two of them are traps: `allowLocalModels` defaults to
+  FALSE in the browser, so turning remote models off alone disables both and
+  the pipeline refuses to start; and without `wasmPaths` the ONNX runtime is
+  fetched from a public CDN on first use — silently, because the feature
+  still works.
+- Don't set `wasmPaths` to a directory prefix. A prefix makes the runtime
+  treat its LOADER as external too and reach for it with a dynamic
+  `import()`, which Vite's dev server refuses to do for a file in `public/`
+  ("should not be imported from source code") — so the prefix form works in
+  a production build and fails in dev. Name the one `.wasm` file and leave
+  `mjs` unset. Which file: transformers.js imports `onnxruntime-web/webgpu`,
+  whose bundled loader wants `ort-wasm-simd-threaded.asyncify.wasm`. Grep the
+  bundle for `ort-wasm` if that ever changes; guessing costs an afternoon.
+- Don't re-embed on a settings change. The threshold and granularity controls
+  re-score against cached fragment vectors, and bucket vectors are cached by
+  prompt TEXT so renaming a bucket is free. Measured on the real survey:
+  2143ms before the cache, 172ms after, against a 300ms budget for a control
+  the user drags. Nothing about a regression here looks wrong in the code.
+- Don't cluster by re-summing member distances on every merge. That is
+  O(n^3) and took 3–10 seconds on the real survey's 134 fragments.
+  `cluster.js` builds the distance matrix once and updates it with the
+  Lance-Williams rule; `cluster.test.js` pins the cost.
+- Don't score the priority list on how many issues were raised. It counts
+  distinct PEOPLE, scaled by severity: one person writing five furious
+  sentences must not outrank five people writing one each. `rankIssues.js`
+  carries the test that pins it.
+- Don't drop a fragment just because it starts with "no". "no issue from IT"
+  is a non-answer; "No proper system exists for tracking approvals" is a
+  report. `boilerplate.js` requires BOTH a leading non-answer word and a
+  short body, and the pair has its own test.
+- Don't gate free-text detection on the profiler's `text` verdict. The
+  profiler calls any column with 50 or fewer distinct values categorical, so
+  on a 42-response survey the written-answer column is never `text` and the
+  whole feature would be invisible on exactly the files it was built for.
+  `detectTextColumns.js` tests shape — length, fill, uniqueness — instead.
+- Don't put `multi` handling after the `column.dictionary` branch in
+  `aggregate.js` or `filterMask.js`. A multi column carries a dictionary too,
+  so the dictionary branch catches it first and every option collapses into
+  one meaningless category.
+- Don't derive `dataset.rowCount` from the first column's `values.length`. A
+  multi column's `values` is the flat option array and is longer than the
+  grid, so every mask allocated from it would be the wrong size.
 - Don't export a helper next to a component from the same file — it drops the
   file out of Fast Refresh (and eslint fails the build). `initialsOf` lives in
   `src/utils/initials.js` for exactly this reason.

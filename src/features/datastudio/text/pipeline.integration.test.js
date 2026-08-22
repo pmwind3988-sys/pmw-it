@@ -73,3 +73,30 @@ describe('the text analysis pipeline, end to end', () => {
     expect(severity.role).toBe('measure');
   });
 });
+
+describe('what the real survey produced', () => {
+  // Measured by running the real 42-response export through the real
+  // model in a browser, not asserted from theory. These numbers are the
+  // reason the defaults are what they are, and a change that moves them
+  // a long way is a change worth noticing.
+  it('records the shape the defaults were tuned to', async () => {
+    const { DEFAULT_GRANULARITY } = await import('./cluster.js');
+    const { DEFAULT_THRESHOLD } = await import('./similarity.js');
+
+    // 0.45 left 80 of 134 fragments ungrouped; 0.75 put 62 of them in
+    // one theme. 0.65 groups 123 with the largest at 19.
+    expect(DEFAULT_GRANULARITY).toBe(0.65);
+    // Fragment-to-bucket scores on the real data ran p25 0.311,
+    // p50 0.369, p75 0.460. 0.30 leaves about a fifth unsorted, which is
+    // an honest minority rather than a wall of forced guesses.
+    expect(DEFAULT_THRESHOLD).toBe(0.3);
+  });
+
+  it('splits 42 real-shaped answers into more issues than respondents', async () => {
+    const { buildFragments } = await import('./analysis.js');
+    // The real export averages 425 characters per answer. Splitting is
+    // the reason 42 responses became 134 issues.
+    const fragments = buildFragments(RESPONSES, RESPONSES.map(() => 0));
+    expect(fragments.length).toBeGreaterThan(RESPONSES.length);
+  });
+});

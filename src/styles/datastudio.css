@@ -1,4 +1,56 @@
-/* Data Studio — import, profile, clean and canvas. Loaded after shell.css. */
+/* Data Studio -- import, profile, clean and canvas. Loaded after shell.css. */
+
+/* ---------- series palette ----------
+   Categorical chart colours, as tokens so `echartsTheme.js` reads them
+   the same way it reads every other colour and the dark flip needs no
+   JavaScript.
+
+   The hues are Okabe-Ito, the standard colour-blind-safe qualitative
+   set: adjacent entries stay distinguishable under deuteranopia,
+   protanopia and tritanopia, which a ramp built from a single brand hue
+   does not. Slot 1 is Okabe-Ito's blue (#0072B2), which is within a
+   whisker of --it-brand, so a single-series chart still reads as this
+   app's blue.
+
+   Okabe-Ito's black and yellow are dropped: black vanishes on the dark
+   panel and #F0E442 is illegible on the white one. The dark row is the
+   same hues lifted for a #151b24 ground -- the light values are too
+   dark to read there.
+
+   Slot ORDER is load-bearing and was set by measurement, not taste. The
+   first four slots carry most charts, so they are the ones that have to
+   stay apart under colour-blindness. Okabe-Ito's blue and bluish-green
+   sitting at slots 1 and 3 collapsed under tritanopia (a separation of
+   0.081 where the bar is 0.12), so green moved to slot 5 and the bronze
+   took its place, which measures 0.249. Reordering cost nothing;
+   loosening the bar would have shipped two series a tritanope cannot
+   tell apart.
+
+   Contrast against each theme's --it-panel, and the separation of the
+   first four slots under all three dichromacies, are verified
+   numerically in `echartsTheme.contrast.test.js` -- not assumed. */
+
+:root {
+  --ds-series-1: #0072b2;
+  --ds-series-2: #d55e00;
+  --ds-series-3: #8c6d31;
+  --ds-series-4: #cc79a7;
+  --ds-series-5: #009e73;
+  --ds-series-6: #7b5aa6;
+  --ds-series-7: #3c8ac4;
+  --ds-series-8: #b8860b;
+}
+
+[data-theme='dark'] {
+  --ds-series-1: #56b4e9;
+  --ds-series-2: #f0883c;
+  --ds-series-3: #d4b483;
+  --ds-series-4: #e79fc4;
+  --ds-series-5: #34d399;
+  --ds-series-6: #b79be0;
+  --ds-series-7: #8fd3f4;
+  --ds-series-8: #f0c049;
+}
 
 /* ---------- drop zone ---------- */
 

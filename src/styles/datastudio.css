@@ -1143,3 +1143,141 @@
   gap: 4px;
   white-space: nowrap;
 }
+
+/* ---------- the autopilot brief ----------
+   Sits above the filter bar and carries the app's account of what it
+   decided for you. Styled as a quiet panel rather than a banner: it is
+   a summary you read once and mostly stop noticing, not an alert. */
+
+.ds-brief {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 14px;
+  border-left: 3px solid var(--it-brand);
+}
+
+.ds-brief-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.ds-brief-icon {
+  flex: none;
+  margin-top: 3px;
+  color: var(--it-brand);
+}
+
+/* Takes the slack so the two controls stay pinned right, and `min-width:
+   0` so a long file title wraps instead of pushing them off the card. */
+.ds-brief-titles {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ds-brief-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--it-ink);
+  overflow-wrap: anywhere;
+}
+
+.ds-brief-line {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--it-ink-soft);
+  overflow-wrap: anywhere;
+}
+
+.ds-brief-dismiss {
+  flex: none;
+  display: inline-flex;
+  padding: 5px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--it-ink-soft);
+  cursor: pointer;
+}
+
+.ds-brief-dismiss:hover {
+  background: var(--it-canvas);
+  color: var(--it-ink);
+}
+
+.ds-brief-hidden,
+.ds-brief-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--it-line);
+}
+
+.ds-brief-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--it-brand);
+  cursor: pointer;
+  text-align: left;
+}
+
+.ds-brief-chevron {
+  flex: none;
+  transition: transform 150ms ease;
+}
+
+.ds-brief-chevron-open {
+  transform: rotate(90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ds-brief-chevron {
+    transition: none;
+  }
+}
+
+.ds-brief-list {
+  margin: 0;
+  padding: 0 0 0 19px;
+  list-style: disc;
+  font-size: 13px;
+  color: var(--it-ink-soft);
+}
+
+.ds-brief-list li {
+  margin-bottom: 3px;
+}
+
+.ds-brief-list strong {
+  color: var(--it-ink);
+  font-weight: 600;
+}
+
+/* The progress track is a block element, so the flex column's
+   `align-items: flex-start` would collapse it to nothing. */
+.ds-brief-text > .ds-progress-track {
+  align-self: stretch;
+}
+
+.ds-brief-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.ds-brief-row > .ds-brief-line {
+  flex: 1 1 220px;
+  margin: 0;
+}

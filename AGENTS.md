@@ -26,7 +26,7 @@ pmw-it/
 │   │   └── ui/               # Icons, Button, Surfaces, StatCard, Badges
 │   ├── features/
 │   │   ├── datastudio/       # ingest/ profile/ clean/ engine/ canvas/
-│   │   │                     # suggest/ store/ text/ time/ worker/
+│   │   │                     # intent/ suggest/ store/ text/ time/ worker/
 │   │   └── devices/          # parse/ derive/ sharepoint/ stats/ ui/
 │   ├── hooks/
 │   │   ├── useRequests.js    # the one SharePoint read + row helpers + token
@@ -63,7 +63,7 @@ pmw-it/
 | `/it-boarding-form` | SurveyJS request form (`?edit=<id>` opens a record) |
 | `/asset-checklist` | Handover checklist (IN / OUT / individual) |
 | `/devices` | Device list: fleet dashboard, register and scan-report import (`?view=`) |
-| `/data-studio` | Import a spreadsheet, profile it, clean it, chart it. Lazy route. A Text analysis tab reads written answers locally. |
+| `/data-studio` | Drop a spreadsheet and land on a dashboard. It reads the file name for the subject, parks the form's bookkeeping columns, charts the rest and reads the written answers. Lazy route. |
 
 ## WHERE TO LOOK
 | Task | Location |
@@ -102,6 +102,10 @@ pmw-it/
 | The model, and where it is served from | `src/features/datastudio/text/embed.js`, `scripts/fetch-model.mjs` |
 | Text analysis pipeline and its worker | `text/analysis.js`, `worker/text.worker.js` |
 | The user's corrections to the analysis | `src/features/datastudio/text/overrides.js` |
+| What the file NAME says the sheet is about | `src/features/datastudio/intent/fileIntent.js` |
+| Which columns are form bookkeeping | `src/features/datastudio/intent/adminColumns.js` |
+| The one decision taken per import | `src/features/datastudio/intent/planAutopilot.js` |
+| The card that discloses that decision | `src/features/datastudio/intent/AutoBrief.jsx` |
 
 ## CONVENTIONS
 
@@ -153,6 +157,19 @@ Data Studio layers the same way — `ingest/` → `profile/` → `clean/` → `e
 each a set of pure functions over plain data, with `canvas/` the only part that
 touches React. That is why `engine/aggregate.js` carries more tests than the
 whole canvas does: it is the part that can be wrong without looking wrong.
+
+**An import decides everything at once, in `intent/planAutopilot.js`.** Dropping
+a sheet no longer parks the user on a profile screen: the file name is read for
+the subject, the form's bookkeeping columns are set to role `ignored`, the
+starter charts are ranked with the title's keywords as a nudge, and a
+pain-point or feedback survey has its written answers read in the background.
+The provider carries the plan out and takes no decisions of its own, so the
+whole of the behaviour is testable without React — see `intent/*.test.js`.
+
+Everything the plan decided is disclosed by `intent/AutoBrief.jsx` at the top of
+the canvas, and every part of it is reversible from there in one click. That
+card is not decoration: it is the reason an autopilot that reads header names
+with a lexicon is safe to ship at all.
 
 **Device report parsing keys off a known-label whitelist** (`parse/labels.js`). A
 generic `^Word:` split reads `Total Slots: 2 | Used Slots: 2` and
@@ -214,6 +231,24 @@ No icon package is installed — add a glyph there rather than a dependency.
 
 ## ANTI-PATTERNS (THIS PROJECT)
 - Don't use `navigate()` in useEffect — causes infinite loops
+- Don't patch a Data Studio profile's `columns` without re-running
+  `retopProfile`. `topMeasure` and `primaryTemporal` are derived from the
+  roles, and a profile patched by hand goes on naming a column that has since
+  been ignored — which is how the starter dashboard opened with
+  "Time taken over Timestamp" on a survey where the autopilot had parked both.
+- Don't let a tile with no x axis fall through `makeXResolver`'s missing-column
+  guard. "No x asked for" (a KPI) and "the x column is gone" (a stale saved
+  dashboard) are different answers: the first aggregates the whole dataset as
+  one group, the second draws nothing. Conflating them made every starter
+  dashboard's KPI row read a confident `0` over a full sheet.
+- Don't have the autopilot DELETE a column it thinks is bookkeeping. It sets
+  role `ignored` and lists what it did in `AutoBrief`, because the lexicon in
+  `adminColumns.js` reads header names and will eventually be wrong about
+  somebody's sheet. Being wrong must cost a click, not a re-import.
+- Don't start the text analysis on every import that happens to have a prose
+  column. The first run pulls a 23MB model, so `planAutopilot` only sets
+  `autoAnalyse` when the file TITLE says the writing is the data (a pain-point
+  or feedback survey). Every other sheet gets a button.
 - Don't add SharePoint scopes to loginRequest — separate request required
 - Don't call `acquireTokenSilent` / `acquireTokenPopup` from a page. Use
   `useSharePointToken()`, which routes through the session guard. The popup

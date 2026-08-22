@@ -126,3 +126,34 @@ describe('suggestCharts', () => {
     expect(tiles[0].title.toLowerCase()).toContain('row');
   });
 });
+
+// The file-title nudge. Two dimensions of comparable shape, one of which
+// the title names -- without the nudge the order is decided by fill and
+// cardinality alone, which is how a dashboard about departments leads
+// with a chart about something else.
+describe('suggestCharts with a file-title focus', () => {
+  const grid = {
+    headers: ['Region', 'Department', 'Hours'],
+    rows: [
+      ['North', 'Finance', '5'], ['South', 'Finance', '3'], ['East', 'Logistics', '8'],
+      ['West', 'Logistics', '2'], ['North', 'Sales', '6'], ['South', 'Sales', '4'],
+      ['East', 'QAQC', '7'], ['West', 'QAQC', '1'],
+    ],
+  };
+  const profile = profileDataset(grid);
+  const barFor = (focus) => suggestCharts(profile, null, focus)
+    .filter((t) => t.chart === 'bar' && t.encoding.x?.column)
+    .map((t) => t.encoding.x.column);
+
+  it('puts the dimension the title names in front', () => {
+    expect(barFor(['department'])[0]).toBe('Department');
+  });
+
+  it('changes nothing when no focus is given', () => {
+    expect(barFor([])).toEqual(barFor(undefined));
+  });
+
+  it('never drops a chart the focus does not mention', () => {
+    expect(barFor(['department'])).toContain('Region');
+  });
+});

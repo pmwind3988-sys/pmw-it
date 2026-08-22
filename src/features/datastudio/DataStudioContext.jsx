@@ -8,11 +8,13 @@ import {
   saveDataset, loadDataset, saveCleanPlan, loadCleanPlan, StorageFullError,
   saveAnalysis, loadAnalysis,
 } from './store/db.js';
-import { profileDataset } from './profile/profileDataset.js';
+import { profileDataset, retopProfile } from './profile/profileDataset.js';
 import { detectTextColumns } from './text/detectTextColumns.js';
 import { STARTER_BUCKETS } from './text/buckets.js';
 import { applyOverrides, EMPTY_OVERRIDES } from './text/overrides.js';
 import { deriveColumns, DERIVED_OVERRIDES, DERIVED_HEADERS } from './text/deriveColumns.js';
+import { planAutopilot } from './intent/planAutopilot.js';
+import { hideColumns, unhideColumns } from './intent/hideColumns.js';
 
 /**
  * Owns the worker and the stage machine for the whole section.
@@ -29,6 +31,11 @@ export function DataStudioProvider({ children }) {
   const workerRef = useRef(null);
   const textWorkerRef = useRef(null);
   const bytesRef = useRef(null);
+  // The file name, beside the bytes rather than read from state. The
+  // worker's message handler is installed once and closes over the
+  // state of that first render, so reading `state.fileName` inside it
+  // would give the autopilot an empty title on every import.
+  const fileNameRef = useRef('');
   // Monotonic id per clean request. A result whose id is not the latest
   // is stale -- the user has ticked something else since -- and applying
   // it would show them the answer to a question they already changed.
@@ -51,26 +58,54 @@ export function DataStudioProvider({ children }) {
       }
 
       if (msg.type === 'parsed') {
+        // Everything the autopilot decides is decided here, once, from
+        // the parse result -- not spread across the effects below. The
+        // provider's job after this is only to carry the plan out.
+        const textColumns = detectTextColumns(msg.profile, { rows: msg.grid.rows });
+        const brief = planAutopilot({
+          fileName: fileNameRef.current,
+          sheetName: msg.activeSheet ?? '',
+          profile: msg.profile,
+          textColumns,
+        });
+        const profile = hideColumns(msg.profile, brief.hidden);
+
         setState((s) => ({
           ...s,
-          stage: 'profiled',
+          // Straight to the canvas. The profile and clean screens are
+          // still reachable from the brief, but they are now somewhere
+          // the user GOES rather than somewhere they are held: on a
+          // survey export the answer to every question those screens ask
+          // is the one the autopilot already picked.
+          stage: 'canvas',
+          brief,
+          autoSeed: true,
+          autoAnalysed: false,
           sheets: msg.sheets,
           activeSheet: msg.activeSheet,
           headerIndex: msg.headerIndex,
           headerCandidates: msg.headerCandidates ?? [],
           grid: msg.grid,
-          profile: msg.profile,
+          profile,
           // A different sheet or header row is a different set of
           // columns, so overrides and the plan from the previous parse
           // no longer refer to anything and are dropped rather than
           // misapplied.
-          overrides: {},
-          plan: proposeCleanPlan(msg.profile, msg.grid),
+          // The hidden columns go in as ordinary overrides, so the
+          // profile panel shows them as overridden and the existing
+          // per-column control is all it takes to disagree.
+          overrides: Object.fromEntries(
+            brief.hidden.map((c) => [c.name, { role: 'ignored' }]),
+          ),
+          plan: proposeCleanPlan(profile, msg.grid),
           dataset: null,
           // A different sheet is different writing, so an analysis of
           // the previous one describes nothing that is still on screen.
-          textColumns: detectTextColumns(msg.profile, { rows: msg.grid.rows }),
+          textColumns,
           textColumnName: '',
+          tiles: [],
+          globalFilters: [],
+          selection: null,
           rawAnalysis: null,
           analysis: null,
           textOverrides: null,
@@ -82,10 +117,22 @@ export function DataStudioProvider({ children }) {
       }
 
       if (msg.type === 'cleaned') {
-        setState((s) => (
-          msg.requestId === cleanIdRef.current
-            ? { ...s, dataset: msg.dataset, cleaning: false }
-            : s));
+        setState((s) => {
+          if (msg.requestId !== cleanIdRef.current) return s;
+          const next = { ...s, dataset: msg.dataset, cleaning: false };
+          // The starter charts need the typed dataset, which only
+          // exists now -- suggesting them at parse time would mean
+          // suggesting them without the values a scatter is scored on.
+          // One shot only: every later clean leaves the canvas alone.
+          if (!s.autoSeed) return next;
+          return {
+            ...next,
+            autoSeed: false,
+            tiles: s.tiles.length > 0
+              ? s.tiles
+              : suggestCharts(s.profile, msg.dataset, s.brief?.focus ?? []),
+          };
+        });
         return;
       }
 
@@ -216,6 +263,7 @@ export function DataStudioProvider({ children }) {
       error: '',
       progress: { stage: 'Reading file', pct: 2 },
     }));
+    fileNameRef.current = file.name;
     try {
       bytesRef.current = await file.arrayBuffer();
     } catch {
@@ -249,7 +297,9 @@ export function DataStudioProvider({ children }) {
       const values = s.grid.rows.map((row) => row?.[index]);
       const columns = s.profile.columns.slice();
       columns[index] = profileColumn(values, columnName, index, override);
-      const profile = { ...s.profile, columns };
+      // Re-topped, or ignoring the column that happened to be the
+      // headline measure would leave the profile still naming it.
+      const profile = retopProfile({ ...s.profile, columns });
 
       return {
         ...s,
@@ -262,6 +312,51 @@ export function DataStudioProvider({ children }) {
       };
     });
   }, []);
+
+  /**
+   * Put the autopilot's hidden columns back on the canvas.
+   *
+   * The brief keeps its list afterwards rather than clearing it, so the
+   * card can go on saying which columns were parked and offer to park
+   * them again. Only the roles and the overrides move.
+   */
+  const showHiddenColumns = useCallback(() => setState((s) => {
+    const hidden = s.brief?.hidden ?? [];
+    if (hidden.length === 0) return s;
+
+    const overrides = { ...s.overrides };
+    for (const column of hidden) delete overrides[column.name];
+    const profile = unhideColumns(s.profile, hidden);
+
+    return {
+      ...s,
+      profile,
+      overrides,
+      plan: proposeCleanPlan(profile, s.grid),
+      brief: { ...s.brief, hiddenShown: true },
+    };
+  }), []);
+
+  const hideAdminColumns = useCallback(() => setState((s) => {
+    const hidden = s.brief?.hidden ?? [];
+    if (hidden.length === 0) return s;
+
+    const profile = hideColumns(s.profile, hidden);
+    return {
+      ...s,
+      profile,
+      overrides: {
+        ...s.overrides,
+        ...Object.fromEntries(hidden.map((c) => [c.name, { role: 'ignored' }])),
+      },
+      plan: proposeCleanPlan(profile, s.grid),
+      brief: { ...s.brief, hiddenShown: false },
+    };
+  }), []);
+
+  const dismissBrief = useCallback(
+    () => setState((s) => (s.brief ? { ...s, brief: { ...s.brief, dismissed: true } } : s)), [],
+  );
 
   // --- clean review -----------------------------------------------------
 
@@ -347,7 +442,9 @@ export function DataStudioProvider({ children }) {
     // Seed the canvas only when it is empty. Re-seeding would throw away
     // tiles the user has edited every time they stepped back to the
     // clean screen and forward again.
-    tiles: s.tiles.length > 0 ? s.tiles : suggestCharts(s.profile, s.dataset),
+    tiles: s.tiles.length > 0
+      ? s.tiles
+      : suggestCharts(s.profile, s.dataset, s.brief?.focus ?? []),
   })), []);
 
   const addTile = useCallback((tile) => setState((s) => ({
@@ -532,6 +629,15 @@ export function DataStudioProvider({ children }) {
         tiles: [],
         globalFilters: [],
         selection: null,
+        // A reopened dataset gets starter charts for the same reason a
+        // fresh import does -- it was saved from a canvas, and coming
+        // back to an empty one reads as data loss.
+        autoSeed: true,
+        // No brief: nothing was decided this time round. The roles the
+        // autopilot set at import are already part of the saved profile.
+        brief: null,
+        autoAnalysed: false,
+        textColumns: detectTextColumns(record.profile, grid),
         error: '',
       }));
 
@@ -586,7 +692,16 @@ export function DataStudioProvider({ children }) {
     return counts.map((n) => n / most);
   }, []);
 
-  const startAnalysis = useCallback((columnName) => setState((s) => {
+  /**
+   * Read a written-answer column.
+   *
+   * `navigate` is false when the autopilot starts this by itself. The
+   * analysis then runs in the background while the user reads their
+   * charts, and the canvas shows how far it has got -- being thrown onto
+   * a progress bar for something they never asked for would be the
+   * feature getting in its own way.
+   */
+  const startAnalysis = useCallback((columnName, { navigate = true } = {}) => setState((s) => {
     const column = s.textColumns.find((c) => c.name === columnName) ?? s.textColumns[0];
     if (!column || !s.grid) return s;
 
@@ -602,7 +717,7 @@ export function DataStudioProvider({ children }) {
 
     return {
       ...s,
-      stage: 'text',
+      stage: navigate ? 'text' : s.stage,
       textColumnName: column.name,
       buckets,
       analysing: true,
@@ -735,6 +850,7 @@ export function DataStudioProvider({ children }) {
 
   const reset = useCallback(() => {
     bytesRef.current = null;
+    fileNameRef.current = '';
     setState(IDLE_STATE);
   }, []);
 
@@ -748,6 +864,23 @@ export function DataStudioProvider({ children }) {
     if (stage === 'idle' || stage === 'parsing') return;
     requestClean(profile, plan);
   }, [profile, plan, stage, requestClean]);
+
+  /**
+   * The autopilot's last step: read the written answers.
+   *
+   * Held until the cleaned dataset exists, so the model download starts
+   * behind a canvas that already has charts on it rather than in front
+   * of an empty one. `autoAnalysed` latches immediately and is never
+   * cleared except by a new import, which is what stops a re-clean or a
+   * tile edit from queueing a second analysis of the same column.
+   */
+  const { brief, dataset, autoAnalysed, analysing } = state;
+  useEffect(() => {
+    if (!brief?.autoAnalyse || autoAnalysed) return;
+    if (!dataset || analysing) return;
+    setState((s) => (s.autoAnalysed ? s : { ...s, autoAnalysed: true }));
+    startAnalysis(brief.analyseColumn, { navigate: false });
+  }, [brief, dataset, autoAnalysed, analysing, startAnalysis]);
 
   // Corrections are saved against the dataset, not the file, so they
   // survive a reload -- in this browser only. Nothing here goes to a
@@ -800,6 +933,9 @@ export function DataStudioProvider({ children }) {
     applyDashboard,
     dismissStorageFull,
     startAnalysis,
+    showHiddenColumns,
+    hideAdminColumns,
+    dismissBrief,
     setTextSetting,
     updateBucket,
     addBucket,
@@ -820,7 +956,8 @@ export function DataStudioProvider({ children }) {
     addTile, updateTile, removeTile, duplicateTile, moveTile, cycleTileSize,
     setEditingTile, addFilter, removeFilter, clearFilters, selectMark, clearSelection,
     saveCurrentDataset, openSavedDataset, applyDashboard, dismissStorageFull,
-    startAnalysis, setTextSetting, updateBucket, addBucket, removeBucket,
+    startAnalysis, showHiddenColumns, hideAdminColumns, dismissBrief,
+    setTextSetting, updateBucket, addBucket, removeBucket,
     retagFragment, toggleNoise, renameTheme, mergeThemes, togglePin, toggleSuppress,
     resetOverrides, applyAnalysisColumns,
     reset, setStage,

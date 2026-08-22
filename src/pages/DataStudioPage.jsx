@@ -13,6 +13,7 @@ import DatasetLibrary from '../features/datastudio/store/DatasetLibrary';
 import { formatBytes } from '../features/datastudio/store/formatBytes';
 import DashboardBar from '../features/datastudio/store/DashboardBar';
 import TextAnalysis from '../features/datastudio/text/TextAnalysis';
+import AutoBrief from '../features/datastudio/intent/AutoBrief';
 import { useDatasetLibrary } from '../features/datastudio/store/useDashboards';
 import { exportTilePng } from '../features/datastudio/store/exporters';
 
@@ -311,7 +312,7 @@ function ProfileStage() {
 function CanvasStage() {
   const {
     tiles, dataset, editingTileId, addTile, setStage, reset, fileName, saveCurrentDataset,
-    textColumns,
+    textColumns, analysing,
   } = useDataStudio();
 
   // Live ECharts instances, by tile id. Export needs a real chart object
@@ -355,7 +356,7 @@ function CanvasStage() {
             it never appears on a sheet of numbers. */}
         {textColumns.length > 0 && (
           <Button variant="secondary" size="sm" onClick={() => setStage('text')}>
-            Text analysis
+            {analysing ? 'Text analysis (reading…)' : 'Text analysis'}
           </Button>
         )}
         <Button variant="secondary" size="sm" onClick={() => saveCurrentDataset(fileName)}>
@@ -369,6 +370,7 @@ function CanvasStage() {
         </Button>
       </div>
 
+      <AutoBrief />
       <FilterBar />
       <DashboardBar />
 

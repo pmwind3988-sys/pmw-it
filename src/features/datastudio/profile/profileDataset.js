@@ -23,7 +23,7 @@ function transpose(headers, rows) {
 // original column order (spec §10.5). Defined here once and imported
 // wherever it is needed -- re-deriving it elsewhere is how two parts of
 // the UI end up disagreeing about which measure is "the" measure.
-function pickByRole(columns, role) {
+export function pickByRole(columns, role) {
   let best = null;
   for (const column of columns) {
     if (column.role !== role) continue;
@@ -32,6 +32,28 @@ function pickByRole(columns, role) {
     if (best === null || column.nonNullRatio > best.nonNullRatio) best = column;
   }
   return best ? best.name : null;
+}
+
+/**
+ * Re-pick the headline measure and temporal after a role has changed.
+ *
+ * Changing a column's role -- the autopilot parking a timestamp, or the
+ * user marking a column ignored in the profile panel -- moves which
+ * column is "the" measure, and a profile patched without this goes on
+ * naming a column nobody can chart any more. The starter charts then
+ * open with "Time taken over Timestamp" on a sheet where both were put
+ * aside, which was the visible symptom.
+ *
+ * Nothing is re-measured: the stats on each column are unchanged, only
+ * the two names derived from their roles.
+ */
+export function retopProfile(profile) {
+  if (!profile) return profile;
+  return {
+    ...profile,
+    topMeasure: pickByRole(profile.columns, 'measure'),
+    primaryTemporal: pickByRole(profile.columns, 'temporal'),
+  };
 }
 
 export function profileDataset(grid, overrides = {}) {

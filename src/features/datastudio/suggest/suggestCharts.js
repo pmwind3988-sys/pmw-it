@@ -10,6 +10,14 @@
 // it.
 
 import { chooseTruncation } from '../engine/aggregate.js';
+import { relevanceOf } from '../intent/fileIntent.js';
+
+// How much a column named in the file title can outrank one that is
+// merely well shaped. Capped low deliberately: a title is a hint about
+// what the reader cares about, not evidence about the data, and a
+// two-value column should not take the first slot just because the file
+// name happens to repeat its header.
+const FOCUS_BONUS = 0.5;
 
 export const MAX_TILES = 6;
 
@@ -119,8 +127,14 @@ function correlation(a, b, rowCount) {
  * `dataset` is optional. Scatter suggestions need the actual values to
  * compute a correlation, and the profile does not carry them; without a
  * dataset those candidates are simply skipped rather than guessed at.
+ *
+ * `focus` is optional too -- the keywords read out of the file name by
+ * `intent/fileIntent.js`. It only ever nudges a candidate up the order;
+ * with no focus the ranking is exactly what it was before, which is what
+ * keeps a sheet opened from the saved library ranking the same way as
+ * one dropped in by name.
  */
-export function suggestCharts(profile, dataset = null) {
+export function suggestCharts(profile, dataset = null, focus = []) {
   const columns = profile?.columns ?? [];
   const measures = columns.filter((c) => c.role === 'measure');
   const dimensions = columns.filter((c) => c.role === 'dimension');
@@ -202,7 +216,7 @@ export function suggestCharts(profile, dataset = null) {
       : { title: `Rows by ${dimension.name}`, y: { column: null, agg: 'count' } };
 
     candidates.push({
-      score: dimensionScore(dimension),
+      score: dimensionScore(dimension) * (1 + FOCUS_BONUS * relevanceOf(dimension.name, focus)),
       spec: tile(
         nextId(), measured.title, 'bar',
         { x: { column: dimension.name }, y: [measured.y] },

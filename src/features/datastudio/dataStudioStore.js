@@ -68,6 +68,21 @@ export const IDLE_STATE = {
   analysing: false,
   textProgress: { stage: '', pct: 0 },
   textError: '',
+  // --- autopilot -------------------------------------------------------
+  // What the app worked out from the file name and did about it: the
+  // subject it read, the bookkeeping columns it parked, and which
+  // written-answer column it went to read. Null until a file is parsed,
+  // and null forever for a dataset reopened from the library -- the
+  // brief describes an import, not a saved dashboard.
+  //
+  // `autoSeed` is the one-shot flag that survives the gap between "the
+  // sheet is parsed" and "the cleaned dataset came back from the
+  // worker", which is the moment the starter charts can actually be
+  // chosen. Without it a second clean would re-seed the canvas over
+  // tiles the user had already edited.
+  brief: null,
+  autoSeed: false,
+  autoAnalysed: false,
 };
 
 // Tile widths on the 12-column canvas grid (spec §10.4).

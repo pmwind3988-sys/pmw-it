@@ -245,6 +245,17 @@ No icon package is installed — add a glyph there rather than a dependency.
 - Don't add `hour12` beside `hourCycle` in `malaysiaTime.js` — per the Intl spec an
   explicit `hour12` nullifies `hourCycle` entirely. The 24-hour path pins `h23`, the
   AM/PM path pins `h12`, and neither passes `hour12`.
+- Don't "fix" the `xlsx` dependency back to a registry version. It is pinned to a
+  tarball URL on `https://cdn.sheetjs.com`, and that is deliberate: the npm registry
+  copy is frozen at 0.18.5 by a known registry bug, and that version carries two
+  open high-severity advisories (prototype pollution GHSA-4r6h-8v6p-xvw6, ReDoS
+  GHSA-5pgg-2g8v-p4x9) with no registry fix. `npm install xlsx`, or accepting a
+  tooling suggestion to "resolve" the URL, silently downgrades and brings both back
+  — and `npm audit` will then say nothing, because the CDN version is not in the
+  registry's advisory graph at all. Upgrade by changing the version in the URL. Note
+  the install therefore reaches cdn.sheetjs.com at build time; the lockfile pins an
+  integrity hash so the contents are verified, but if that dependency is ever
+  unacceptable, SheetJS documents vendoring the tarball into the repo instead.
 - Don't import the `echarts` umbrella. It pulls in every chart type and both
   renderers — about a megabyte, most of it for charts this app never draws — and
   it does so silently, because the code still works. Import the default export

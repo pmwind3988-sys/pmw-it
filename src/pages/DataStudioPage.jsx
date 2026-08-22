@@ -12,6 +12,7 @@ import FilterBar from '../features/datastudio/canvas/FilterBar';
 import DatasetLibrary from '../features/datastudio/store/DatasetLibrary';
 import { formatBytes } from '../features/datastudio/store/formatBytes';
 import DashboardBar from '../features/datastudio/store/DashboardBar';
+import TextAnalysis from '../features/datastudio/text/TextAnalysis';
 import { useDatasetLibrary } from '../features/datastudio/store/useDashboards';
 import { exportTilePng } from '../features/datastudio/store/exporters';
 
@@ -310,6 +311,7 @@ function ProfileStage() {
 function CanvasStage() {
   const {
     tiles, dataset, editingTileId, addTile, setStage, reset, fileName, saveCurrentDataset,
+    textColumns,
   } = useDataStudio();
 
   // Live ECharts instances, by tile id. Export needs a real chart object
@@ -349,6 +351,13 @@ function CanvasStage() {
         >
           Add a chart
         </Button>
+        {/* Only offered when the sheet actually holds written answers, so
+            it never appears on a sheet of numbers. */}
+        {textColumns.length > 0 && (
+          <Button variant="secondary" size="sm" onClick={() => setStage('text')}>
+            Text analysis
+          </Button>
+        )}
         <Button variant="secondary" size="sm" onClick={() => saveCurrentDataset(fileName)}>
           Save this data
         </Button>
@@ -384,6 +393,7 @@ function DataStudioBody() {
   if (stage === 'parsing') return <ParsingStage />;
   if (stage === 'idle') return <DropStage />;
   if (stage === 'cleaning') return <CleanReview />;
+  if (stage === 'text') return <TextAnalysis />;
   if (stage === 'canvas') return <CanvasStage />;
   return <ProfileStage />;
 }

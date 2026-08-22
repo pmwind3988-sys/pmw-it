@@ -15,6 +15,11 @@ import { createEmbedder } from '../text/embed.js';
 
 const embedder = createEmbedder();
 
+// Bucket vectors live as long as the worker does. Keyed by prompt text
+// (see embedBuckets), so moving a slider or renaming a bucket reuses
+// them and only an edit to what a bucket MEANS pays to embed again.
+const bucketCache = new Map();
+
 let current = null;
 
 function report(progress) {
@@ -33,6 +38,7 @@ async function handleAnalyze(msg) {
     columnName: msg.columnName,
     settings: msg.settings,
     embedAll,
+    bucketCache,
     onProgress: report,
   });
 
@@ -58,6 +64,7 @@ async function handleRescore(msg) {
     buckets: msg.buckets,
     settings: msg.settings,
     embedAll,
+    bucketCache,
   });
 
   self.postMessage({ type: 'analyzed', raw });

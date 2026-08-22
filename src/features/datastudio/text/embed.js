@@ -7,14 +7,36 @@
 // nothing on screen says so, because the feature still works.
 
 import { pipeline, env } from '@huggingface/transformers';
-
 export const MODEL_ID = 'Xenova/all-MiniLM-L6-v2';
 export const BATCH_SIZE = 16;
 
 // Served by this app, not by anyone else.
+//
+// `allowLocalModels` defaults to FALSE in the browser, so turning remote
+// models off without turning local ones on disables both and the
+// pipeline refuses to start. Verified against the running app: the error
+// is "both local and remote models are disabled", which does at least
+// say so, but only once someone opens the tab.
+env.allowLocalModels = true;
 env.allowRemoteModels = false;
 env.localModelPath = '/models/';
-env.backends.onnx.wasm.wasmPaths = '/ort/';
+
+// ONE named file, and deliberately no `mjs` entry.
+//
+// A directory prefix ('/ort/') makes the runtime treat its LOADER as
+// external too, and it then reaches for that loader with a dynamic
+// import(). Vite's dev server refuses to serve a file from public/ that
+// way -- "should not be imported from source code" -- so the prefix form
+// works in a production build and fails in dev. Naming only the .wasm
+// leaves the runtime using its own bundled loader and fetching just this
+// one file, which fetch() serves happily from public/ in both.
+//
+// It also pins the plain CPU build. Left to choose, the runtime picks
+// one of four (plain, jsep, jspi, asyncify) from what the visitor's
+// browser supports, and all four would have to ship -- 74MB to serve the
+// 13MB anyone actually loads. There is no WebGPU work here, only
+// sentence embeddings on the CPU.
+env.backends.onnx.wasm.wasmPaths = { wasm: '/ort/ort-wasm-simd-threaded.asyncify.wasm' };
 
 // Loading the model dominates the first run, so the 0-40 band of the
 // progress bar is reserved for it. Without its own progress the tab

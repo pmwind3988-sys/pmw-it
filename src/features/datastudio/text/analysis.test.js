@@ -104,3 +104,41 @@ describe('analyze', () => {
     expect(raw.vectors).toHaveLength(raw.fragments.length);
   });
 });
+
+describe('embedBuckets caching', () => {
+  const twoBuckets = [
+    { id: 'a', label: 'A', description: 'approval sign-off status', hints: ['chasing'] },
+    { id: 'b', label: 'B', description: 'sap erp posting', hints: [] },
+  ];
+
+  it('embeds nothing a second time when nothing meaningful changed', async () => {
+    const { embedBuckets } = await import('./analysis.js');
+    const cache = new Map();
+    const spy = vi.fn(fakeEmbed);
+
+    await embedBuckets(twoBuckets, spy, cache);
+    const firstCallCount = spy.mock.calls.flatMap(([l]) => l).length;
+    expect(firstCallCount).toBe(3);
+
+    // Renaming a bucket changes nothing about what matches it.
+    const renamed = twoBuckets.map((b) => ({ ...b, label: `${b.label} renamed` }));
+    await embedBuckets(renamed, spy, cache);
+    expect(spy.mock.calls.flatMap(([l]) => l).length).toBe(firstCallCount);
+  });
+
+  it('re-embeds only the bucket whose description changed', async () => {
+    const { embedBuckets } = await import('./analysis.js');
+    const cache = new Map();
+    const spy = vi.fn(fakeEmbed);
+
+    await embedBuckets(twoBuckets, spy, cache);
+    spy.mockClear();
+
+    const edited = [{ ...twoBuckets[0], description: 'approval and sign-off delays' }, twoBuckets[1]];
+    await embedBuckets(edited, spy, cache);
+    // Its description and its one hint -- not the other bucket's.
+    expect(spy.mock.calls.flatMap(([l]) => l)).toEqual([
+      'approval and sign-off delays', 'chasing',
+    ]);
+  });
+});

@@ -7,7 +7,11 @@
 // Fetching it at BUILD time and serving it ourselves has neither
 // problem.
 //
-// The files are gitignored rather than committed, which keeps ~25MB out
+// Only the MODEL is fetched. The ONNX runtime is imported from
+// node_modules by embed.js and bundled by Vite as an ordinary asset, so
+// it needs neither a download nor a copy.
+//
+// The files are gitignored rather than committed, which keeps ~23MB out
 // of every clone at the cost of a build-time network dependency. If
 // that ever becomes unacceptable, commit public/models and public/ort
 // and delete the prebuild hook; nothing else changes.
@@ -16,9 +20,7 @@
 //   node scripts/fetch-model.mjs --update   record new hashes
 
 import { createHash } from 'node:crypto';
-import {
-  mkdir, readFile, writeFile, copyFile, readdir,
-} from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -36,13 +38,6 @@ const MODEL_FILES = [
 
 const MANIFEST = join(ROOT, 'scripts', 'model-manifest.json');
 const MODEL_DIR = join(ROOT, 'public', 'models', MODEL_ID);
-const ORT_DIR = join(ROOT, 'public', 'ort');
-
-// The runtime ships inside the installed package, so the runtime half of
-// the promise needs no network at all. It lives in onnxruntime-web, NOT
-// in the transformers dist directory -- that one carries only the .mjs
-// loader and none of the .wasm binaries it loads.
-const ORT_SOURCE = join(ROOT, 'node_modules', 'onnxruntime-web', 'dist');
 
 const update = process.argv.includes('--update');
 
@@ -85,24 +80,7 @@ async function fetchModelFiles(manifest) {
   }
 }
 
-async function copyOnnxRuntime() {
-  if (!existsSync(ORT_SOURCE)) {
-    throw new Error('onnxruntime-web is not installed; run npm install first.');
-  }
-  await mkdir(ORT_DIR, { recursive: true });
-
-  let copied = 0;
-  for (const entry of await readdir(ORT_SOURCE)) {
-    if (!entry.endsWith('.wasm') && !entry.endsWith('.mjs')) continue;
-    await copyFile(join(ORT_SOURCE, entry), join(ORT_DIR, entry));
-    copied++;
-  }
-  if (copied === 0) throw new Error(`No runtime files found in ${ORT_SOURCE}.`);
-  process.stdout.write(`copied ${copied} ONNX runtime files\n`);
-}
-
 const manifest = await loadManifest();
 await fetchModelFiles(manifest);
-await copyOnnxRuntime();
 await writeFile(MANIFEST, `${JSON.stringify(manifest, null, 2)}\n`);
 process.stdout.write('model ready under public/\n');

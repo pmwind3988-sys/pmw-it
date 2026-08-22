@@ -9,7 +9,7 @@ describe('clusterVectors', () => {
       v(1, 0), v(0.99, 0.1), v(0.98, 0.05),
       v(0, 1), v(0.1, 0.99),
     ];
-    const { clusters } = clusterVectors(vectors, DEFAULT_GRANULARITY);
+    const { clusters } = clusterVectors(vectors, 0.45);
     expect(clusters).toHaveLength(2);
     expect(clusters[0]).toHaveLength(3);
     expect(clusters[0]).toEqual(expect.arrayContaining([0, 1, 2]));
@@ -18,7 +18,7 @@ describe('clusterVectors', () => {
   it('keeps a lone vector out of the themes', () => {
     // A theme of one is a quote, not a pattern.
     const vectors = [v(1, 0), v(0.99, 0.1), v(0, 1)];
-    const { clusters, oneOffs } = clusterVectors(vectors, DEFAULT_GRANULARITY);
+    const { clusters, oneOffs } = clusterVectors(vectors, 0.45);
     expect(clusters).toHaveLength(1);
     expect(oneOffs).toEqual([2]);
   });
@@ -43,5 +43,23 @@ describe('clusterVectors', () => {
   it('refuses rather than freezing on an enormous input', () => {
     const huge = Array.from({ length: MAX_CLUSTERABLE + 1 }, () => v(1, 0));
     expect(() => clusterVectors(huge, DEFAULT_GRANULARITY)).toThrow(RangeError);
+  });
+});
+
+describe('clustering cost', () => {
+  it('groups a survey-sized set well inside the interactive budget', () => {
+    // 134 fragments is the real survey. The first implementation
+    // recomputed every member-to-member distance on every merge round
+    // and took between three and ten seconds here, against a 300ms
+    // budget for a control the user drags. A regression would not look
+    // wrong on screen -- it would just feel broken.
+    const vectors = Array.from({ length: 134 }, (_, i) => {
+      const a = (i / 134) * Math.PI * 2;
+      return Float32Array.from([Math.cos(a), Math.sin(a), (i % 7) / 7]);
+    });
+
+    const started = Date.now();
+    clusterVectors(vectors, DEFAULT_GRANULARITY);
+    expect(Date.now() - started).toBeLessThan(300);
   });
 });

@@ -13,6 +13,7 @@ import { detectTextColumns } from './text/detectTextColumns.js';
 import { STARTER_BUCKETS } from './text/buckets.js';
 import { applyOverrides, EMPTY_OVERRIDES } from './text/overrides.js';
 import { deriveColumns, DERIVED_OVERRIDES, DERIVED_HEADERS } from './text/deriveColumns.js';
+import { withAnalysisTiles } from './text/analysisTiles.js';
 import { planAutopilot } from './intent/planAutopilot.js';
 import { hideColumns, unhideColumns } from './intent/hideColumns.js';
 
@@ -840,6 +841,12 @@ export function DataStudioProvider({ children }) {
       profile,
       plan: proposeCleanPlan(profile, grid),
       textColumns: detectTextColumns(profile, grid),
+      // The columns alone landed the user back on the dashboard they
+      // already had, with five new columns nothing was charting -- so
+      // the button that promised a dashboard of their analysis
+      // delivered no visible change at all. The tiles are what makes it
+      // a dashboard; the user's own charts are kept below them.
+      tiles: withAnalysisTiles(s.tiles, headers),
       stage: 'canvas',
     };
   }), []);

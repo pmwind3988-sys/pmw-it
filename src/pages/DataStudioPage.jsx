@@ -9,6 +9,7 @@ import CleanReview from '../features/datastudio/clean/CleanReview';
 import CanvasGrid from '../features/datastudio/canvas/CanvasGrid';
 import TileEditor from '../features/datastudio/canvas/TileEditor';
 import FilterBar from '../features/datastudio/canvas/FilterBar';
+import RecordsPanel from '../features/datastudio/canvas/RecordsPanel';
 import DatasetLibrary from '../features/datastudio/store/DatasetLibrary';
 import { formatBytes } from '../features/datastudio/store/formatBytes';
 import DashboardBar from '../features/datastudio/store/DashboardBar';
@@ -386,6 +387,11 @@ function CanvasStage() {
           {editingTileId && <TileEditor />}
         </div>
       )}
+
+      {/* Below the charts, not beside them: the rows are the answer to
+          "what is this bar made of", and that question only comes up
+          once the bar has been looked at. */}
+      <RecordsPanel />
     </>
   );
 }

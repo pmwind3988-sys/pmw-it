@@ -1281,3 +1281,228 @@
   flex: 1 1 220px;
   margin: 0;
 }
+
+/* ---------- the rows behind the charts ----------
+   The drill-down half of the canvas: the records the charts are
+   counting, and one record in full. It is collapsed by default because
+   a dashboard is meant to be read as pictures first -- the table is the
+   answer to "what is that bar made of", which is a question that only
+   arises after the bar has been looked at. */
+
+.ds-records {
+  margin-top: 16px;
+  border-top: 1px solid var(--it-line);
+  padding-top: 12px;
+}
+
+.ds-records-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.ds-records-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--it-line);
+  border-radius: 8px;
+  background: var(--it-panel);
+  color: var(--it-ink);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ds-records-toggle:hover {
+  border-color: var(--it-brand);
+  color: var(--it-brand-deep);
+}
+
+.ds-records-toggle em {
+  font-style: normal;
+  font-weight: 500;
+  color: var(--it-ink-soft);
+}
+
+.ds-records-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.ds-records-empty {
+  margin: 14px 0 4px;
+  color: var(--it-ink-soft);
+  font-size: 13px;
+}
+
+.ds-records-scroll {
+  margin-top: 12px;
+  max-height: 420px;
+  overflow: auto;
+}
+
+/* A cell is truncated rather than wrapped: a written-answer column is
+   paragraphs long, and one row of it would push every other row off the
+   screen. The full text is one click away in the record card, and is on
+   the `title` attribute meanwhile. */
+.ds-records-table td {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ds-records-row {
+  cursor: pointer;
+}
+
+.ds-records-row:hover td,
+.ds-records-row:focus-visible td {
+  background: var(--it-brand-wash);
+}
+
+.ds-records-row:focus-visible {
+  outline: 2px solid var(--it-brand);
+  outline-offset: -2px;
+}
+
+.ds-records-blank {
+  color: var(--it-ink-soft);
+}
+
+.ds-records-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+/* ---------- one record, in full ---------- */
+
+.ds-record-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(2, 6, 12, 0.5);
+}
+
+.ds-record {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(680px, 100%);
+  max-height: 84vh;
+  padding: 18px;
+  border: 1px solid var(--it-line);
+  border-radius: 14px;
+  background: var(--it-panel);
+  overflow-y: auto;
+}
+
+.ds-record-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.ds-record-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--it-ink);
+}
+
+.ds-record-sub {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--it-ink-soft);
+}
+
+.ds-record-nav {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.ds-record-nav button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--it-line);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--it-ink-soft);
+  cursor: pointer;
+}
+
+.ds-record-nav button:hover:not(:disabled) {
+  border-color: var(--it-brand);
+  color: var(--it-brand-deep);
+}
+
+.ds-record-nav button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.ds-record-fields {
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+
+.ds-record-field {
+  display: grid;
+  grid-template-columns: minmax(140px, 34%) 1fr;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--it-line);
+}
+
+.ds-record-field:last-child {
+  border-bottom: 0;
+}
+
+.ds-record-field dt {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--it-ink-soft);
+}
+
+.ds-record-field dd {
+  margin: 0;
+  font-size: 13px;
+  color: var(--it-ink);
+  /* Written answers are the reason this card exists, so they wrap
+     rather than truncate here -- the opposite of the table above. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.ds-record-field-empty dd {
+  color: var(--it-ink-soft);
+  font-style: italic;
+}
+
+.ds-badge-parked {
+  background: var(--it-line);
+  color: var(--it-ink-soft);
+}
+
+@media (max-width: 640px) {
+  .ds-record-field {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}

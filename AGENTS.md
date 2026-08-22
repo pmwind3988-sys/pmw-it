@@ -63,7 +63,7 @@ pmw-it/
 | `/it-boarding-form` | SurveyJS request form (`?edit=<id>` opens a record) |
 | `/asset-checklist` | Handover checklist (IN / OUT / individual) |
 | `/devices` | Device list: fleet dashboard, register and scan-report import (`?view=`) |
-| `/data-studio` | Drop a spreadsheet and land on a dashboard. It reads the file name for the subject, parks the form's bookkeeping columns, charts the rest and reads the written answers. Lazy route. |
+| `/data-studio` | Drop a spreadsheet and land on a dashboard. It reads the file name for the subject, parks the form's bookkeeping columns, charts the rest and reads the written answers. Every chart drills down to the rows behind it and to one record in full. Lazy route. |
 
 ## WHERE TO LOOK
 | Task | Location |
@@ -106,6 +106,9 @@ pmw-it/
 | Which columns are form bookkeeping | `src/features/datastudio/intent/adminColumns.js` |
 | The one decision taken per import | `src/features/datastudio/intent/planAutopilot.js` |
 | The card that discloses that decision | `src/features/datastudio/intent/AutoBrief.jsx` |
+| Decoding one stored cell into readable text | `src/features/datastudio/engine/formatCell.js` |
+| The rows behind the charts, and one record in full | `engine/rows.js`, `canvas/RecordsPanel.jsx` |
+| The dashboard built out of the text analysis | `src/features/datastudio/text/analysisTiles.js` |
 
 ## CONVENTIONS
 
@@ -307,6 +310,32 @@ No icon package is installed — add a glyph there rather than a dependency.
   screen shows that it happened. `castType` keys this off `dateOnly`, and the
   control in the clean review is rendered DISABLED rather than hidden so someone
   who knows their export is UTC is not left hunting for a setting.
+- Don't decode a cell by checking `column.dictionary` before
+  `type === 'multi'`. A multi column carries a dictionary too, so the
+  dictionary branch reads its FLAT option array as one code per row and
+  prints a real label from the wrong row -- a confident wrong answer, in a
+  CSV somebody has already emailed on. `engine/formatCell.js` is the one
+  decoder; the row table, the record card and the CSV export all read it,
+  so there is one place to get this right rather than three.
+- Don't give the records panel its own query. It reads `maskFor` with no
+  tile id, which is the same mask the tiles read, so the list cannot
+  disagree with the chart above it. A table that disagrees with its chart
+  is worse than no table.
+- Don't reset the records panel's page from an effect. `npm run lint`
+  fails it (`react-hooks/set-state-in-effect`), and it renders one frame
+  of the empty page first. The page offset is CLAMPED during render
+  instead.
+- Don't let Escape inside the record card reach the window. The canvas
+  clears the cross-filter on Escape, so closing the card would also throw
+  away the selection the user drilled in from and return them to an
+  unfiltered dashboard. The card calls `stopImmediatePropagation` on the
+  native event.
+- Don't build the analysis dashboard by running `suggestCharts` over the
+  derived columns. The suggester ranks by SHAPE because on an unknown
+  sheet shape is the only evidence; here every column's meaning is known,
+  and guessing would sum severity instead of averaging it -- ranking a
+  category twenty people mentioned mildly above one three people are
+  furious about. `text/analysisTiles.js` names the six tiles outright.
 - Don't filter the tile that originated a cross-filter selection. Click "HR" on a
   department bar chart and the other tiles narrow to HR — but that chart keeps
   all its bars, or it collapses to the one bar just clicked and deletes the

@@ -79,14 +79,15 @@ export default function TextAnalysis() {
         <Button variant="ghost" size="sm" onClick={resetOverrides} disabled={!analysis}>
           Reset my edits
         </Button>
+        {/* The headline action of this tab, so not a ghost button: it
+            is what the reading was for. */}
         <Button
-          variant="ghost"
           size="sm"
           icon={BarChart3}
           onClick={applyAnalysisColumns}
           disabled={!analysis}
         >
-          Add to my charts
+          Build a dashboard from this
         </Button>
         <Button variant="ghost" size="sm" icon={RefreshCw} onClick={() => setStage('canvas')}>
           Back to charts

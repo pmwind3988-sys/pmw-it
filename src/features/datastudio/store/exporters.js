@@ -6,7 +6,7 @@
 // spreadsheet, which is why the CSV quoting and the date formatting are
 // tested rather than eyeballed.
 
-import { formatMYT } from '../time/malaysiaTime.js';
+import { formatCell } from '../engine/formatCell.js';
 
 export const DASHBOARD_EXPORT_VERSION = 1;
 
@@ -24,28 +24,6 @@ export function csvField(value) {
   return `"${text.replace(/"/g, '""')}"`;
 }
 
-function cellText(column, index) {
-  const raw = column.values[index];
-
-  if (column.dictionary) {
-    return raw < 0 ? '' : column.dictionary[raw];
-  }
-  if (column.type === 'boolean') {
-    if (raw === 2) return '';
-    return raw === 1 ? 'Yes' : 'No';
-  }
-  if (column.type === 'date' || column.type === 'datetime') {
-    if (Number.isNaN(raw)) return '';
-    // A date-only column has no time of day, so rendering 00:00 against
-    // every row would invent precision the data does not have.
-    return formatMYT(raw, column.dateOnly ? 'date' : 'datetime');
-  }
-  if (typeof raw === 'number') {
-    return Number.isNaN(raw) ? '' : String(raw);
-  }
-  return raw ?? '';
-}
-
 /**
  * The cleaned dataset as CSV text.
  *
@@ -58,7 +36,11 @@ export function datasetToCsv(dataset, mask = null) {
 
   for (let row = 0; row < dataset.rowCount; row++) {
     if (mask && !mask[row]) continue;
-    lines.push(dataset.columns.map((c) => csvField(cellText(c, row))).join(','));
+    lines.push(dataset.columns
+      // A ratio stays a number here: formatted as "12.5%" it arrives in
+      // Excel as text and no formula will touch it.
+      .map((c) => csvField(formatCell(c, row, { percentAsText: false })))
+      .join(','));
   }
 
   // CRLF, because Excel on Windows is the destination for essentially

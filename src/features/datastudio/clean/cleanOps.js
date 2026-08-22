@@ -204,6 +204,19 @@ export function castType(values, params = {}) {
       return parseDate(values, { ...params, dateOnly: true });
     case 'datetime':
       return parseDate(values, params);
+    case 'multi': {
+      const separator = params.separator ?? ';';
+      return values.map((v) => {
+        if (isNullish(v)) return null;
+        const options = String(v)
+          .split(separator)
+          .map((part) => part.trim())
+          .filter(Boolean);
+        // A cell of nothing but separators held no options at all, so it
+        // is empty -- not an option named "".
+        return options.length > 0 ? options.join(separator) : null;
+      });
+    }
     case 'text':
     case 'categorical':
       return values.map((v) => {

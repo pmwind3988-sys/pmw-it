@@ -53,6 +53,31 @@ function applyFilter(dataset, mask, filter) {
   // "match nothing" -- a half-built filter must not blank the dashboard.
   if (wanted.length === 0) return;
 
+  // A multi column carries a dictionary too, so this has to come first
+  // or the branch below reads its flat option array as one code per row.
+  //
+  // A row is kept when ANY of its options was asked for: "show me
+  // everyone who mentioned approvals" must not exclude the people who
+  // mentioned approvals and four other things.
+  if (column.type === 'multi') {
+    const codes = new Set();
+    for (const label of wanted) {
+      const code = column.dictionary.indexOf(label);
+      if (code !== -1) codes.add(code);
+    }
+    for (let i = 0; i < column.offsets.length - 1; i++) {
+      let keep = false;
+      for (let j = column.offsets[i]; j < column.offsets[i + 1]; j++) {
+        if (codes.has(values[j])) {
+          keep = true;
+          break;
+        }
+      }
+      if (!keep) mask[i] = 0;
+    }
+    return;
+  }
+
   if (column.dictionary) {
     // Resolve the labels to integer codes ONCE, then compare integers in
     // the row loop. Comparing strings per row is the difference between

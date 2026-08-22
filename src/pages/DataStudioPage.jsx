@@ -17,7 +17,7 @@ import { exportTilePng } from '../features/datastudio/store/exporters';
 
 const ACCEPT = '.xlsx,.xlsm,.csv';
 
-const TYPE_OPTIONS = ['numeric', 'categorical', 'boolean', 'date', 'datetime', 'text', 'identifier'];
+const TYPE_OPTIONS = ['numeric', 'categorical', 'multi', 'boolean', 'date', 'datetime', 'text', 'identifier'];
 const ROLE_OPTIONS = ['measure', 'dimension', 'temporal', 'ignored'];
 
 function percent(ratio) {

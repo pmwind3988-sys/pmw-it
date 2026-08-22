@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { buildDataset } from './dataset.js';
 import { buildMask, maskFor, createMaskCache } from './filterMask.js';
 import { applyCleanPlan } from '../clean/applyCleanPlan.js';
 import { profileDataset } from '../profile/profileDataset.js';
@@ -140,5 +141,23 @@ describe('createMaskCache', () => {
     const b = cache.get(other, [], null, 'tile_1');
     expect(a).not.toBe(b);
     expect(b.length).toBe(1);
+  });
+});
+
+describe('filtering a multi column', () => {
+  const multiDataset = buildDataset({
+    headers: ['Challenges'],
+    columns: [['A;B;', 'B;', 'C;', '']],
+    profile: { columns: [{ name: 'Challenges', type: 'multi', role: 'dimension', separator: ';' }] },
+  });
+
+  it('keeps a row when any of its options match', () => {
+    const mask = buildMask(multiDataset, [{ column: 'Challenges', kind: 'in', values: ['A'] }]);
+    expect(Array.from(mask)).toEqual([1, 0, 0, 0]);
+  });
+
+  it('drops a row with no options at all', () => {
+    const mask = buildMask(multiDataset, [{ column: 'Challenges', kind: 'in', values: ['A', 'B', 'C'] }]);
+    expect(Array.from(mask)).toEqual([1, 1, 1, 0]);
   });
 });

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { buildDataset } from './dataset.js';
 import {
   aggregate, truncateDate, chooseTruncation, binNumeric,
 } from './aggregate.js';
@@ -252,5 +253,24 @@ describe('binNumeric', () => {
     const values = Float64Array.from([1, NaN, 100]);
     const { edges } = binNumeric(values, new Uint8Array([1, 1, 0]));
     expect(edges[edges.length - 1]).toBeLessThan(100);
+  });
+});
+
+describe('aggregate over a multi column', () => {
+  const dataset = buildDataset({
+    headers: ['Challenges'],
+    columns: [['A;B;', 'B;', 'A;B;C;', '']],
+    profile: { columns: [{ name: 'Challenges', type: 'multi', role: 'dimension', separator: ';' }] },
+  });
+
+  it('counts each option a row picked', () => {
+    const result = aggregate(dataset, null, {
+      encoding: { x: { column: 'Challenges' }, y: [{ column: null, agg: 'count' }] },
+      sort: { by: 'y', dir: 'desc' },
+    });
+    const counts = Object.fromEntries(
+      result.categories.map((c, i) => [c, result.series[0].data[i]]),
+    );
+    expect(counts).toEqual({ B: 3, A: 2, C: 1 });
   });
 });

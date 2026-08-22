@@ -26,6 +26,17 @@ export const IDLE_STATE = {
   grid: null,
   profile: null,
   overrides: {},
+  // The proposed cleaning checklist, and the typed dataset that results
+  // from applying its ticked steps. `dataset` is null until the worker
+  // returns the first clean.
+  plan: [],
+  dataset: null,
+  cleaning: false,
+  // Per-column user decisions that the inference could not make alone:
+  // which reading an ambiguous date column gets, and whether a datetime
+  // column was stored as UTC.
+  dateOrders: {},
+  zones: {},
   error: '',
   progress: { stage: '', pct: 0 },
 };

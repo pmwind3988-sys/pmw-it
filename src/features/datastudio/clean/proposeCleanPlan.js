@@ -69,7 +69,10 @@ function step(op, column, params, confidence, affectedCount, preview) {
 // --- per-column proposals ---------------------------------------------
 
 function proposeTrim(values, name) {
-  const examples = [];
+  // A Set, not an array: a column of 300 identically-padded values would
+  // otherwise preview as `" HR " -> "HR"; " HR " -> "HR"`, which spends
+  // the whole example budget saying one thing twice.
+  const examples = new Set();
   let affected = 0;
 
   for (const v of values) {
@@ -77,15 +80,15 @@ function proposeTrim(values, name) {
     const cleaned = collapse(v);
     if (cleaned === v) continue;
     affected++;
-    if (examples.length < PREVIEW_EXAMPLES) {
-      examples.push(`${quote(v)} -> ${quote(cleaned)}`);
+    if (examples.size < PREVIEW_EXAMPLES) {
+      examples.add(`${quote(v)} -> ${quote(cleaned)}`);
     }
   }
 
   if (affected === 0) return null;
   return step(
     'trimWhitespace', name, {}, 'high', affected,
-    `Trim ${affected} value${affected === 1 ? '' : 's'}, e.g. ${examples.join('; ')}`,
+    `Trim ${affected} value${affected === 1 ? '' : 's'}, e.g. ${[...examples].join('; ')}`,
   );
 }
 
@@ -170,13 +173,13 @@ function proposeCast(values, column) {
   if (!['numeric', 'boolean', 'date', 'datetime'].includes(type)) return null;
 
   let affected = 0;
-  const examples = [];
+  const examples = new Set();
 
   for (const v of values) {
     if (isEmptyCell(v)) continue;
     if (alreadyTyped(v, type)) continue;
     affected++;
-    if (examples.length < PREVIEW_EXAMPLES) examples.push(quote(String(v)));
+    if (examples.size < PREVIEW_EXAMPLES) examples.add(quote(String(v)));
   }
 
   if (affected === 0) return null;
@@ -192,7 +195,7 @@ function proposeCast(values, column) {
 
   return step(
     'castType', name, params, 'high', affected,
-    `Read ${affected} value${affected === 1 ? '' : 's'} in ${quote(name)} as ${type}, e.g. ${examples.join(', ')}`,
+    `Read ${affected} value${affected === 1 ? '' : 's'} in ${quote(name)} as ${type}, e.g. ${[...examples].join(', ')}`,
   );
 }
 

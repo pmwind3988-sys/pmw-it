@@ -96,6 +96,14 @@ describe('proposeCleanPlan', () => {
     expect(ops.indexOf('mergeCategories')).toBeLessThan(ops.indexOf('dropEmptyColumns'));
   });
 
+  // A column of identically-padded values used to spend the whole
+  // example budget saying one thing twice.
+  it('does not repeat the same example twice in a preview', () => {
+    const grid = { headers: ['Dept'], rows: [[' HR '], [' HR '], [' HR '], ['IT']] };
+    const step = planFor(grid).find((s) => s.op === 'trimWhitespace');
+    expect(step.preview).toBe('Trim 3 values, e.g. " HR " -> "HR"');
+  });
+
   it('marks whole-grid steps with a null column', () => {
     const grid = { headers: ['a', 'blank'], rows: [['x', null], ['y', null]] };
     const step = planFor(grid).find((s) => s.op === 'dropEmptyColumns');

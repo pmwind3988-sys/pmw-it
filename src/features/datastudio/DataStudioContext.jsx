@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DataStudioContext, IDLE_STATE } from './dataStudioStore.js';
 import { profileColumn } from './profile/profileColumn.js';
+import { proposeCleanPlan } from './clean/proposeCleanPlan.js';
 
 /**
  * Owns the worker and the stage machine for the whole section.
@@ -16,6 +17,10 @@ export function DataStudioProvider({ children }) {
   const [state, setState] = useState(IDLE_STATE);
   const workerRef = useRef(null);
   const bytesRef = useRef(null);
+  // Monotonic id per clean request. A result whose id is not the latest
+  // is stale -- the user has ticked something else since -- and applying
+  // it would show them the answer to a question they already changed.
+  const cleanIdRef = useRef(0);
 
   useEffect(() => {
     // Vite's native worker syntax -- no plugin, and the worker's own
@@ -27,10 +32,12 @@ export function DataStudioProvider({ children }) {
 
     worker.onmessage = (e) => {
       const msg = e.data ?? {};
+
       if (msg.type === 'progress') {
         setState((s) => ({ ...s, progress: { stage: msg.stage, pct: msg.pct } }));
         return;
       }
+
       if (msg.type === 'parsed') {
         setState((s) => ({
           ...s,
@@ -42,18 +49,36 @@ export function DataStudioProvider({ children }) {
           grid: msg.grid,
           profile: msg.profile,
           // A different sheet or header row is a different set of
-          // columns, so type overrides from the previous parse no longer
-          // refer to anything and are dropped rather than misapplied.
+          // columns, so overrides and the plan from the previous parse
+          // no longer refer to anything and are dropped rather than
+          // misapplied.
           overrides: {},
+          plan: proposeCleanPlan(msg.profile, msg.grid),
+          dataset: null,
           error: '',
           progress: { stage: '', pct: 100 },
         }));
         return;
       }
+
+      if (msg.type === 'cleaned') {
+        setState((s) => (
+          msg.requestId === cleanIdRef.current
+            ? { ...s, dataset: msg.dataset, cleaning: false }
+            : s));
+        return;
+      }
+
       if (msg.type === 'error') {
         // Never leave the UI on a spinner (spec §12) -- go back to a
         // screen the user can act on, carrying the reason.
-        setState((s) => ({ ...s, stage: 'idle', error: msg.message, progress: { stage: '', pct: 0 } }));
+        setState((s) => ({
+          ...s,
+          stage: s.stage === 'parsing' ? 'idle' : s.stage,
+          cleaning: false,
+          error: msg.message,
+          progress: { stage: '', pct: 0 },
+        }));
       }
     };
 
@@ -61,6 +86,7 @@ export function DataStudioProvider({ children }) {
       setState((s) => ({
         ...s,
         stage: 'idle',
+        cleaning: false,
         error: event?.message || 'The import worker stopped unexpectedly.',
         progress: { stage: '', pct: 0 },
       }));
@@ -83,6 +109,18 @@ export function DataStudioProvider({ children }) {
     // because we never hand it over in a transfer list. Keep it that way.
     workerRef.current.postMessage({
       type: 'parse', arrayBuffer: bytes, sheetName, headerIndex,
+    });
+  }, []);
+
+  // Asks the worker to re-apply the plan. The grid never crosses the
+  // boundary again -- the worker kept it -- so this costs a small plan
+  // message each way however large the sheet is.
+  const requestClean = useCallback((profile, plan) => {
+    if (!workerRef.current || !profile || !plan) return;
+    cleanIdRef.current += 1;
+    setState((s) => ({ ...s, cleaning: true }));
+    workerRef.current.postMessage({
+      type: 'clean', profile, plan, requestId: cleanIdRef.current,
     });
   }, []);
 
@@ -126,13 +164,99 @@ export function DataStudioProvider({ children }) {
       if (index === -1) return s;
 
       const values = s.grid.rows.map((row) => row?.[index]);
-      const nextOverrides = { ...s.overrides, [columnName]: override };
       const columns = s.profile.columns.slice();
       columns[index] = profileColumn(values, columnName, index, override);
+      const profile = { ...s.profile, columns };
 
-      return { ...s, overrides: nextOverrides, profile: { ...s.profile, columns } };
+      return {
+        ...s,
+        overrides: { ...s.overrides, [columnName]: override },
+        profile,
+        // The plan was proposed against the old verdict, so a column
+        // that is no longer numeric must lose its "read as numeric"
+        // step rather than keep it and coerce the column back.
+        plan: proposeCleanPlan(profile, s.grid),
+      };
     });
   }, []);
+
+  // --- clean review -----------------------------------------------------
+
+  const setStepEnabled = useCallback((id, enabled) => {
+    setState((s) => ({
+      ...s,
+      plan: s.plan.map((step) => (step.id === id ? { ...step, enabled } : step)),
+    }));
+  }, []);
+
+  const removeStep = useCallback((id) => {
+    setState((s) => ({ ...s, plan: s.plan.filter((step) => step.id !== id) }));
+  }, []);
+
+  // A merge the user built by hand. Confidence 'low' because nothing
+  // inferred it -- and enabled anyway, because they asked for it.
+  const addManualMerge = useCallback((columnName, keys, canonical) => {
+    setState((s) => {
+      const id = `manualMerge:${columnName}`;
+      const existing = s.plan.find((step) => step.id === id);
+      const map = { ...(existing?.params?.map ?? {}) };
+      for (const key of keys) map[key] = canonical;
+
+      const affectedCount = Object.keys(map).length;
+      const merged = {
+        id,
+        column: columnName,
+        op: 'mergeCategories',
+        params: { map },
+        confidence: 'low',
+        affectedCount,
+        preview: `Merge ${affectedCount} spellings you picked into "${canonical}"`,
+        enabled: true,
+        manual: true,
+      };
+
+      return {
+        ...s,
+        plan: existing
+          ? s.plan.map((step) => (step.id === id ? merged : step))
+          : [...s.plan, merged],
+      };
+    });
+  }, []);
+
+  // The date-order flip for an ambiguous or conflicting column. It has
+  // to rewrite the cast step's params rather than add a step, or the
+  // column would be cast twice under two different readings.
+  const setColumnDateOrder = useCallback((columnName, order) => {
+    setState((s) => ({
+      ...s,
+      dateOrders: { ...s.dateOrders, [columnName]: order },
+      plan: s.plan.map((step) => (
+        step.column === columnName && step.op === 'castType'
+          ? { ...step, params: { ...step.params, order }, enabled: true }
+          : step)),
+    }));
+  }, []);
+
+  // Spec §9 hard rule: date-ONLY columns are never shifted, whatever the
+  // toggle says. Adding eight hours to a pure date moves it to the wrong
+  // day, which is a data corruption the user cannot see.
+  const setColumnZone = useCallback((columnName, sourceZone) => {
+    setState((s) => {
+      const column = s.profile?.columns.find((c) => c.name === columnName);
+      if (column?.type === 'date') return s;
+      return {
+        ...s,
+        zones: { ...s.zones, [columnName]: sourceZone },
+        plan: s.plan.map((step) => (
+          step.column === columnName && step.op === 'castType'
+            ? { ...step, params: { ...step.params, sourceZone } }
+            : step)),
+      };
+    });
+  }, []);
+
+  const commitClean = useCallback(() => setState((s) => ({ ...s, stage: 'canvas' })), []);
 
   const reset = useCallback(() => {
     bytesRef.current = null;
@@ -141,9 +265,34 @@ export function DataStudioProvider({ children }) {
 
   const setStage = useCallback((stage) => setState((s) => ({ ...s, stage })), []);
 
+  // Any change to the plan or the profile invalidates the dataset, so
+  // the apply is re-run from raw rather than patched. That is the whole
+  // non-destructive model: unticking a step must leave no trace of it.
+  const { profile, plan, stage } = state;
+  useEffect(() => {
+    if (stage === 'idle' || stage === 'parsing') return;
+    requestClean(profile, plan);
+  }, [profile, plan, stage, requestClean]);
+
   const value = useMemo(() => ({
-    ...state, importFile, selectSheet, setHeaderIndex, overrideColumn, reset, setStage,
-  }), [state, importFile, selectSheet, setHeaderIndex, overrideColumn, reset, setStage]);
+    ...state,
+    importFile,
+    selectSheet,
+    setHeaderIndex,
+    overrideColumn,
+    setStepEnabled,
+    removeStep,
+    addManualMerge,
+    setColumnDateOrder,
+    setColumnZone,
+    commitClean,
+    reset,
+    setStage,
+  }), [
+    state, importFile, selectSheet, setHeaderIndex, overrideColumn, setStepEnabled,
+    removeStep, addManualMerge, setColumnDateOrder, setColumnZone, commitClean,
+    reset, setStage,
+  ]);
 
   return <DataStudioContext.Provider value={value}>{children}</DataStudioContext.Provider>;
 }

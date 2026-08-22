@@ -264,3 +264,276 @@
   font-size: 13px;
   text-align: center;
 }
+
+/* ---------- clean review ---------- */
+
+.ds-plan-card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: 14px;
+}
+
+.ds-plan-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ds-plan-heading {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--it-ink-soft);
+}
+
+.ds-step-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ds-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: 8px;
+  border-left: 3px solid transparent;
+  font-size: 13px;
+}
+
+.ds-step:hover {
+  background: var(--it-brand-wash);
+}
+
+/* The confidence stripe is the safety model made visible: a green edge
+   means mechanical and reversible, amber means the step is a judgement
+   call and arrives unticked. */
+.ds-step-high {
+  border-left-color: var(--it-good);
+}
+
+.ds-step-medium {
+  border-left-color: var(--it-accent);
+}
+
+.ds-step-low {
+  border-left-color: var(--it-brand);
+}
+
+.ds-step-main {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.ds-step-main input {
+  margin-top: 2px;
+  flex-shrink: 0;
+  accent-color: var(--it-brand);
+}
+
+.ds-step-text {
+  min-width: 0;
+  color: var(--it-ink);
+  overflow-wrap: anywhere;
+}
+
+.ds-step-count {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--it-ink-soft);
+}
+
+.ds-badge-high {
+  background: color-mix(in srgb, var(--it-good) 14%, transparent);
+  color: var(--it-good);
+}
+
+.ds-badge-medium {
+  background: color-mix(in srgb, var(--it-accent) 18%, transparent);
+  color: var(--it-accent);
+}
+
+.ds-badge-low {
+  background: var(--it-brand-wash);
+  color: var(--it-brand-deep);
+}
+
+.ds-step-remove {
+  flex-shrink: 0;
+  display: inline-flex;
+  padding: 3px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--it-ink-soft);
+  cursor: pointer;
+}
+
+.ds-step-remove:hover {
+  background: var(--it-brand-wash);
+  color: var(--it-danger);
+}
+
+/* ---------- date-order banner ---------- */
+
+.ds-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 14px;
+  border: 1px solid var(--it-accent);
+  border-radius: var(--it-radius);
+  background: color-mix(in srgb, var(--it-accent) 8%, var(--it-panel));
+}
+
+.ds-banner-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--it-ink);
+}
+
+.ds-banner-head svg {
+  color: var(--it-accent);
+  align-self: center;
+}
+
+.ds-banner-table-scroll {
+  overflow-x: auto;
+}
+
+.ds-banner-table {
+  width: auto;
+  min-width: 320px;
+  background: var(--it-panel);
+  border-radius: 8px;
+}
+
+/* The reading currently in force, so the two columns are not just
+   information but an answer. */
+.ds-chosen {
+  background: var(--it-brand-wash);
+  font-weight: 600;
+  color: var(--it-brand-deep);
+}
+
+.ds-banner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ---------- zones and manual merge ---------- */
+
+.ds-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--it-line);
+}
+
+.ds-zone:last-child {
+  border-bottom: 0;
+}
+
+.ds-zone-note {
+  max-width: 62ch;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--it-ink-soft);
+}
+
+.ds-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.ds-merge {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--it-line);
+  font-size: 13px;
+}
+
+.ds-merge:last-child {
+  border-bottom: 0;
+}
+
+.ds-merge > summary {
+  cursor: pointer;
+  color: var(--it-ink);
+}
+
+.ds-merge-hint {
+  margin: 8px 0 6px;
+  font-size: 12px;
+  color: var(--it-ink-soft);
+}
+
+.ds-merge-list {
+  display: grid;
+  gap: 2px;
+  max-height: 240px;
+  margin: 0 0 10px;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.ds-merge-list label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.ds-merge-list label:hover {
+  background: var(--it-brand-wash);
+}
+
+.ds-merge-list input {
+  accent-color: var(--it-brand);
+}
+
+.ds-merge-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.ds-merge-count {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--it-ink-soft);
+}
+
+.ds-merge-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (min-width: 640px) {
+  .ds-merge-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

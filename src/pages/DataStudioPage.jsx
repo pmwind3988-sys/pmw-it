@@ -5,6 +5,7 @@ import Button from '../components/ui/Button';
 import { Inbox, AlertTriangle, RefreshCw } from '../components/ui/Icons';
 import { DataStudioProvider } from '../features/datastudio/DataStudioContext';
 import { useDataStudio } from '../features/datastudio/useDataStudio';
+import CleanReview from '../features/datastudio/clean/CleanReview';
 
 const ACCEPT = '.xlsx,.xlsm,.csv';
 
@@ -247,6 +248,7 @@ function DataStudioBody() {
   const { stage } = useDataStudio();
   if (stage === 'parsing') return <ParsingStage />;
   if (stage === 'idle') return <DropStage />;
+  if (stage === 'cleaning') return <CleanReview />;
   return <ProfileStage />;
 }
 

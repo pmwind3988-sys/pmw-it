@@ -147,12 +147,30 @@ function columnOf(dataset, name) {
   return index === undefined ? undefined : dataset.columns[index];
 }
 
+// The one group every row falls into when a tile has no x axis. Frozen
+// because the resolver hands the same object back for every row and a
+// caller mutating it would rewrite the group under all of them.
+const TOTAL_GROUP = Object.freeze({ key: '', label: 'Total' });
+
 // The label a row's x value groups under, plus a sort key. Returns null
 // when the row has no x value at all -- a row that cannot be placed on
 // the axis is not a category called "empty", it is a row this chart
 // cannot show.
 function makeXResolver(dataset, xSpec, mask) {
-  const column = columnOf(dataset, xSpec?.column);
+  // No x axis ASKED FOR is not the same as an x axis that has gone
+  // missing, and the two used to arrive here indistinguishable. A KPI
+  // tile is `x: null` by construction -- there is one number and nothing
+  // to spread it across -- so it took the missing-column path, got an
+  // empty result and rendered a confident 0 over a full dataset. Every
+  // starter dashboard's KPI row read zero because of it.
+  //
+  // A tile that NAMES a column the dataset does not have still resolves
+  // to null and still draws nothing, which is the case this guard was
+  // written for. Chart types that require an x are stopped earlier, by
+  // `validateTileSpec`, so nothing else reaches the single-group path.
+  if (!xSpec?.column) return () => TOTAL_GROUP;
+
+  const column = columnOf(dataset, xSpec.column);
   if (!column) return null;
 
   const isTemporal = column.type === 'date' || column.type === 'datetime';

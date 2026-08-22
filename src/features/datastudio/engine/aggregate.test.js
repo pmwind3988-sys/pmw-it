@@ -40,6 +40,42 @@ const spec = (over = {}) => ({
   ...over,
 });
 
+// A KPI tile has no x axis by construction. These used to fall through
+// the missing-column guard and aggregate to nothing, so every starter
+// dashboard opened with a row of confident zeroes over a full dataset.
+describe('aggregate with no x axis', () => {
+  const kpi = (over = {}) => spec({
+    chart: 'kpi',
+    encoding: { x: null, y: [{ column: 'Amount', agg: 'sum' }], series: null },
+    ...over,
+  });
+
+  it('totals the whole dataset as one group', () => {
+    const r = aggregate(ds, ALL, kpi());
+    expect(r.categories).toEqual(['Total']);
+    expect(r.series[0].data).toEqual([100]);
+  });
+
+  it('counts every row when the measure is a count', () => {
+    const r = aggregate(ds, ALL, kpi({
+      encoding: { x: null, y: [{ column: null, agg: 'count' }], series: null },
+    }));
+    expect(r.series[0].data).toEqual([5]);
+  });
+
+  it('respects the filter mask', () => {
+    const mask = new Uint8Array([1, 0, 1, 0, 1]);
+    expect(aggregate(ds, mask, kpi()).series[0].data).toEqual([40]);
+  });
+
+  it('still draws nothing when the x column was named but is missing', () => {
+    const r = aggregate(ds, ALL, spec({ encoding: {
+      x: { column: 'Gone' }, y: [{ column: 'Amount', agg: 'sum' }], series: null,
+    } }));
+    expect(r.categories).toEqual([]);
+  });
+});
+
 describe('aggregate', () => {
   it('groups by a dimension and sums a measure', () => {
     const r = aggregate(ds, ALL, spec());

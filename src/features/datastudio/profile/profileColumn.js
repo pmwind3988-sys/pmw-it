@@ -13,6 +13,7 @@
 // zero that a chart would happily plot.
 
 import { inferType, isNullish, parseNumberLike } from './inferType.js';
+import { toEpochMs } from '../time/malaysiaTime.js';
 
 // How many frequent values a dimension carries for previews and filter
 // pickers. Spec §7.1; the profile panel shows fewer, but suggestion
@@ -91,6 +92,28 @@ function applyOverride(verdict, override) {
   return { ...verdict, type, role, overridden: true };
 }
 
+// min/max for a temporal column, as epoch milliseconds.
+//
+// Without this the suggestion engine cannot see how long a date column
+// spans, so `chooseTruncation` has nothing to choose from and every time
+// series falls back to a day grain -- which on five years of data draws
+// about eighteen hundred categories.
+function temporalStats(values, dateOrder) {
+  const order = dateOrder && dateOrder !== 'conflict' ? dateOrder : 'dmy';
+  let min = null;
+  let max = null;
+
+  for (const v of values) {
+    if (isNullish(v)) continue;
+    const ms = v instanceof Date ? v.getTime() : toEpochMs(v, { order, dateOnly: true });
+    if (!Number.isFinite(ms)) continue;
+    if (min === null || ms < min) min = ms;
+    if (max === null || ms > max) max = ms;
+  }
+
+  return { min, max, mean: null };
+}
+
 export function profileColumn(values, columnName, index, override = null) {
   const verdict = applyOverride(inferType(values, columnName), override);
   const total = values.length;
@@ -101,6 +124,7 @@ export function profileColumn(values, columnName, index, override = null) {
   const nonNullRatio = total > 0 ? (total - verdict.nullCount) / total : 0;
 
   const isNumericLike = verdict.type === 'numeric';
+  const isTemporalLike = verdict.type === 'date' || verdict.type === 'datetime';
   const isDimensionLike = verdict.role === 'dimension';
 
   return {
@@ -109,8 +133,8 @@ export function profileColumn(values, columnName, index, override = null) {
     index,
     nonNullRatio,
     topValues: isDimensionLike ? rankTopValues(values) : [],
-    ...(isNumericLike
-      ? numericStats(values)
-      : { min: null, max: null, mean: null }),
+    ...(isNumericLike ? numericStats(values) : null),
+    ...(isTemporalLike ? temporalStats(values, verdict.dateOrder) : null),
+    ...(isNumericLike || isTemporalLike ? null : { min: null, max: null, mean: null }),
   };
 }

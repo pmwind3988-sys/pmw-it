@@ -58,6 +58,34 @@ describe('profileDataset', () => {
   });
 });
 
+describe('temporal stats', () => {
+  // Without min/max on temporal columns the suggestion engine has no
+  // span to measure, so `chooseTruncation` cannot choose and every time
+  // series falls back to a day grain -- about eighteen hundred
+  // categories on five years of data.
+  it('reports the span of a date column as epoch milliseconds', () => {
+    const c = profileColumn(['13/01/2024', '05/02/2024', '20/03/2024'], 'Created', 0);
+    expect(c.min).toBe(Date.UTC(2024, 0, 13));
+    expect(c.max).toBe(Date.UTC(2024, 2, 20));
+  });
+
+  it('leaves the mean null for a date column, where it means nothing', () => {
+    expect(profileColumn(['13/01/2024', '05/02/2024'], 'Created', 0).mean).toBeNull();
+  });
+
+  it('reads the span of Date objects too', () => {
+    const c = profileColumn(
+      [new Date(Date.UTC(2024, 0, 1)), new Date(Date.UTC(2024, 5, 1))], 'Created', 0,
+    );
+    expect(c.max - c.min).toBe(Date.UTC(2024, 5, 1) - Date.UTC(2024, 0, 1));
+  });
+
+  it('still reports no stats for a categorical column', () => {
+    const c = profileColumn(['HR', 'IT', 'HR'], 'Dept', 0);
+    expect([c.min, c.max, c.mean]).toEqual([null, null, null]);
+  });
+});
+
 describe('profileColumn overrides', () => {
   const values = ['10', '20', '30', '40'];
 

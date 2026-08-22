@@ -25,7 +25,8 @@ pmw-it/
 │   │   ├── SignatureDialog.jsx
 │   │   └── ui/               # Icons, Button, Surfaces, StatCard, Badges
 │   ├── features/
-│   │   ├── datastudio/       # Excel import + profiling (in progress)
+│   │   ├── datastudio/       # ingest/ profile/ clean/ engine/ canvas/
+│   │   │                     # suggest/ store/ time/ worker/
 │   │   └── devices/          # parse/ derive/ sharepoint/ stats/ ui/
 │   ├── hooks/
 │   │   ├── useRequests.js    # the one SharePoint read + row helpers + token
@@ -35,7 +36,8 @@ pmw-it/
 │   ├── styles/
 │   │   ├── shell.css         # tokens, brand surface, shell, UI, dashboard
 │   │   ├── auth.css          # sign-in layout + the idle animation
-│   │   └── devices.css       # the device list section
+│   │   ├── devices.css       # the device list section
+│   │   └── datastudio.css    # Data Studio, incl. the chart series palette
 │   ├── context/              # ThemeContext (dark/light), SessionContext (auto
 │   │                         # re-sign-in + its dialog and entrance animation)
 │   ├── services/             # sharePointService.js
@@ -61,6 +63,7 @@ pmw-it/
 | `/it-boarding-form` | SurveyJS request form (`?edit=<id>` opens a record) |
 | `/asset-checklist` | Handover checklist (IN / OUT / individual) |
 | `/devices` | Device list: fleet dashboard, register and scan-report import (`?view=`) |
+| `/data-studio` | Import a spreadsheet, profile it, clean it, chart it. Lazy route. |
 
 ## WHERE TO LOOK
 | Task | Location |
@@ -84,6 +87,15 @@ pmw-it/
 | Bar and column charts | `src/components/ui/Charts.jsx` (shared by both dashboards) |
 | SharePoint writes | `src/services/sharePointService.js` |
 | Theme | `src/context/ThemeContext.jsx`; toggle lives in the shell's bar |
+| Spreadsheet parsing / header detection | `src/features/datastudio/ingest/` |
+| Column type inference and stats | `src/features/datastudio/profile/` |
+| The cleaning ops, proposals and apply | `src/features/datastudio/clean/` |
+| Columnar store, filter masks, aggregation | `src/features/datastudio/engine/` |
+| Chart tiles, theme, grid, tile editor | `src/features/datastudio/canvas/` |
+| Starter chart suggestions | `src/features/datastudio/suggest/suggestCharts.js` |
+| IndexedDB, exports, the saved library | `src/features/datastudio/store/` |
+| Malaysia time parsing and formatting | `src/features/datastudio/time/malaysiaTime.js` |
+| Data Studio state and worker lifetime | `src/features/datastudio/DataStudioContext.jsx` |
 
 ## CONVENTIONS
 
@@ -92,7 +104,8 @@ its own body. The bar, the nav, the theme toggle, sign-out and the sign-in gate
 all belong to the shell — do not re-add per-page copies of them.
 
 **Stylesheet order** (`src/main.jsx`): `index.css` → `App.css` → `styles/shell.css`
-→ `styles/auth.css`. shell.css re-points the older `--bg` / `--surface` /
+→ `styles/auth.css` → `styles/devices.css` → `styles/datastudio.css`.
+shell.css re-points the older `--bg` / `--surface` /
 `--border` / `--text-*` tokens at the new palette, so it must load last.
 `--accent` is deliberately left alone: it fills `.ms-button`, whose text colour
 is `--bg`.
@@ -130,6 +143,10 @@ timeout and undo it. Sign out through `useSession().signOut()` for that reason.
 lives — `datastudio/` and `devices/` both follow it. Layering inside a feature:
 `parse/` knows nothing about the domain, `derive/` knows nothing about SharePoint,
 `sharepoint/` imports no React. Each layer is testable without the one above it.
+Data Studio layers the same way — `ingest/` → `profile/` → `clean/` → `engine/`,
+each a set of pure functions over plain data, with `canvas/` the only part that
+touches React. That is why `engine/aggregate.js` carries more tests than the
+whole canvas does: it is the part that can be wrong without looking wrong.
 
 **Device report parsing keys off a known-label whitelist** (`parse/labels.js`). A
 generic `^Word:` split reads `Total Slots: 2 | Used Slots: 2` and
@@ -228,6 +245,28 @@ No icon package is installed — add a glyph there rather than a dependency.
 - Don't add `hour12` beside `hourCycle` in `malaysiaTime.js` — per the Intl spec an
   explicit `hour12` nullifies `hourCycle` entirely. The 24-hour path pins `h23`, the
   AM/PM path pins `h12`, and neither passes `hour12`.
+- Don't import the `echarts` umbrella. It pulls in every chart type and both
+  renderers — about a megabyte, most of it for charts this app never draws — and
+  it does so silently, because the code still works. Import the default export
+  of `src/features/datastudio/canvas/echartsCore.js`, which registers exactly
+  the pieces used.
+- Don't shift a date-only column when the UTC toggle is on. Adding eight hours to
+  a value that has no time of day moves it to the wrong day, and nothing on
+  screen shows that it happened. `castType` keys this off `dateOnly`, and the
+  control in the clean review is rendered DISABLED rather than hidden so someone
+  who knows their export is UTC is not left hunting for a setting.
+- Don't filter the tile that originated a cross-filter selection. Click "HR" on a
+  department bar chart and the other tiles narrow to HR — but that chart keeps
+  all its bars, or it collapses to the one bar just clicked and deletes the
+  context needed to click anything else. `maskFor` in `engine/filterMask.js`
+  implements it, its cache keys on whether the selection *applies* rather than on
+  the tile id, and the source tile dims its unselected marks as presentation only.
+- Don't write an invisible character as a literal in source. A U+00A0 or a
+  zero-width space does not survive being retyped or pasted, so a test that
+  claims to cover it silently becomes a no-op, and a diff cannot show the
+  difference. Use ` `, `​`, `﻿`. This is not hypothetical here:
+  one such swap voided a whole test in `inferType.test.js` and was only caught
+  by byte-diffing the file.
 - Don't export a helper next to a component from the same file — it drops the
   file out of Fast Refresh (and eslint fails the build). `initialsOf` lives in
   `src/utils/initials.js` for exactly this reason.

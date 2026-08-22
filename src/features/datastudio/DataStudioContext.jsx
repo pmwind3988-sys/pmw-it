@@ -14,6 +14,7 @@ import { STARTER_BUCKETS } from './text/buckets.js';
 import { applyOverrides, EMPTY_OVERRIDES } from './text/overrides.js';
 import { deriveColumns, DERIVED_OVERRIDES, DERIVED_HEADERS } from './text/deriveColumns.js';
 import { withAnalysisTiles } from './text/analysisTiles.js';
+import { gridToSend } from './worker/gridSync.js';
 import { planAutopilot } from './intent/planAutopilot.js';
 import { hideColumns, unhideColumns } from './intent/hideColumns.js';
 
@@ -41,6 +42,12 @@ export function DataStudioProvider({ children }) {
   // is stale -- the user has ticked something else since -- and applying
   // it would show them the answer to a question they already changed.
   const cleanIdRef = useRef(0);
+  // The grid the WORKER is holding. It keeps the parsed grid so a
+  // re-clean stays a small message, which means the main thread has to
+  // notice when it has replaced that grid -- otherwise the worker
+  // cleans the previous sheet and the difference shows up only as tiles
+  // reporting a column that is plainly on screen. See `worker/gridSync.js`.
+  const workerGridRef = useRef(null);
 
   useEffect(() => {
     // Vite's native worker syntax -- no plugin, and the worker's own
@@ -59,6 +66,9 @@ export function DataStudioProvider({ children }) {
       }
 
       if (msg.type === 'parsed') {
+        // The worker parsed it and is holding it; re-sending it on the
+        // first clean would ship the whole sheet back for nothing.
+        workerGridRef.current = msg.grid;
         // Everything the autopilot decides is decided here, once, from
         // the parse result -- not spread across the effects below. The
         // provider's job after this is only to carry the plan out.
@@ -642,6 +652,7 @@ export function DataStudioProvider({ children }) {
         error: '',
       }));
 
+      workerGridRef.current = grid;
       requestClean(record.profile, plan, grid);
 
       // Corrections outlive the session they were made in. The analysis
@@ -866,11 +877,16 @@ export function DataStudioProvider({ children }) {
   // Any change to the plan or the profile invalidates the dataset, so
   // the apply is re-run from raw rather than patched. That is the whole
   // non-destructive model: unticking a step must leave no trace of it.
-  const { profile, plan, stage } = state;
+  const { profile, plan, stage, grid } = state;
   useEffect(() => {
     if (stage === 'idle' || stage === 'parsing') return;
-    requestClean(profile, plan);
-  }, [profile, plan, stage, requestClean]);
+    // Carries the grid only when the worker's copy is out of date --
+    // when the analysis columns were just appended, say. Every other
+    // re-clean stays a plan-sized message.
+    const send = gridToSend(grid, workerGridRef.current);
+    if (send) workerGridRef.current = send;
+    requestClean(profile, plan, send);
+  }, [profile, plan, stage, grid, requestClean]);
 
   /**
    * The autopilot's last step: read the written answers.

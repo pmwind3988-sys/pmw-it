@@ -310,6 +310,14 @@ No icon package is installed — add a glyph there rather than a dependency.
   screen shows that it happened. `castType` keys this off `dateOnly`, and the
   control in the clean review is rendered DISABLED rather than hidden so someone
   who knows their export is UTC is not left hunting for a setting.
+- Don't replace the grid in state without sending it to the worker. The
+  worker KEEPS the parsed grid so a re-clean costs one small plan message
+  however large the sheet is -- so a main thread that rebuilds the grid
+  (which is exactly what adding the text analysis does) leaves the worker
+  cleaning the PREVIOUS sheet. Nothing errors: the analysis dashboard
+  simply renders six tiles all reporting `Column "Severity" is not in
+  this dataset`. `worker/gridSync.js` decides when to carry it, by
+  identity, and the provider keeps `workerGridRef` in step.
 - Don't decode a cell by checking `column.dictionary` before
   `type === 'multi'`. A multi column carries a dictionary too, so the
   dictionary branch reads its FLAT option array as one code per row and

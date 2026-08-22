@@ -34,13 +34,19 @@ function pickByRole(columns, role) {
   return best ? best.name : null;
 }
 
-export function profileDataset(grid) {
+export function profileDataset(grid, overrides = {}) {
   const headers = grid?.headers ?? [];
   const rows = grid?.rows ?? [];
 
   const byColumn = transpose(headers, rows);
+  // `overrides` is a caller that already KNOWS a column's type saying
+  // so, rather than the inference guessing. The text analysis uses it
+  // for the categories column it just built: most respondents raise a
+  // single category, so fewer than 60% of cells carry a separator and
+  // the multi-select heuristic correctly declines -- but there is
+  // nothing to infer, we wrote that column.
   const columns = headers.map((name, index) =>
-    profileColumn(byColumn[index], name, index));
+    profileColumn(byColumn[index], name, index, overrides[name] ?? null));
 
   return {
     columns,

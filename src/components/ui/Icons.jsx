@@ -156,6 +156,15 @@ export const Laptop = make('Laptop', (
   </>
 ));
 
+export const BarChart3 = make('BarChart3', (
+  <>
+    <path d="M3 3v18h18" />
+    <rect x="7" y="12" width="3" height="6" rx="0.5" />
+    <rect x="12.5" y="8" width="3" height="10" rx="0.5" />
+    <rect x="18" y="5" width="3" height="13" rx="0.5" />
+  </>
+));
+
 export const Share2 = make('Share2', (
   <>
     <circle cx="18" cy="5" r="3" />

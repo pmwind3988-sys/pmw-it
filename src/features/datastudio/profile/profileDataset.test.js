@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { profileDataset } from './profileDataset.js';
+import { profileColumn } from './profileColumn.js';
 
 const grid = {
   headers: ['Department', 'Amount', 'Created', 'Notes'],
@@ -54,5 +55,32 @@ describe('profileDataset', () => {
   it('returns null for topMeasure when there are no measures', () => {
     const noMeasures = { headers: ['Dept'], rows: [['HR'], ['IT']] };
     expect(profileDataset(noMeasures).topMeasure).toBeNull();
+  });
+});
+
+describe('profileColumn overrides', () => {
+  const values = ['10', '20', '30', '40'];
+
+  it('lets the user force a type and derives the role from it', () => {
+    const c = profileColumn(values, 'Amount', 0, { type: 'categorical' });
+    expect(c).toMatchObject({ type: 'categorical', role: 'dimension', overridden: true });
+  });
+
+  it('recomputes the stats to match the forced type', () => {
+    const asText = profileColumn(values, 'Amount', 0, { type: 'categorical' });
+    // No longer a measure, so the numeric stats must go -- leaving them
+    // would let a chart plot a mean for a column the user just said is
+    // not a number.
+    expect(asText.min).toBeNull();
+    expect(asText.topValues.length).toBe(4);
+  });
+
+  it('lets the user force a role independently of the type', () => {
+    const c = profileColumn(values, 'Amount', 0, { role: 'ignored' });
+    expect(c).toMatchObject({ type: 'numeric', role: 'ignored' });
+  });
+
+  it('leaves the verdict alone when there is no override', () => {
+    expect(profileColumn(values, 'Amount', 0).overridden).toBeUndefined();
   });
 });

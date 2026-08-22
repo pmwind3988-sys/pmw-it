@@ -21,6 +21,7 @@ import {
   Moon,
   ShieldCheck,
   Laptop,
+  BarChart3,
 } from './ui/Icons';
 
 /**
@@ -42,6 +43,7 @@ const NAV_ITEMS = [
   { to: '/it-boarding-form', label: 'New request', icon: FilePlus },
   { to: '/asset-checklist', label: 'Asset checklist', icon: CheckSquare },
   { to: '/devices', label: 'Device list', icon: Laptop },
+  { to: '/data-studio', label: 'Data Studio', icon: BarChart3 },
 ];
 
 export default function AppShell({ title, subtitle, actions, search, children }) {

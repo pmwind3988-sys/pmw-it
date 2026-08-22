@@ -64,8 +64,35 @@ function numericStats(values) {
   return { min, max, mean: count > 0 ? sum / count : null };
 }
 
-export function profileColumn(values, columnName, index) {
-  const verdict = inferType(values, columnName);
+// Which role each type plays on the canvas -- spec section 7.1. Kept as
+// data rather than a chain of ifs because the profile panel's type
+// override needs to answer the same question for a type the inference
+// never picked.
+export const ROLE_BY_TYPE = {
+  numeric: 'measure',
+  categorical: 'dimension',
+  boolean: 'dimension',
+  date: 'temporal',
+  datetime: 'temporal',
+  text: 'ignored',
+  identifier: 'ignored',
+  empty: 'ignored',
+};
+
+// `override` is the user disagreeing with the inference from the profile
+// panel, and the user wins -- that is the whole point of showing them the
+// verdict. The measured confidence is kept as reported rather than forced
+// to 1: it still describes how well the data fitted the ORIGINAL guess,
+// which is the context for why they had to intervene.
+function applyOverride(verdict, override) {
+  if (!override?.type && !override?.role) return verdict;
+  const type = override.type ?? verdict.type;
+  const role = override.role ?? ROLE_BY_TYPE[type] ?? 'ignored';
+  return { ...verdict, type, role, overridden: true };
+}
+
+export function profileColumn(values, columnName, index, override = null) {
+  const verdict = applyOverride(inferType(values, columnName), override);
   const total = values.length;
 
   // An empty grid has no rows to be non-null, and 0/0 is NaN -- which

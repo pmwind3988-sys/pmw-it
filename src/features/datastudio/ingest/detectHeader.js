@@ -22,6 +22,14 @@ import { isNullish, parseNumberLike, parseBooleanLike } from '../profile/inferTy
 // row 20 is not a header, it is a second table, which is out of scope.
 export const HEADER_SCAN_ROWS = 20;
 
+// How many rows of the body to characterise a candidate against. One is
+// not enough: real sheets put a 'pending' in the first row of a money
+// column, and a single such cell made that column look like text, erased
+// the header/body difference, and handed the whole detection to a title
+// banner. A handful of rows and a majority vote per column costs
+// nothing and does not care about one messy row.
+export const BODY_SAMPLE_ROWS = 5;
+
 // Below this, no row is a convincing header and we say so rather than
 // promoting the least-bad one and mislabelling every column.
 export const HEADER_SCORE_FLOOR = 0.5;
@@ -49,10 +57,49 @@ function rowWidth(rows) {
   return rows.reduce((widest, row) => Math.max(widest, row?.length ?? 0), 0);
 }
 
+function shapesOf(row, width) {
+  return Array.from({ length: width }, (_, c) => cellShape(row?.[c]));
+}
+
+// What the body below `from` looks like, one representative shape per
+// column, by majority over the next few non-blank rows. Ties keep the
+// shape seen first, so the result does not depend on Map ordering.
+// Returns null when there is no body at all.
+function bodyShapes(rows, from, width) {
+  const tallies = Array.from({ length: width }, () => new Map());
+  let sampled = 0;
+
+  for (let r = from; r < rows.length && sampled < BODY_SAMPLE_ROWS; r++) {
+    const shapes = shapesOf(rows[r], width);
+    // A blank spacer between a header and its data says nothing about
+    // the body's types; skipping it stops it reading as "completely
+    // different" and flattering every row above it.
+    if (shapes.every((s) => s === 'empty')) continue;
+    for (let c = 0; c < width; c++) {
+      const tally = tallies[c];
+      tally.set(shapes[c], (tally.get(shapes[c]) ?? 0) + 1);
+    }
+    sampled++;
+  }
+
+  if (sampled === 0) return null;
+
+  return tallies.map((tally) => {
+    let best = 'empty';
+    let bestCount = -1;
+    for (const [shape, count] of tally) {
+      if (count > bestCount) {
+        best = shape;
+        bestCount = count;
+      }
+    }
+    return best;
+  });
+}
+
 // How header-like one row is, in 0..1.
 function scoreRow(rows, index, width) {
-  const row = rows[index] ?? [];
-  const shapes = Array.from({ length: width }, (_, c) => cellShape(row[c]));
+  const shapes = shapesOf(rows[index], width);
   const filled = shapes.filter((s) => s !== 'empty');
 
   // A blank row is a spacer, never a header. Returning 0 rather than
@@ -63,19 +110,22 @@ function scoreRow(rows, index, width) {
   const words = filled.filter((s) => s === 'text').length / filled.length;
   const fill = filled.length / width;
 
-  // Compare against the first non-blank row below, not merely the next
-  // one -- a blank spacer between the header and the data would
-  // otherwise read as "totally different" and flatter every row above it.
+  // The comparison runs only over the columns this row actually fills.
+  // Counting its empty columns as "different from the body" is what lets
+  // a one-cell title banner score as though it were the most
+  // header-like row on the sheet: five of its six columns are empty
+  // where the body is full, and emptiness is not evidence of a header.
+  const body = bodyShapes(rows, index + 1, width);
   let differs = 0;
-  for (let below = index + 1; below < rows.length; below++) {
-    const belowShapes = Array.from({ length: width }, (_, c) => cellShape(rows[below]?.[c]));
-    if (belowShapes.every((s) => s === 'empty')) continue;
+  if (body) {
+    let compared = 0;
     let changed = 0;
     for (let c = 0; c < width; c++) {
-      if (shapes[c] !== belowShapes[c]) changed++;
+      if (shapes[c] === 'empty') continue;
+      compared++;
+      if (shapes[c] !== body[c]) changed++;
     }
-    differs = changed / width;
-    break;
+    differs = compared > 0 ? changed / compared : 0;
   }
 
   return WEIGHT_WORDS * words + WEIGHT_FILL * fill + WEIGHT_DIFFERS * differs;

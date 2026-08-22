@@ -1,0 +1,266 @@
+/* Data Studio — import, profile, clean and canvas. Loaded after shell.css. */
+
+/* ---------- drop zone ---------- */
+
+.ds-drop-card {
+  padding: 0;
+}
+
+.ds-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 48px 20px;
+  border: 1px dashed var(--it-line);
+  border-radius: var(--it-radius);
+  background: var(--it-panel);
+  text-align: center;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.ds-drop-active {
+  border-color: var(--it-brand);
+  background: var(--it-brand-wash);
+}
+
+.ds-drop-icon {
+  color: var(--it-brand);
+}
+
+.ds-drop-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--it-ink);
+}
+
+.ds-drop-hint {
+  max-width: 46ch;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--it-ink-soft);
+}
+
+.ds-drop-hint code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--it-brand-wash);
+  color: var(--it-brand-deep);
+  font-size: 12px;
+}
+
+.ds-drop-input {
+  display: none;
+}
+
+/* ---------- progress ---------- */
+
+.ds-progress-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ds-progress-file {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--it-ink);
+  overflow-wrap: anywhere;
+}
+
+.ds-progress-track {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--it-brand-wash);
+}
+
+.ds-progress-bar {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--it-brand);
+  transition: width 200ms ease;
+}
+
+.ds-progress-stage {
+  margin: 0;
+  font-size: 13px;
+  color: var(--it-ink-soft);
+}
+
+/* ---------- toolbar ---------- */
+
+.ds-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.ds-toolbar-spacer {
+  flex: 1 1 auto;
+}
+
+.ds-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ds-field > span {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--it-ink-soft);
+}
+
+.ds-select {
+  max-width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--it-line);
+  border-radius: 8px;
+  background: var(--it-panel);
+  color: var(--it-ink);
+  font: inherit;
+  font-size: 13px;
+}
+
+.ds-select:focus-visible {
+  outline: 2px solid var(--it-brand);
+  outline-offset: 1px;
+}
+
+.ds-summary {
+  font-size: 12px;
+  color: var(--it-ink-soft);
+}
+
+/* ---------- profile table ---------- */
+
+.ds-table-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.ds-table-scroll {
+  overflow-x: auto;
+}
+
+.ds-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.ds-table th,
+.ds-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--it-line);
+  text-align: left;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.ds-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--it-canvas);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--it-ink-soft);
+}
+
+.ds-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.ds-table .ds-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.ds-col-name {
+  font-weight: 600;
+  color: var(--it-ink);
+}
+
+.ds-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.ds-badge-edit {
+  background: var(--it-brand-wash);
+  color: var(--it-brand-deep);
+}
+
+.ds-casualty {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--it-danger);
+}
+
+.ds-casualty-eg {
+  color: var(--it-ink-soft);
+}
+
+.ds-ok {
+  color: var(--it-good);
+}
+
+/* ---------- wider screens ---------- */
+/* Mobile-first, per the project's `min-width`-only breakpoints: on a
+   phone the toolbar stacks, its buttons share the last row and the
+   summary line gets a row to itself. From 640px the toolbar is one
+   row and everything sits at its natural width. */
+
+.ds-toolbar > .ui-btn {
+  flex: 1 1 auto;
+}
+
+.ds-summary {
+  flex: 1 1 100%;
+}
+
+@media (min-width: 640px) {
+  .ds-toolbar > .ui-btn {
+    flex: 0 0 auto;
+  }
+
+  .ds-summary {
+    flex: 0 1 auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ds-drop,
+  .ds-progress-bar {
+    transition: none;
+  }
+}
+
+/* The lazy route's fallback. Deliberately plain: the chunk arrives in a
+   moment on any normal connection, and a spinner that flashes for 80ms
+   reads as a glitch rather than as progress. */
+.ds-route-loading {
+  padding: 48px 20px;
+  color: var(--it-ink-soft);
+  font-size: 13px;
+  text-align: center;
+}

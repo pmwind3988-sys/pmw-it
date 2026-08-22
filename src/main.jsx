@@ -21,6 +21,7 @@ import './App.css';
 import './styles/shell.css';
 import './styles/auth.css';
 import './styles/devices.css';
+import './styles/datastudio.css';
 
 // MSAL request timeout (30 seconds)
 const MSAL_TIMEOUT_MS = 30000;

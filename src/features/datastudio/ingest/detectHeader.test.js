@@ -29,6 +29,36 @@ describe('detectHeader', () => {
   it('returns -1 for an empty sheet', () => {
     expect(detectHeader([]).headerIndex).toBe(-1);
   });
+
+  // Found by running the real pipeline over a generated workbook. The
+  // header was compared against ONE row below it, and that row happened
+  // to carry 'pending' in the money column. That single cell erased the
+  // strings-over-numbers signal, and the one-cell title banner above won
+  // instead -- naming every column after the report title and shifting
+  // the whole table up a row.
+  it('is not thrown off by a stray text value in the first data row', () => {
+    const rows = [
+      ['IT Asset Report 2024', null, null],
+      ['Asset Tag', 'Department', 'Cost'],
+      ['A1000', 'HR', 'pending'],
+      ['A1001', 'IT', 1007],
+      ['A1002', 'Finance', 1014],
+      ['A1003', 'Ops', 1021],
+    ];
+    expect(detectHeader(rows).headerIndex).toBe(1);
+  });
+
+  // The other half of the same bug: a sparse banner must not out-score a
+  // full header just because its empty columns differ from a full body.
+  it('does not mistake a one-cell title banner for a header', () => {
+    const rows = [
+      ['Quarterly Summary', null, null, null],
+      ['Region', 'Owner', 'Units', 'Value'],
+      ['North', 'Ann', 12, 300],
+      ['South', 'Bo', 9, 210],
+    ];
+    expect(detectHeader(rows).headerIndex).toBe(1);
+  });
 });
 
 describe('toGrid', () => {

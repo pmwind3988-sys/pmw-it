@@ -26,3 +26,7 @@ dist-ssr
 .vercel
 .env
 server/.env
+
+# Fetched at build time by scripts/fetch-model.mjs.
+public/models/
+public/ort/

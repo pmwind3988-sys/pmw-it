@@ -4,6 +4,7 @@ import {
   saveDataset, loadDataset, listDatasets, deleteDataset,
   saveDashboard, listDashboards, loadDashboard, deleteDashboard,
   saveCleanPlan, loadCleanPlan, datasetsBySize, storageEstimate,
+  saveAnalysis, loadAnalysis, MAX_CACHED_VECTORS,
 } from './db.js';
 
 const record = () => ({
@@ -144,5 +145,60 @@ describe('quota reporting', () => {
   // where the Storage API is missing.
   it('reports nulls rather than throwing when the API is unavailable', async () => {
     expect(await storageEstimate()).toMatchObject({ usage: null, quota: null });
+  });
+});
+
+describe('analyses', () => {
+  it('round-trips buckets, overrides and settings', async () => {
+    await saveAnalysis({
+      datasetId: 'ds_analysis_1',
+      columnName: 'Describe',
+      buckets: [{ id: 'sap', label: 'SAP', description: 'd', hints: [] }],
+      overrides: {
+        retags: { '0:0': 'sap' },
+        noise: ['1:0'],
+        themeNames: {},
+        themeMerges: {},
+        pinned: [],
+        suppressed: [],
+      },
+      settings: { threshold: 0.35, granularity: 0.5 },
+    });
+
+    const record = await loadAnalysis('ds_analysis_1');
+    expect(record.columnName).toBe('Describe');
+    expect(record.overrides.retags['0:0']).toBe('sap');
+    expect(record.settings.threshold).toBe(0.35);
+  });
+
+  it('keeps vectors for a small analysis so reopening is instant', async () => {
+    await saveAnalysis({
+      datasetId: 'ds_analysis_2',
+      columnName: 'D',
+      buckets: [],
+      overrides: {},
+      settings: {},
+      vectors: [Float32Array.from([1, 0]), Float32Array.from([0, 1])],
+    });
+    const record = await loadAnalysis('ds_analysis_2');
+    expect(record.vectors).toHaveLength(2);
+    expect(Array.from(record.vectors[0])).toEqual([1, 0]);
+  });
+
+  it('drops vectors for a large analysis rather than filling the quota', async () => {
+    const many = Array.from({ length: MAX_CACHED_VECTORS + 1 }, () => Float32Array.from([1]));
+    await saveAnalysis({
+      datasetId: 'ds_analysis_3',
+      columnName: 'D',
+      buckets: [],
+      overrides: {},
+      settings: {},
+      vectors: many,
+    });
+    expect((await loadAnalysis('ds_analysis_3')).vectors).toBeNull();
+  });
+
+  it('returns undefined for a dataset that was never analysed', async () => {
+    expect(await loadAnalysis('never-analysed')).toBeUndefined();
   });
 });

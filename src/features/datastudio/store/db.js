@@ -10,7 +10,7 @@
 // is not stuck with a blob that was cleaned the old way.
 
 export const DB_NAME = 'pmw-datastudio';
-export const DB_VERSION = 1;
+export const DB_VERSION = 2;
 
 export const STORE_DATASETS = 'datasets';
 // The heavy column blobs live apart from the dataset metadata.
@@ -24,6 +24,11 @@ export const STORE_DATASETS = 'datasets';
 export const STORE_COLUMNS = 'datasetColumns';
 export const STORE_PLANS = 'cleanPlans';
 export const STORE_DASHBOARDS = 'dashboards';
+// Text analysis: the bucket definitions in force, the user's corrections,
+// and the settings they were produced under. Never the analysis itself --
+// that is derived, and re-deriving it is cheap compared with storing a
+// copy that can silently disagree with the data it came from.
+export const STORE_ANALYSES = 'analyses';
 
 /**
  * Thrown when the browser refuses a write for want of space.
@@ -58,6 +63,9 @@ export function openDb() {
       }
       if (!db.objectStoreNames.contains(STORE_PLANS)) {
         db.createObjectStore(STORE_PLANS, { keyPath: 'datasetId' });
+      }
+      if (!db.objectStoreNames.contains(STORE_ANALYSES)) {
+        db.createObjectStore(STORE_ANALYSES, { keyPath: 'datasetId' });
       }
       if (!db.objectStoreNames.contains(STORE_DASHBOARDS)) {
         const dashboards = db.createObjectStore(STORE_DASHBOARDS, { keyPath: 'id' });
@@ -150,13 +158,15 @@ export async function deleteDataset(id) {
 
   await new Promise((resolve, reject) => {
     const tx = db.transaction(
-      [STORE_DATASETS, STORE_COLUMNS, STORE_PLANS, STORE_DASHBOARDS], 'readwrite',
+      [STORE_DATASETS, STORE_COLUMNS, STORE_PLANS, STORE_DASHBOARDS, STORE_ANALYSES],
+      'readwrite',
     );
     tx.oncomplete = resolve;
     tx.onerror = () => reject(tx.error);
     tx.objectStore(STORE_DATASETS).delete(id);
     tx.objectStore(STORE_COLUMNS).delete(id);
     tx.objectStore(STORE_PLANS).delete(id);
+    tx.objectStore(STORE_ANALYSES).delete(id);
     const dashboards = tx.objectStore(STORE_DASHBOARDS);
     for (const dashboardId of dashboardIds) dashboards.delete(dashboardId);
   });
@@ -208,6 +218,36 @@ export async function deleteDashboard(id) {
   await run(STORE_DASHBOARDS, 'readwrite', (store) => {
     store.delete(id);
   });
+}
+
+// --- text analysis ----------------------------------------------------
+
+// Above this, the fragment vectors are re-computed on reopen instead of
+// stored. 2,000 x 384 floats is about 3MB, which is a reasonable thing
+// to keep; ten times that is not, and a survey that large is rare enough
+// that paying for the model run again is the better trade.
+export const MAX_CACHED_VECTORS = 2000;
+
+export async function saveAnalysis(record) {
+  const vectors = record?.vectors ?? null;
+  const value = {
+    datasetId: record.datasetId,
+    columnName: record.columnName ?? '',
+    buckets: record.buckets ?? [],
+    overrides: record.overrides ?? {},
+    settings: record.settings ?? {},
+    vectors: vectors && vectors.length <= MAX_CACHED_VECTORS ? vectors : null,
+    updatedAt: Date.now(),
+  };
+  await run(STORE_ANALYSES, 'readwrite', (store) => {
+    store.put(value);
+  });
+}
+
+export async function loadAnalysis(datasetId) {
+  const db = await openDb();
+  const tx = db.transaction(STORE_ANALYSES, 'readonly');
+  return promisify(tx.objectStore(STORE_ANALYSES).get(datasetId));
 }
 
 // --- quota ------------------------------------------------------------

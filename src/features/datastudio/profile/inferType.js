@@ -102,6 +102,13 @@ export function parseNumberLike(rawValue) {
   // as a separator.
   s = s.replace(/,/g, '').replace(/\s+/g, '');
 
+  // The leading-zero guard has to run a second time. The first pass sees
+  // the raw string, but '$007', '(007)' and '-007' only expose their
+  // leading zero once the currency symbol, parentheses and sign are gone.
+  // Without this, a cost centre written as '$007' parses as 7 -- exactly
+  // the silent mangling spec section 7.4 exists to prevent.
+  if (LEADING_ZERO_RE.test(s)) return fail;
+
   if (s === '' || !/^\d+(\.\d+)?$/.test(s)) return fail;
 
   let value = Number(s);
@@ -135,8 +142,14 @@ export function parseBooleanLike(rawValue) {
 // the ONLY condition that fires the identifier override regardless of
 // column name (part (a)); merely-monotonic-but-non-consecutive sequences
 // like ['10','20','30','40'] must NOT trigger it.
+// A run this short is not evidence of anything: ['10','11'] is two
+// ordinary measurements as readily as it is two row numbers, and preview
+// slices and tiny sheets would otherwise produce spurious identifier
+// verdicts that demote a real measure to role 'ignored'.
+export const MIN_IDENTIFIER_RUN = 5;
+
 function isConsecutiveIntegerSequence(rawValues) {
-  if (rawValues.length < 2) return false;
+  if (rawValues.length < MIN_IDENTIFIER_RUN) return false;
 
   const nums = [];
   for (const raw of rawValues) {
@@ -154,7 +167,28 @@ function isConsecutiveIntegerSequence(rawValues) {
   return true;
 }
 
-const IDENTIFIER_NAME_RE = /id|no|code|ref|serial/i;
+const IDENTIFIER_NAME_TOKEN_RE = /^(ids?|nos?|codes?|refs?|serials?)$/i;
+
+// Splits a header into words, breaking on separators AND on camelCase
+// boundaries, so 'EmpID' and 'Emp_ID' tokenise the same way as 'Emp ID'.
+function nameTokens(name) {
+  return String(name ?? '')
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    .split(/[^A-Za-z0-9]+/)
+    .filter(Boolean);
+}
+
+// Whether a header names an identifier. Matching is per-token, not by
+// substring: the brief's literal /id|no|code|ref|serial/i is unanchored,
+// so 'Paid Amount' (contains 'id'), 'Width', 'Notes' and 'Income' all
+// matched it, and a genuine measure with distinct values was silently
+// demoted to role 'ignored' -- the same class of harm as misclassifying
+// a date column. Token matching keeps every intended hit ('Employee ID',
+// 'Ref No', 'Serial Number', 'Cost Code') and drops the collisions.
+function matchesIdentifierName(name) {
+  return nameTokens(name).some((token) => IDENTIFIER_NAME_TOKEN_RE.test(token));
+}
 
 // Whether a value carries an explicit time-of-day component. A native
 // `Date` instance always represents a specific millisecond instant -- it
@@ -396,14 +430,14 @@ export function inferType(values, columnName) {
   // Runs last, only over numeric/text/categorical verdicts. Fires on:
   //  (a) a consecutive integer sequence (step of exactly 1), regardless
   //      of column name; or
-  //  (b) distinct ratio > 0.95 AND the column name matches
-  //      /id|no|code|ref|serial/i.
+  //  (b) distinct ratio > 0.95 AND the column name carries an
+  //      identifier word as a whole token (see `matchesIdentifierName`).
   // (Binding ruling amending the brief's literal "monotonic" wording --
   // see task-2-brief.md.)
   if (verdict.type === 'numeric' || verdict.type === 'text' || verdict.type === 'categorical') {
     const distinctRatio = distinctCount / nonNullCount;
     const consecutive = isConsecutiveIntegerSequence(nonNull);
-    const nameMatches = IDENTIFIER_NAME_RE.test(columnName ?? '');
+    const nameMatches = matchesIdentifierName(columnName);
 
     if (consecutive || (distinctRatio > 0.95 && nameMatches)) {
       verdict = {

@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { isNullish, parseNumberLike, parseBooleanLike, inferType } from './inferType.js';
+import {
+  isNullish, parseNumberLike, parseBooleanLike, inferType, MIN_IDENTIFIER_RUN,
+} from './inferType.js';
 
 describe('isNullish', () => {
   it.each([['', true], ['-', true], ['N/A', true], ['#DIV/0!', true],
@@ -54,6 +56,13 @@ describe('parseNumberLike', () => {
   it('cancels a double negative from accounting parentheses', () => {
     expect(parseNumberLike('(-5)')).toMatchObject({ ok: true, value: 5 });
   });
+
+  // The leading-zero guard has to survive currency, parenthesis and sign
+  // stripping -- otherwise a cost centre written '$007' is silently 7.
+  it.each(['$007', 'RM 007', '(007)', '-007', '+007'])(
+    'refuses %j, whose leading zero only shows after stripping', (input) => {
+      expect(parseNumberLike(input).ok).toBe(false);
+    });
 });
 
 describe('parseBooleanLike', () => {
@@ -171,5 +180,101 @@ describe('inferType', () => {
   it('preserves leading-zero codes as categorical, not numeric', () => {
     const v = inferType(['007', '008', '007', '009'], 'Cost Centre');
     expect(v.type).toBe('categorical');
+  });
+
+  // I3 -- clause (b) of the identifier override (distinct ratio > 0.95 AND
+  // an identifier-ish name) had zero coverage: every existing identifier
+  // fixture was a consecutive run, so clause (a) fired first. These two
+  // pin the boundary in both directions with NON-consecutive values.
+  it('detects a non-consecutive unique column as an identifier when the name says so', () => {
+    const values = ['101', '207', '313', '429', '555', '661'];
+    expect(inferType(values, 'Ref No')).toMatchObject({
+      type: 'identifier', role: 'ignored',
+    });
+  });
+
+  it('leaves the same non-consecutive values as a measure under a measure name', () => {
+    const values = ['101', '207', '313', '429', '555', '661'];
+    expect(inferType(values, 'Amount')).toMatchObject({
+      type: 'numeric', role: 'measure',
+    });
+  });
+
+  // The brief's literal /id|no|code|ref|serial/i is an unanchored substring
+  // match, so 'Paid Amount' (contains 'id') was demoted to role 'ignored'.
+  // Matching whole tokens keeps the intended hits and drops the collisions.
+  it.each(['Paid Amount', 'Width', 'Notes', 'Income', 'Humidity'])(
+    'does not mistake %j for an identifier name', (name) => {
+      const values = ['101', '207', '313', '429', '555', '661'];
+      expect(inferType(values, name).type).toBe('numeric');
+    });
+
+  it.each(['Employee ID', 'EmpID', 'Emp_ID', 'Serial Number', 'Cost Code', 'Ref'])(
+    'still reads %j as an identifier name', (name) => {
+      const values = ['101', '207', '313', '429', '555', '661'];
+      expect(inferType(values, name).type).toBe('identifier');
+    });
+
+  // A two-value run is not evidence of a row number -- it is two ordinary
+  // measurements just as readily. Short runs must not fire clause (a).
+  it('does not call a two-value ascending run an identifier', () => {
+    expect(inferType(['10', '11'], 'Delta').type).toBe('numeric');
+  });
+
+  it('still calls a long consecutive run an identifier', () => {
+    const values = Array.from({ length: MIN_IDENTIFIER_RUN }, (_, i) => String(i + 1));
+    expect(inferType(values, 'Delta').type).toBe('identifier');
+  });
+
+  // I4.1 -- ZERO_WIDTH_RE is load-bearing in a way NBSP handling is not:
+  // U+200B-U+200D and U+FEFF are NOT in JavaScript's \s class, so nothing
+  // else strips them. Escape sequences, never literals -- a literal
+  // invisible character does not survive retyping and voids the test.
+  it('strips zero-width characters before comparing values', () => {
+    const v = inferType(['HR', 'H\u200BR', 'HR', '\uFEFFHR'], 'Department');
+    expect(v.distinctCount).toBe(1);
+  });
+
+  it('parses a number that is peppered with zero-width characters', () => {
+    expect(parseNumberLike('1\u200B234').value).toBe(1234);
+  });
+
+  // I4.2 -- casualties must hold the RAW value, not a normalised one, so
+  // the user sees what is actually in their sheet. The pre-existing
+  // fixture used 'pending', identical raw and normalised, so a mutation
+  // to normalise them failed no test.
+  it('reports casualties with their raw surrounding whitespace intact', () => {
+    const v = inferType([...Array(19).fill('10'), '  pending  '], 'Amount');
+    expect(v.casualties).toContain('  pending  ');
+  });
+
+  // I4.3 -- a column is isPercent only when EVERY numeric match was a
+  // percent; `percentMatches > 0` failed no test before this.
+  it('flags a column as percent only when every value is a percent', () => {
+    expect(inferType(['45%', '50%', '55%'], 'Rate').isPercent).toBe(true);
+    expect(inferType(['45%', '50', '55%'], 'Rate').isPercent).toBe(false);
+  });
+
+  // I4.4 -- `type: 'date'` is a whole member of the verdict union and the
+  // flag `dateOnly` consumers key off, but nothing asserted it; hardcoding
+  // 'datetime' failed no test.
+  it('distinguishes a date-only column from one carrying a time', () => {
+    expect(inferType(['13/01/2024', '05/02/2024'], 'Join Date').type).toBe('date');
+    expect(inferType(['13/01/2024 08:30', '05/02/2024 09:00'], 'Join Date').type)
+      .toBe('datetime');
+  });
+
+  // I4.5 -- distinctCount is computed over NORMALISED values, so padding
+  // does not invent extra categories.
+  it('counts distinct values after normalising them', () => {
+    const v = inferType(['HR', ' HR ', 'IT', 'IT '], 'Department');
+    expect(v.distinctCount).toBe(2);
+  });
+
+  // A pure-Date column has no strings to be ambiguous about, so `null` is
+  // the accurate dateOrder rather than a guess.
+  it('reports no date order for a column of Date objects', () => {
+    const values = [new Date(Date.UTC(2024, 0, 1)), new Date(Date.UTC(2024, 0, 2))];
+    expect(inferType(values, 'Created').dateOrder).toBe(null);
   });
 });

@@ -57,7 +57,11 @@ function handleParse({ arrayBuffer, sheetName, headerIndex: forcedHeaderIndex })
   });
 }
 
-function handleClean({ profile, plan, requestId }) {
+function handleClean({ grid, profile, plan, requestId }) {
+  // A grid on the message means the caller is reopening a dataset from
+  // storage rather than continuing with the one just parsed. Adopting
+  // it here keeps every later re-clean cheap in exactly the same way.
+  if (grid) currentGrid = grid;
   if (!currentGrid) throw new Error('There is no imported sheet to clean.');
   const dataset = applyCleanPlan(currentGrid, plan, profile);
   // `requestId` lets the main thread ignore a result that a later toggle

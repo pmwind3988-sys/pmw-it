@@ -47,6 +47,10 @@ export const IDLE_STATE = {
   globalFilters: [],
   selection: null,
   editingTileId: null,
+  // The id this import is saved under, once it has been saved. Null
+  // means "not persisted yet", which is what the Save button reads.
+  datasetId: null,
+  storageFull: false,
   error: '',
   progress: { stage: '', pct: 0 },
 };

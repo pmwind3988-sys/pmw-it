@@ -903,3 +903,123 @@
     top: 14px;
   }
 }
+
+/* ---------- saved dataset library ---------- */
+
+.ds-library {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.ds-library-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* Past 90% the meter turns to the danger token, because "nearly full"
+   is the moment to act, not the moment it fails. */
+.ds-progress-bar-full {
+  background: var(--it-danger);
+}
+
+.ds-library-list,
+.ds-dashboard-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ds-library-list li,
+.ds-dashboard-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.ds-library-list li:hover,
+.ds-dashboard-list li:hover {
+  background: var(--it-brand-wash);
+}
+
+.ds-library-open {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ds-library-name {
+  font-weight: 600;
+  color: var(--it-ink);
+  overflow-wrap: anywhere;
+}
+
+.ds-library-meta {
+  font-size: 12px;
+  color: var(--it-ink-soft);
+}
+
+.ds-library-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--it-danger);
+}
+
+/* ---------- dashboard bar ---------- */
+
+.ds-dashboardbar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.ds-dashboardbar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+/* ---------- storage full ---------- */
+
+.ds-quota {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(2, 6, 12, 0.5);
+}
+
+.ds-quota-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(460px, 100%);
+  max-height: 80vh;
+  overflow-y: auto;
+}

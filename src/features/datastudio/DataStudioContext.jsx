@@ -4,6 +4,9 @@ import { profileColumn } from './profile/profileColumn.js';
 import { proposeCleanPlan } from './clean/proposeCleanPlan.js';
 import { suggestCharts } from './suggest/suggestCharts.js';
 import { SIZE_ORDER } from './dataStudioStore.js';
+import {
+  saveDataset, loadDataset, saveCleanPlan, loadCleanPlan, StorageFullError,
+} from './store/db.js';
 
 /**
  * Owns the worker and the stage machine for the whole section.
@@ -117,12 +120,12 @@ export function DataStudioProvider({ children }) {
   // Asks the worker to re-apply the plan. The grid never crosses the
   // boundary again -- the worker kept it -- so this costs a small plan
   // message each way however large the sheet is.
-  const requestClean = useCallback((profile, plan) => {
+  const requestClean = useCallback((profile, plan, grid) => {
     if (!workerRef.current || !profile || !plan) return;
     cleanIdRef.current += 1;
     setState((s) => ({ ...s, cleaning: true }));
     workerRef.current.postMessage({
-      type: 'clean', profile, plan, requestId: cleanIdRef.current,
+      type: 'clean', profile, plan, grid, requestId: cleanIdRef.current,
     });
   }, []);
 
@@ -375,6 +378,106 @@ export function DataStudioProvider({ children }) {
     });
   }, []);
 
+  // --- persistence ------------------------------------------------------
+
+  /**
+   * Saves the RAW grid, not the cleaned dataset (spec §11).
+   *
+   * Cleaned columns are derived from raw plus plan on load, so someone
+   * who later unticks a cleaning step gets their original values back.
+   * Persisting the cleaned blob would bake today's decisions into the
+   * file permanently.
+   */
+  const saveCurrentDataset = useCallback(async (name) => {
+    let saved = null;
+    setState((s) => { saved = s; return s; });
+    // Read the latest state through a no-op setter above, since this
+    // runs from an event handler that may hold a stale closure.
+    const { grid, profile, plan, fileName, activeSheet, datasetId } = saved ?? {};
+    if (!grid || !profile) return null;
+
+    const id = datasetId ?? `ds_${Date.now()}`;
+    const rawColumns = profile.columns.map(
+      (column) => grid.rows.map((row) => row?.[column.index] ?? null),
+    );
+
+    try {
+      await saveDataset({
+        id,
+        name: name || fileName || 'Imported sheet',
+        sourceFileName: fileName,
+        sheetName: activeSheet,
+        importedAt: Date.now(),
+        rowCount: grid.rows.length,
+        headers: grid.headers,
+        columns: profile.columns,
+        profile,
+        rawColumns,
+      });
+      await saveCleanPlan(id, plan);
+      setState((s) => ({ ...s, datasetId: id, storageFull: false, error: '' }));
+      return id;
+    } catch (err) {
+      setState((s) => ({
+        ...s,
+        storageFull: err instanceof StorageFullError,
+        error: err?.message ?? 'Could not save that dataset.',
+      }));
+      return null;
+    }
+  }, []);
+
+  const openSavedDataset = useCallback(async (id) => {
+    try {
+      const record = await loadDataset(id);
+      if (!record) return;
+
+      // Back to a row-major grid, which is what the clean pipeline and
+      // the profile panel both read.
+      const rows = Array.from({ length: record.rowCount }, (_, r) => (
+        record.rawColumns.map((column) => column?.[r] ?? null)));
+      const grid = { headers: record.headers, rows };
+      const plan = (await loadCleanPlan(id)) ?? proposeCleanPlan(record.profile, grid);
+
+      setState((s) => ({
+        ...s,
+        stage: 'canvas',
+        datasetId: id,
+        fileName: record.sourceFileName ?? record.name,
+        activeSheet: record.sheetName ?? '',
+        sheets: record.sheetName ? [record.sheetName] : [],
+        headerCandidates: [],
+        grid,
+        profile: record.profile,
+        plan,
+        dataset: null,
+        tiles: [],
+        globalFilters: [],
+        selection: null,
+        error: '',
+      }));
+
+      requestClean(record.profile, plan, grid);
+    } catch (err) {
+      setState((s) => ({ ...s, error: err?.message ?? 'Could not open that dataset.' }));
+    }
+  }, [requestClean]);
+
+  // Loading a saved dashboard replaces the tiles wholesale. A merge
+  // would leave the user with both dashboards at once and no way to
+  // tell which tile came from where.
+  const applyDashboard = useCallback((record) => setState((s) => ({
+    ...s,
+    tiles: record?.tiles ?? [],
+    globalFilters: record?.globalFilters ?? [],
+    selection: null,
+    stage: 'canvas',
+  })), []);
+
+  const dismissStorageFull = useCallback(
+    () => setState((s) => ({ ...s, storageFull: false })), [],
+  );
+
   const reset = useCallback(() => {
     bytesRef.current = null;
     setState(IDLE_STATE);
@@ -415,6 +518,10 @@ export function DataStudioProvider({ children }) {
     clearFilters,
     selectMark,
     clearSelection,
+    saveCurrentDataset,
+    openSavedDataset,
+    applyDashboard,
+    dismissStorageFull,
     reset,
     setStage,
   }), [
@@ -422,6 +529,7 @@ export function DataStudioProvider({ children }) {
     removeStep, addManualMerge, setColumnDateOrder, setColumnZone, commitClean,
     addTile, updateTile, removeTile, duplicateTile, moveTile, cycleTileSize,
     setEditingTile, addFilter, removeFilter, clearFilters, selectMark, clearSelection,
+    saveCurrentDataset, openSavedDataset, applyDashboard, dismissStorageFull,
     reset, setStage,
   ]);
 

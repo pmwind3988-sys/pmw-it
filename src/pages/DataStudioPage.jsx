@@ -1,14 +1,19 @@
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AppShell from '../components/AppShell';
 import { Card, EmptyState, ErrorBanner } from '../components/ui/Surfaces';
 import Button from '../components/ui/Button';
-import { Inbox, AlertTriangle, RefreshCw, Plus } from '../components/ui/Icons';
+import { Inbox, AlertTriangle, RefreshCw, Plus, Trash2 } from '../components/ui/Icons';
 import { DataStudioProvider } from '../features/datastudio/DataStudioContext';
 import { useDataStudio } from '../features/datastudio/useDataStudio';
 import CleanReview from '../features/datastudio/clean/CleanReview';
 import CanvasGrid from '../features/datastudio/canvas/CanvasGrid';
 import TileEditor from '../features/datastudio/canvas/TileEditor';
 import FilterBar from '../features/datastudio/canvas/FilterBar';
+import DatasetLibrary from '../features/datastudio/store/DatasetLibrary';
+import { formatBytes } from '../features/datastudio/store/formatBytes';
+import DashboardBar from '../features/datastudio/store/DashboardBar';
+import { useDatasetLibrary } from '../features/datastudio/store/useDashboards';
+import { exportTilePng } from '../features/datastudio/store/exporters';
 
 const ACCEPT = '.xlsx,.xlsm,.csv';
 
@@ -77,7 +82,62 @@ function DropStage() {
           {fileName && !error && <p className="ds-drop-hint">Last file: {fileName}</p>}
         </div>
       </Card>
+      <DatasetLibrary />
     </>
+  );
+}
+
+/**
+ * The storage-full dialog (spec §11).
+ *
+ * Quota exhaustion is the one storage failure a user can actually fix,
+ * so it gets a real screen listing their datasets biggest-first with
+ * delete buttons. The default browser behaviour is a silent failure
+ * that is miserable to diagnose.
+ */
+function StorageFullDialog() {
+  const { storageFull, dismissStorageFull } = useDataStudio();
+  const { bySize, remove } = useDatasetLibrary();
+  const [sized, setSized] = useState([]);
+
+  useEffect(() => {
+    if (!storageFull) return undefined;
+    let cancelled = false;
+    bySize().then((list) => { if (!cancelled) setSized(list); });
+    return () => { cancelled = true; };
+  }, [storageFull, bySize]);
+
+  if (!storageFull) return null;
+
+  return (
+    <div className="ds-quota" role="alertdialog" aria-label="Browser storage is full">
+      <Card className="ds-quota-card">
+        <h3 className="ds-plan-heading">This browser has run out of storage</h3>
+        <p className="ds-summary">
+          Nothing was lost — the save just could not complete. Delete a dataset you no
+          longer need and try again.
+        </p>
+        <ul className="ds-library-list">
+          {sized.map((d) => (
+            <li key={d.id}>
+              <span className="ds-library-open">
+                <span className="ds-library-name">{d.name}</span>
+                <span className="ds-library-meta">{formatBytes(d.bytes)}</span>
+              </span>
+              <button
+                type="button"
+                className="ds-step-remove"
+                aria-label={`Delete ${d.name} to free space`}
+                onClick={() => { remove(d.id); setSized((c) => c.filter((x) => x.id !== d.id)); }}
+              >
+                <Trash2 size={14} />
+              </button>
+            </li>
+          ))}
+        </ul>
+        <Button size="sm" variant="secondary" onClick={dismissStorageFull}>Close</Button>
+      </Card>
+    </div>
   );
 }
 
@@ -249,8 +309,19 @@ function ProfileStage() {
 
 function CanvasStage() {
   const {
-    tiles, dataset, editingTileId, addTile, setStage, reset,
+    tiles, dataset, editingTileId, addTile, setStage, reset, fileName, saveCurrentDataset,
   } = useDataStudio();
+
+  // Live ECharts instances, by tile id. Export needs a real chart object
+  // to call getDataURL on, and nothing else exposes one.
+  const chartsRef = useRef(new Map());
+  const handleChartInit = useCallback((tileId, chart) => {
+    chartsRef.current.set(tileId, chart);
+  }, []);
+
+  const handleExport = useCallback((tile) => {
+    exportTilePng(chartsRef.current.get(tile.id), tile.title);
+  }, []);
 
   if (!dataset) return <EmptyState>Nothing imported yet.</EmptyState>;
 
@@ -278,6 +349,9 @@ function CanvasStage() {
         >
           Add a chart
         </Button>
+        <Button variant="secondary" size="sm" onClick={() => saveCurrentDataset(fileName)}>
+          Save this data
+        </Button>
         <Button variant="secondary" size="sm" onClick={() => setStage('cleaning')}>
           Back to cleaning
         </Button>
@@ -287,6 +361,7 @@ function CanvasStage() {
       </div>
 
       <FilterBar />
+      <DashboardBar />
 
       {tiles.length === 0 ? (
         <Card>
@@ -296,7 +371,7 @@ function CanvasStage() {
         </Card>
       ) : (
         <div className={editingTileId ? 'ds-canvas-with-editor' : undefined}>
-          <CanvasGrid />
+          <CanvasGrid onExport={handleExport} onChartInit={handleChartInit} />
           {editingTileId && <TileEditor />}
         </div>
       )}
@@ -321,6 +396,7 @@ export default function DataStudioPage() {
         subtitle="Import a spreadsheet and chart it, without leaving the browser."
       >
         <DataStudioBody />
+        <StorageFullDialog />
       </AppShell>
     </DataStudioProvider>
   );

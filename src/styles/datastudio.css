@@ -130,11 +130,18 @@
   background: var(--it-brand-wash);
 }
 
+/* Driven by a scale transform rather than by width, so advancing the
+   bar is a compositor job and never triggers layout. The track already
+   clips to a pill via `overflow: hidden`, so the bar needs no radius of
+   its own -- which also avoids scaleX squashing a rounded cap into an
+   ellipse. Callers set `--ds-progress` to a 0..1 fraction. */
 .ds-progress-bar {
+  width: 100%;
   height: 100%;
-  border-radius: 999px;
   background: var(--it-brand);
-  transition: width 200ms ease;
+  transform: scaleX(var(--ds-progress, 0));
+  transform-origin: left center;
+  transition: transform 200ms ease;
 }
 
 .ds-progress-stage {

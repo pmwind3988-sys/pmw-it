@@ -155,7 +155,7 @@ function ParsingStage() {
         aria-valuemax={100}
         aria-label={progress.stage || 'Importing'}
       >
-        <div className="ds-progress-bar" style={{ width: `${pct}%` }} />
+        <div className="ds-progress-bar" style={{ '--ds-progress': pct / 100 }} />
       </div>
       <p className="ds-progress-stage">{progress.stage || 'Working...'}</p>
     </Card>

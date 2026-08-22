@@ -43,7 +43,7 @@ export default function DatasetLibrary() {
         >
           <div
             className={`ds-progress-bar${estimate.ratio > 0.9 ? ' ds-progress-bar-full' : ''}`}
-            style={{ width: `${Math.min(100, Math.round(estimate.ratio * 100))}%` }}
+            style={{ '--ds-progress': Math.min(1, estimate.ratio) }}
           />
         </div>
       )}

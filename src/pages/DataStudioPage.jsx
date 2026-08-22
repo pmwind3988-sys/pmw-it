@@ -2,10 +2,13 @@ import { useMemo, useRef, useState } from 'react';
 import AppShell from '../components/AppShell';
 import { Card, EmptyState, ErrorBanner } from '../components/ui/Surfaces';
 import Button from '../components/ui/Button';
-import { Inbox, AlertTriangle, RefreshCw } from '../components/ui/Icons';
+import { Inbox, AlertTriangle, RefreshCw, Plus } from '../components/ui/Icons';
 import { DataStudioProvider } from '../features/datastudio/DataStudioContext';
 import { useDataStudio } from '../features/datastudio/useDataStudio';
 import CleanReview from '../features/datastudio/clean/CleanReview';
+import CanvasGrid from '../features/datastudio/canvas/CanvasGrid';
+import TileEditor from '../features/datastudio/canvas/TileEditor';
+import FilterBar from '../features/datastudio/canvas/FilterBar';
 
 const ACCEPT = '.xlsx,.xlsm,.csv';
 
@@ -244,11 +247,69 @@ function ProfileStage() {
   );
 }
 
+function CanvasStage() {
+  const {
+    tiles, dataset, editingTileId, addTile, setStage, reset,
+  } = useDataStudio();
+
+  if (!dataset) return <EmptyState>Nothing imported yet.</EmptyState>;
+
+  return (
+    <>
+      <div className="ds-toolbar">
+        <span className="ds-summary">
+          {`${dataset.rowCount.toLocaleString()} rows · ${dataset.columns.length} columns`}
+        </span>
+        <span className="ds-toolbar-spacer" />
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={Plus}
+          onClick={() => addTile({
+            title: 'New chart',
+            chart: 'bar',
+            encoding: { x: null, y: [{ column: null, agg: 'count' }], series: null },
+            sort: { by: 'y', dir: 'desc' },
+            limit: 10,
+            size: 'M',
+            stacked: false,
+            respondsToFilters: true,
+          })}
+        >
+          Add a chart
+        </Button>
+        <Button variant="secondary" size="sm" onClick={() => setStage('cleaning')}>
+          Back to cleaning
+        </Button>
+        <Button variant="secondary" size="sm" icon={RefreshCw} onClick={reset}>
+          Start over
+        </Button>
+      </div>
+
+      <FilterBar />
+
+      {tiles.length === 0 ? (
+        <Card>
+          <EmptyState>
+            No charts yet. Use “Add a chart” to build one from your columns.
+          </EmptyState>
+        </Card>
+      ) : (
+        <div className={editingTileId ? 'ds-canvas-with-editor' : undefined}>
+          <CanvasGrid />
+          {editingTileId && <TileEditor />}
+        </div>
+      )}
+    </>
+  );
+}
+
 function DataStudioBody() {
   const { stage } = useDataStudio();
   if (stage === 'parsing') return <ParsingStage />;
   if (stage === 'idle') return <DropStage />;
   if (stage === 'cleaning') return <CleanReview />;
+  if (stage === 'canvas') return <CanvasStage />;
   return <ProfileStage />;
 }
 

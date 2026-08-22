@@ -90,6 +90,36 @@ describe('toEChartsOption', () => {
   });
 });
 
+// Spec §10.3 -- the source tile of a cross-filter keeps EVERY category
+// and only dims the ones that were not clicked. If highlighting removed
+// categories instead, the chart would collapse to the one bar you just
+// clicked and delete the context needed to click anything else.
+describe('toEChartsOption with a selection', () => {
+  it('keeps every category and dims the ones not selected', () => {
+    const o = toEChartsOption('bar', agg, tile, ['HR']);
+    expect(o.xAxis.data).toEqual(['HR', 'IT']);
+    expect(o.series[0].data).toHaveLength(2);
+    expect(o.series[0].data[0].itemStyle.opacity).toBe(1);
+    expect(o.series[0].data[1].itemStyle.opacity).toBeLessThan(1);
+  });
+
+  it('leaves the values themselves untouched', () => {
+    const o = toEChartsOption('bar', agg, tile, ['HR']);
+    expect(o.series[0].data.map((d) => d.value)).toEqual([40, 60]);
+  });
+
+  it('dims pie slices the same way', () => {
+    const o = toEChartsOption('pie', agg, tile, ['IT']);
+    expect(o.series[0].data[0].itemStyle.opacity).toBeLessThan(1);
+    expect(o.series[0].data[1].itemStyle.opacity).toBe(1);
+  });
+
+  it('emits plain values when there is no selection', () => {
+    expect(toEChartsOption('bar', agg, tile).series[0].data).toEqual([40, 60]);
+    expect(toEChartsOption('bar', agg, tile, []).series[0].data).toEqual([40, 60]);
+  });
+});
+
 describe('validateTileSpec', () => {
   const dataset = { byName: new Map([['Dept', {}], ['Amount', {}]]) };
 

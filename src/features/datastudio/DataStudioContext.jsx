@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DataStudioContext, IDLE_STATE } from './dataStudioStore.js';
 import { profileColumn } from './profile/profileColumn.js';
 import { proposeCleanPlan } from './clean/proposeCleanPlan.js';
+import { suggestCharts } from './suggest/suggestCharts.js';
+import { SIZE_ORDER } from './dataStudioStore.js';
 
 /**
  * Owns the worker and the stage machine for the whole section.
@@ -256,7 +258,122 @@ export function DataStudioProvider({ children }) {
     });
   }, []);
 
-  const commitClean = useCallback(() => setState((s) => ({ ...s, stage: 'canvas' })), []);
+  // --- the canvas -------------------------------------------------------
+
+  const commitClean = useCallback(() => setState((s) => ({
+    ...s,
+    stage: 'canvas',
+    // Seed the canvas only when it is empty. Re-seeding would throw away
+    // tiles the user has edited every time they stepped back to the
+    // clean screen and forward again.
+    tiles: s.tiles.length > 0 ? s.tiles : suggestCharts(s.profile, s.dataset),
+  })), []);
+
+  const addTile = useCallback((tile) => setState((s) => ({
+    ...s,
+    tiles: [...s.tiles, { ...tile, id: tile.id ?? `tile_${Date.now()}_${s.tiles.length}` }],
+  })), []);
+
+  const updateTile = useCallback((id, patch) => setState((s) => ({
+    ...s,
+    tiles: s.tiles.map((t) => (t.id === id ? { ...t, ...patch } : t)),
+  })), []);
+
+  const removeTile = useCallback((id) => setState((s) => ({
+    ...s,
+    tiles: s.tiles.filter((t) => t.id !== id),
+    editingTileId: s.editingTileId === id ? null : s.editingTileId,
+    // A selection that came from a tile that no longer exists would
+    // filter the whole canvas with nothing on screen explaining why.
+    selection: s.selection?.sourceTileId === id ? null : s.selection,
+  })), []);
+
+  const duplicateTile = useCallback((id) => setState((s) => {
+    const index = s.tiles.findIndex((t) => t.id === id);
+    if (index === -1) return s;
+    const copy = {
+      ...s.tiles[index],
+      id: `tile_${Date.now()}_${s.tiles.length}`,
+      title: `${s.tiles[index].title} (copy)`,
+    };
+    const tiles = s.tiles.slice();
+    tiles.splice(index + 1, 0, copy);
+    return { ...s, tiles };
+  }), []);
+
+  // Keyboard reordering is the whole reordering story -- there is no
+  // drag engine -- so it has to be exact rather than approximate.
+  const moveTile = useCallback((id, delta) => setState((s) => {
+    const index = s.tiles.findIndex((t) => t.id === id);
+    const target = index + delta;
+    if (index === -1 || target < 0 || target >= s.tiles.length) return s;
+    const tiles = s.tiles.slice();
+    [tiles[index], tiles[target]] = [tiles[target], tiles[index]];
+    return { ...s, tiles };
+  }), []);
+
+  const cycleTileSize = useCallback((id) => setState((s) => ({
+    ...s,
+    tiles: s.tiles.map((t) => (t.id === id
+      ? { ...t, size: SIZE_ORDER[(SIZE_ORDER.indexOf(t.size ?? 'M') + 1) % SIZE_ORDER.length] }
+      : t)),
+  })), []);
+
+  const setEditingTile = useCallback(
+    (id) => setState((s) => ({ ...s, editingTileId: id })), [],
+  );
+
+  // --- filters and cross-filter selection --------------------------------
+
+  const addFilter = useCallback((filter) => setState((s) => ({
+    ...s,
+    // One filter per column: a second filter on the same column would
+    // AND with the first and silently produce an empty dashboard.
+    globalFilters: [...s.globalFilters.filter((f) => f.column !== filter.column), filter],
+  })), []);
+
+  const removeFilter = useCallback((column) => setState((s) => ({
+    ...s,
+    globalFilters: s.globalFilters.filter((f) => f.column !== column),
+  })), []);
+
+  const clearFilters = useCallback(
+    () => setState((s) => ({ ...s, globalFilters: [] })), [],
+  );
+
+  const clearSelection = useCallback(
+    () => setState((s) => (s.selection ? { ...s, selection: null } : s)), [],
+  );
+
+  /**
+   * A click on a mark. `additive` is a shift-click.
+   *
+   * Clicking the value that is already the whole selection clears it --
+   * the same gesture in and out, so there is always a way back without
+   * hunting for a clear button.
+   */
+  const selectMark = useCallback(({ tileId, column, value, additive = false }) => {
+    setState((s) => {
+      if (!column || value === undefined || value === null) return s;
+
+      const current = s.selection;
+      const sameSource = current
+        && current.sourceTileId === tileId
+        && current.column === column;
+
+      if (!sameSource) {
+        return { ...s, selection: { sourceTileId: tileId, column, values: [value] } };
+      }
+
+      const values = additive
+        ? (current.values.includes(value)
+          ? current.values.filter((v) => v !== value)
+          : [...current.values, value])
+        : (current.values.length === 1 && current.values[0] === value ? [] : [value]);
+
+      return { ...s, selection: values.length === 0 ? null : { ...current, values } };
+    });
+  }, []);
 
   const reset = useCallback(() => {
     bytesRef.current = null;
@@ -286,11 +403,25 @@ export function DataStudioProvider({ children }) {
     setColumnDateOrder,
     setColumnZone,
     commitClean,
+    addTile,
+    updateTile,
+    removeTile,
+    duplicateTile,
+    moveTile,
+    cycleTileSize,
+    setEditingTile,
+    addFilter,
+    removeFilter,
+    clearFilters,
+    selectMark,
+    clearSelection,
     reset,
     setStage,
   }), [
     state, importFile, selectSheet, setHeaderIndex, overrideColumn, setStepEnabled,
     removeStep, addManualMerge, setColumnDateOrder, setColumnZone, commitClean,
+    addTile, updateTile, removeTile, duplicateTile, moveTile, cycleTileSize,
+    setEditingTile, addFilter, removeFilter, clearFilters, selectMark, clearSelection,
     reset, setStage,
   ]);
 

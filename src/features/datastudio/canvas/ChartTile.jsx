@@ -17,7 +17,7 @@ function formatValue(n, isPercent) {
  * makes cross-filtering cheap -- the mask changes, this recomputes, and
  * nothing else in the tree has to know.
  */
-export default function ChartTile({ tile, dataset, mask, onSelect, onChartInit }) {
+export default function ChartTile({ tile, dataset, mask, selection, onSelect, onChartInit }) {
   const chartRef = useRef(null);
 
   const validity = useMemo(() => validateTileSpec(tile, dataset), [tile, dataset]);
@@ -27,9 +27,17 @@ export default function ChartTile({ tile, dataset, mask, onSelect, onChartInit }
     [validity.ok, dataset, mask, tile],
   );
 
+  // Only the tile the selection CAME FROM highlights. Every other tile
+  // has already been narrowed by the mask, so dimming there would say
+  // the same thing twice.
+  const highlighted = useMemo(
+    () => (selection && selection.sourceTileId === tile.id ? selection.values : null),
+    [selection, tile.id],
+  );
+
   const option = useMemo(
-    () => (result ? toEChartsOption(tile.chart, result, tile) : null),
-    [result, tile],
+    () => (result ? toEChartsOption(tile.chart, result, tile, highlighted) : null),
+    [result, tile, highlighted],
   );
 
   // Memoised, or `EChart`'s binding effect tears down and re-attaches on
@@ -45,6 +53,10 @@ export default function ChartTile({ tile, dataset, mask, onSelect, onChartInit }
         tileId: tile.id,
         column: tile.encoding?.x?.column,
         value,
+        // Shift-click adds to the selection. ECharts wraps the native
+        // event one level down, which is the only place the modifier
+        // key survives.
+        additive: Boolean(params?.event?.event?.shiftKey),
       });
     },
   }), [onSelect, tile.id, tile.encoding]);

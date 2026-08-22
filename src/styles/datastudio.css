@@ -589,3 +589,317 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* ---------- canvas ---------- */
+
+/* Twelve columns, per spec §10.4. Tile widths come from the
+   `--ds-tile-span` each tile sets from its size preset. Mobile-first:
+   below 640px every tile is full width, because a 3-column KPI on a
+   360px phone is 90px of chart. */
+.ds-canvas {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.ds-tile {
+  display: flex;
+  flex-direction: column;
+  grid-column: span 12;
+  min-width: 0;
+  padding: 12px 14px 14px;
+  border: 1px solid var(--it-line);
+  border-radius: var(--it-radius);
+  background: var(--it-panel);
+  box-shadow: var(--it-card-shadow);
+}
+
+.ds-tile-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.ds-tile-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--it-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ds-tile-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 2px;
+}
+
+.ds-tile-actions button {
+  display: inline-flex;
+  padding: 4px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--it-ink-soft);
+  cursor: pointer;
+}
+
+.ds-tile-actions button:hover:not(:disabled) {
+  background: var(--it-brand-wash);
+  color: var(--it-brand-deep);
+}
+
+.ds-tile-actions button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Keyboard reordering replaces the drag engine, so the focus ring is
+   not decoration -- it is the only way to tell which tile you are
+   about to move. */
+.ds-tile-actions button:focus-visible {
+  outline: 2px solid var(--it-brand);
+  outline-offset: 1px;
+}
+
+.ds-tile-body {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.ds-tile-chart {
+  width: 100%;
+  height: 240px;
+}
+
+.ds-tile-kpi .ds-tile-chart,
+.ds-tile-kpi .ds-tile-body {
+  height: auto;
+}
+
+.ds-tile-table .ds-tile-body {
+  max-height: 360px;
+  overflow: auto;
+}
+
+.ds-tile-table-scroll {
+  overflow: auto;
+}
+
+.ds-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 0 2px;
+}
+
+.ds-kpi-value {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--it-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.ds-kpi-label {
+  font-size: 12px;
+  color: var(--it-ink-soft);
+}
+
+.ds-tile-broken,
+.ds-tile-empty {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  min-height: 120px;
+  font-size: 13px;
+  color: var(--it-ink-soft);
+  text-align: center;
+}
+
+.ds-tile-broken p {
+  margin: 0;
+}
+
+.ds-tile-broken p:first-child {
+  color: var(--it-danger);
+}
+
+.ds-tile-broken-hint {
+  font-size: 12px;
+}
+
+/* ---------- filter bar ---------- */
+
+.ds-filterbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--it-line);
+  border-radius: var(--it-radius);
+  background: var(--it-panel);
+}
+
+.ds-filterbar-icon {
+  color: var(--it-ink-soft);
+}
+
+.ds-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px 3px 10px;
+  border-radius: 999px;
+  background: var(--it-brand-wash);
+  color: var(--it-brand-deep);
+  font-size: 12px;
+}
+
+.ds-chip em {
+  font-style: normal;
+  opacity: 0.75;
+}
+
+/* The cross-filter chip is deliberately a different colour from the
+   global ones: it was created by clicking a chart rather than by
+   setting a filter, and it is the one people forget they applied. */
+.ds-chip-selection {
+  background: color-mix(in srgb, var(--it-accent) 18%, transparent);
+  color: var(--it-ink);
+}
+
+.ds-chip button {
+  display: inline-flex;
+  padding: 3px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.ds-chip button:hover {
+  background: var(--it-panel);
+}
+
+.ds-filterbar-add {
+  display: inline-flex;
+}
+
+.ds-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---------- tile editor ---------- */
+
+.ds-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--it-line);
+  border-radius: var(--it-radius);
+  background: var(--it-panel);
+  box-shadow: var(--it-card-shadow);
+}
+
+.ds-editor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ds-editor-head h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--it-ink);
+}
+
+.ds-editor-head button {
+  display: inline-flex;
+  padding: 4px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--it-ink-soft);
+  cursor: pointer;
+}
+
+.ds-editor-measure,
+.ds-editor-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ds-editor-measure > .ds-field,
+.ds-editor-row > .ds-field {
+  flex: 1 1 130px;
+}
+
+.ds-editor-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--it-ink-soft);
+}
+
+.ds-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--it-ink);
+  cursor: pointer;
+}
+
+.ds-check input {
+  margin-top: 2px;
+  accent-color: var(--it-brand);
+}
+
+.ds-check em {
+  display: block;
+  font-size: 12px;
+  font-style: normal;
+  color: var(--it-ink-soft);
+}
+
+@media (min-width: 640px) {
+  .ds-tile {
+    grid-column: span var(--ds-tile-span, 6);
+  }
+}
+
+@media (min-width: 1024px) {
+  /* The editor sits beside the canvas rather than under it, so a change
+     and its effect are visible at the same time. */
+  .ds-canvas-with-editor {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: 14px;
+    align-items: start;
+  }
+
+  .ds-canvas-with-editor .ds-editor {
+    position: sticky;
+    top: 14px;
+  }
+}

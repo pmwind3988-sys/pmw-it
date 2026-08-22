@@ -156,6 +156,24 @@ export const Laptop = make('Laptop', (
   </>
 ));
 
+export const ChevronLeft = make('ChevronLeft', <polyline points="15 18 9 12 15 6" />);
+
+export const Trash2 = make('Trash2', (
+  <>
+    <path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" />
+    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+    <path d="M10 11v6M14 11v6" />
+  </>
+));
+
+export const Maximize2 = make('Maximize2', (
+  <>
+    <polyline points="15 3 21 3 21 9" />
+    <polyline points="9 21 3 21 3 15" />
+    <path d="M21 3l-7 7M3 21l7-7" />
+  </>
+));
+
 export const BarChart3 = make('BarChart3', (
   <>
     <path d="M3 3v18h18" />

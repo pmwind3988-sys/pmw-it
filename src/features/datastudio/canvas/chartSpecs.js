@@ -91,7 +91,24 @@ function baseGrid() {
   };
 }
 
-function cartesian(type, aggResult, spec) {
+// Dims the marks that are not part of the current selection.
+//
+// This is presentation ONLY (spec §10.3). The source tile of a
+// cross-filter keeps every category -- that is the whole rule -- so the
+// numbers are untouched and only the opacity says which one was
+// clicked. Recomputing the tile against its own selection is exactly
+// the bug the self-exclusion rule exists to prevent.
+const DIMMED_OPACITY = 0.28;
+
+function withSelection(data, categories, selected) {
+  if (!selected || selected.length === 0) return data;
+  const wanted = new Set(selected);
+  return data.map((value, i) => (wanted.has(categories[i])
+    ? { value, itemStyle: { opacity: 1 } }
+    : { value, itemStyle: { opacity: DIMMED_OPACITY } }));
+}
+
+function cartesian(type, aggResult, spec, selected) {
   const stacked = Boolean(spec?.stacked);
   const isArea = type === 'area';
 
@@ -106,7 +123,7 @@ function cartesian(type, aggResult, spec) {
       // 'area' is not an ECharts series type -- an area chart is a line
       // that fills, so the type stays 'line' and areaStyle does the work.
       type: isArea ? 'line' : type,
-      data: s.data,
+      data: withSelection(s.data, aggResult.categories, selected),
       ...(isArea ? { areaStyle: {}, smooth: false } : {}),
       ...(stacked ? { stack: STACK_GROUP } : {}),
       // Selection state is what lets the SOURCE tile of a cross-filter
@@ -119,8 +136,9 @@ function cartesian(type, aggResult, spec) {
   };
 }
 
-function pie(aggResult, spec) {
+function pie(aggResult, spec, selected) {
   const first = aggResult.series[0] ?? { data: [] };
+  const wanted = new Set(selected ?? []);
   return {
     tooltip: { trigger: 'item' },
     legend: { data: aggResult.categories, type: 'scroll' },
@@ -132,7 +150,13 @@ function pie(aggResult, spec) {
       // to sit and makes small slices easier to compare by arc length.
       avoidLabelOverlap: true,
       label: { show: false },
-      data: aggResult.categories.map((name, i) => ({ name, value: first.data[i] ?? 0 })),
+      data: aggResult.categories.map((name, i) => ({
+        name,
+        value: first.data[i] ?? 0,
+        ...(wanted.size > 0
+          ? { itemStyle: { opacity: wanted.has(name) ? 1 : DIMMED_OPACITY } }
+          : null),
+      })),
       selectedMode: 'multiple',
       emphasis: { focus: 'self' },
     }],
@@ -191,7 +215,7 @@ function heatmap(aggResult, spec) {
  * KPI and table return their own shapes rather than ECharts options --
  * see the note at the top of the file.
  */
-export function toEChartsOption(chartType, aggResult, spec) {
+export function toEChartsOption(chartType, aggResult, spec, selected = null) {
   const result = {
     categories: aggResult?.categories ?? [],
     series: aggResult?.series ?? [],
@@ -219,12 +243,12 @@ export function toEChartsOption(chartType, aggResult, spec) {
         ]),
       };
     case 'pie':
-      return pie(result, spec);
+      return pie(result, spec, selected);
     case 'scatter':
       return scatter(result, spec);
     case 'heatmap':
       return heatmap(result, spec);
     default:
-      return cartesian(chartType, result, spec);
+      return cartesian(chartType, result, spec, selected);
   }
 }

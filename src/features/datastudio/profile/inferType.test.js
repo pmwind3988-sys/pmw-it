@@ -278,3 +278,44 @@ describe('inferType', () => {
     expect(inferType(values, 'Created').dateOrder).toBe(null);
   });
 });
+
+describe('multi-select detection', () => {
+  const survey = [
+    'Data Collection;Data Cleaning;Report Generation;',
+    'Data Collection;Approval Tracking;',
+    'Report Generation;Data Collection;',
+    'Approval Tracking;',
+    'Data Cleaning;Report Generation;',
+    'Data Collection;Data Cleaning;',
+  ];
+
+  it('reads a semicolon-joined multi-select as multi', () => {
+    const verdict = inferType(survey, 'Which challenges');
+    expect(verdict.type).toBe('multi');
+    expect(verdict.role).toBe('dimension');
+    expect(verdict.separator).toBe(';');
+  });
+
+  it('leaves an ordinary categorical column alone', () => {
+    const verdict = inferType(['IT', 'Finance', 'IT', 'Logistics', 'IT'], 'Department');
+    expect(verdict.type).toBe('categorical');
+  });
+
+  it('does not read prose containing semicolons as multi', () => {
+    // Parts that never repeat are sentences, not options.
+    const prose = [
+      'The process is manual; it takes hours to reconcile every month.',
+      'We chase approvals by email; nobody knows the current status.',
+      'Reports are rebuilt from scratch; version control is guesswork.',
+      'Files live in five places; finding the latest one is luck.',
+      'Data is retyped between systems; typos are common.',
+      'Updates arrive on WhatsApp; important ones get missed.',
+    ];
+    expect(inferType(prose, 'Describe').type).not.toBe('multi');
+  });
+
+  it('does not read a single-option column as multi', () => {
+    const single = ['IT;', 'Finance;', 'IT;', 'Logistics;', 'IT;', 'Finance;'];
+    expect(inferType(single, 'Department').type).not.toBe('multi');
+  });
+});

@@ -42,6 +42,26 @@ function rankTopValues(values) {
     .map(({ value, count }) => ({ value, count }));
 }
 
+// A multi column's frequent values are its OPTIONS, not its cells. A
+// cell reading "A;B;C" is three answers; counting it whole makes every
+// respondent their own category and the filter picker useless.
+function rankTopOptions(values, separator) {
+  const counts = new Map();
+  for (const v of values) {
+    if (isNullish(v)) continue;
+    for (const part of String(v).split(separator)) {
+      const label = part.trim();
+      if (label === '') continue;
+      counts.set(label, (counts.get(label) ?? 0) + 1);
+    }
+  }
+  return [...counts.entries()]
+    .map(([value, count], firstSeen) => ({ value, count, firstSeen }))
+    .sort((a, b) => b.count - a.count || a.firstSeen - b.firstSeen)
+    .slice(0, TOP_VALUE_LIMIT)
+    .map(({ value, count }) => ({ value, count }));
+}
+
 // min/max/mean over the values that actually parse as numbers. Values
 // that do not parse are the column's casualties and are excluded rather
 // than counted as zero, which would drag the mean toward nothing.
@@ -72,6 +92,7 @@ function numericStats(values) {
 export const ROLE_BY_TYPE = {
   numeric: 'measure',
   categorical: 'dimension',
+  multi: 'dimension',
   boolean: 'dimension',
   date: 'temporal',
   datetime: 'temporal',
@@ -132,7 +153,9 @@ export function profileColumn(values, columnName, index, override = null) {
     name: columnName,
     index,
     nonNullRatio,
-    topValues: isDimensionLike ? rankTopValues(values) : [],
+    topValues: verdict.type === 'multi'
+      ? rankTopOptions(values, verdict.separator ?? ';')
+      : (isDimensionLike ? rankTopValues(values) : []),
     ...(isNumericLike ? numericStats(values) : null),
     ...(isTemporalLike ? temporalStats(values, verdict.dateOrder) : null),
     ...(isNumericLike || isTemporalLike ? null : { min: null, max: null, mean: null }),

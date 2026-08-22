@@ -112,3 +112,22 @@ describe('profileColumn overrides', () => {
     expect(profileColumn(values, 'Amount', 0).overridden).toBeUndefined();
   });
 });
+
+describe('profileColumn on a multi column', () => {
+  it('counts options, not whole answers', () => {
+    const values = [
+      'Data Collection;Report Generation;',
+      'Data Collection;Approval Tracking;',
+      'Data Collection;',
+      'Report Generation;Approval Tracking;',
+      'Data Collection;Report Generation;',
+      'Approval Tracking;',
+    ];
+    const column = profileColumn(values, 'Challenges', 0);
+
+    expect(column.type).toBe('multi');
+    expect(column.topValues[0]).toEqual({ value: 'Data Collection', count: 4 });
+    // Whole-answer counting would have made every row its own value.
+    expect(column.topValues.some((t) => t.value.includes(';'))).toBe(false);
+  });
+});

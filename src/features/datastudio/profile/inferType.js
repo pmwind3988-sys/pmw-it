@@ -216,6 +216,59 @@ function makeEmptyVerdict(nullCount) {
   };
 }
 
+export const MULTI_SEPARATORS = [';', '|'];
+
+// A multi-select answer is many options in one cell. Three conditions
+// have to hold together, and each one rules out a different impostor:
+//
+//   * most values carry the separator          -- or it is prose that
+//                                                 happens to contain one
+//   * the average cell holds more than one     -- or it is a plain
+//     option                                      category with a stray
+//                                                 trailing separator
+//   * the options repeat across rows           -- or the "options" are
+//                                                 sentences, and every
+//                                                 one is unique
+//
+// The last is the load-bearing one. Free text split on ';' produces a
+// distinct part for almost every row; a real multi-select reuses a small
+// fixed menu.
+const MULTI_MIN_SEPARATED_RATIO = 0.6;
+const MULTI_MIN_PARTS_PER_VALUE = 1.2;
+const MULTI_MAX_DISTINCT_RATIO = 0.5;
+const MULTI_MAX_DISTINCT_PARTS = 60;
+
+function detectMultiSeparator(nonNull) {
+  const strings = nonNull.filter((v) => !(v instanceof Date)).map(normalizeToString);
+  if (strings.length === 0) return null;
+
+  for (const separator of MULTI_SEPARATORS) {
+    let separated = 0;
+    let parts = 0;
+    const distinct = new Set();
+
+    for (const s of strings) {
+      if (s.includes(separator)) separated++;
+      for (const part of s.split(separator)) {
+        const trimmed = part.trim();
+        if (trimmed === '') continue;
+        parts++;
+        distinct.add(trimmed.toLowerCase());
+      }
+    }
+
+    if (parts === 0) continue;
+    if (separated / strings.length < MULTI_MIN_SEPARATED_RATIO) continue;
+    if (parts / strings.length < MULTI_MIN_PARTS_PER_VALUE) continue;
+    if (distinct.size > MULTI_MAX_DISTINCT_PARTS) continue;
+    if (distinct.size / parts > MULTI_MAX_DISTINCT_RATIO) continue;
+
+    return separator;
+  }
+
+  return null;
+}
+
 // Infers the type and chart role of a column from its raw values and
 // header name.
 //
@@ -399,31 +452,53 @@ export function inferType(values, columnName) {
   if (numericVerdict) {
     verdict = numericVerdict;
   } else {
-    // --- categorical vs text -------------------------------------------
-    const isCategorical = distinctCount <= 50 || distinctCount / nonNullCount < 0.05;
-    verdict = isCategorical
-      ? {
-          type: 'categorical',
-          role: 'dimension',
-          confidence: 1,
-          dateOrder: null,
-          isPercent: false,
-          nullCount,
-          distinctCount,
-          casualties: [],
-          casualtyCount: 0,
-        }
-      : {
-          type: 'text',
-          role: 'ignored',
-          confidence: 1,
-          dateOrder: null,
-          isPercent: false,
-          nullCount,
-          distinctCount,
-          casualties: [],
-          casualtyCount: 0,
-        };
+    // --- multi-select ----------------------------------------------------
+    // Ahead of the categorical/text split: a multi-select column is
+    // categorical-looking (few distinct cells) or text-looking (many)
+    // depending only on how many combinations people happened to pick,
+    // so neither verdict can be trusted to fall out correctly on its own.
+    const separator = detectMultiSeparator(nonNull);
+
+    if (separator) {
+      verdict = {
+        type: 'multi',
+        role: 'dimension',
+        confidence: 1,
+        dateOrder: null,
+        isPercent: false,
+        separator,
+        nullCount,
+        distinctCount,
+        casualties: [],
+        casualtyCount: 0,
+      };
+    } else {
+      // --- categorical vs text -------------------------------------------
+      const isCategorical = distinctCount <= 50 || distinctCount / nonNullCount < 0.05;
+      verdict = isCategorical
+        ? {
+            type: 'categorical',
+            role: 'dimension',
+            confidence: 1,
+            dateOrder: null,
+            isPercent: false,
+            nullCount,
+            distinctCount,
+            casualties: [],
+            casualtyCount: 0,
+          }
+        : {
+            type: 'text',
+            role: 'ignored',
+            confidence: 1,
+            dateOrder: null,
+            isPercent: false,
+            nullCount,
+            distinctCount,
+            casualties: [],
+            casualtyCount: 0,
+          };
+    }
   }
 
   // --- identifier override ---------------------------------------------

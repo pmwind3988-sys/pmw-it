@@ -284,23 +284,31 @@ No icon package is installed — add a glyph there rather than a dependency.
   difference. Use ` `, `​`, `﻿`. This is not hypothetical here:
   one such swap voided a whole test in `inferType.test.js` and was only caught
   by byte-diffing the file.
-- Don't let the analysis model or its runtime come from anywhere but this
-  app's own origin. `embed.js` sets `allowLocalModels = true`,
-  `allowRemoteModels = false`, `localModelPath` AND the runtime's `wasmPaths`.
-  The tab tells the user nothing leaves their machine; those four lines are
-  what make it true. Two of them are traps: `allowLocalModels` defaults to
-  FALSE in the browser, so turning remote models off alone disables both and
-  the pipeline refuses to start; and without `wasmPaths` the ONNX runtime is
-  fetched from a public CDN on first use — silently, because the feature
-  still works.
-- Don't set `wasmPaths` to a directory prefix. A prefix makes the runtime
-  treat its LOADER as external too and reach for it with a dynamic
-  `import()`, which Vite's dev server refuses to do for a file in `public/`
-  ("should not be imported from source code") — so the prefix form works in
-  a production build and fails in dev. Name the one `.wasm` file and leave
-  `mjs` unset. Which file: transformers.js imports `onnxruntime-web/webgpu`,
-  whose bundled loader wants `ort-wasm-simd-threaded.asyncify.wasm`. Grep the
-  bundle for `ort-wasm` if that ever changes; guessing costs an afternoon.
+- Don't let the analysis model come from anywhere but this app's own origin.
+  `embed.js` sets `allowLocalModels = true`, `allowRemoteModels = false` and
+  `localModelPath`. The tab tells the user nothing leaves their machine;
+  those three lines are what make it true, and the first is a trap —
+  `allowLocalModels` defaults to FALSE in the browser, so switching remote
+  models off alone disables both and the pipeline refuses to start.
+  `embed.contract.test.js` pins all of it by reading the file as text.
+- Don't set `wasmPaths`. The runtime reaches its `.wasm` through
+  `new URL(…, import.meta.url)`, which the bundler already rewrites to a
+  hashed asset on this origin — so the default keeps the promise, and an
+  override made the build ship the same 22.5MB file twice. If it ever has to
+  be set, name the ONE file rather than a directory prefix: a prefix makes
+  the runtime treat its loader as external too and fetch it with a dynamic
+  `import()`, which Vite's dev server refuses to do for anything in `public/`,
+  so the prefix form works in a build and fails in dev. The file wanted is
+  `ort-wasm-simd-threaded.asyncify.wasm` — transformers.js imports
+  `onnxruntime-web/webgpu` and that is what its bundled loader names. Grep
+  the bundle for `ort-wasm` if it changes; guessing costs an afternoon.
+- Don't point runtime code at a path under `public/` that only exists because
+  somebody copied it there. `public/models` is gitignored and recreated by
+  `scripts/fetch-model.mjs`; anything else gitignored is not recreated by
+  anything. A missing file does not 404 — the SPA rewrite answers with
+  `index.html`, so the browser reports
+  "expected magic word 00 61 73 6d, found 3c 21 64 6f", which is `<!do`.
+  That cost a live bug; `embed.contract.test.js` is the guard.
 - Don't re-embed on a settings change. The threshold and granularity controls
   re-score against cached fragment vectors, and bucket vectors are cached by
   prompt TEXT so renaming a bucket is free. Measured on the real survey:

@@ -12,10 +12,15 @@ import { fileURLToPath } from 'node:url';
 // are CSS custom properties and there is no DOM here to compute them
 // against.
 
+// Line endings are normalised before anything is matched. Git converts
+// this file to CRLF on a Windows checkout, and the block markers below
+// contain a literal "\n" -- so without this the palette parses as eight
+// undefineds and twenty-four tests fail for a reason that has nothing to
+// do with colour.
 const CSS = readFileSync(
   fileURLToPath(new URL('../../../styles/datastudio.css', import.meta.url)),
   'utf8',
-);
+).replace(/\r\n/g, '\n');
 
 function paletteFrom(blockStart) {
   const start = CSS.indexOf(blockStart);

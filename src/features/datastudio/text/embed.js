@@ -1,10 +1,8 @@
 // The only module in this feature that is not a pure function.
 //
 // Everything here exists to keep one promise: no response text ever
-// leaves the browser. Two settings do that, and the second is the one
-// that is easy to miss -- without `wasmPaths` the ONNX runtime is
-// fetched from a public CDN the first time anyone opens the tab, and
-// nothing on screen says so, because the feature still works.
+// leaves the browser, and neither the model nor the runtime is fetched
+// from anyone else's server.
 
 import { pipeline, env } from '@huggingface/transformers';
 export const MODEL_ID = 'Xenova/all-MiniLM-L6-v2';
@@ -21,22 +19,21 @@ env.allowLocalModels = true;
 env.allowRemoteModels = false;
 env.localModelPath = '/models/';
 
-// ONE named file, and deliberately no `mjs` entry.
+// `wasmPaths` is deliberately NOT set.
 //
-// A directory prefix ('/ort/') makes the runtime treat its LOADER as
-// external too, and it then reaches for that loader with a dynamic
-// import(). Vite's dev server refuses to serve a file from public/ that
-// way -- "should not be imported from source code" -- so the prefix form
-// works in a production build and fails in dev. Naming only the .wasm
-// leaves the runtime using its own bundled loader and fetching just this
-// one file, which fetch() serves happily from public/ in both.
+// The runtime reaches its .wasm through `new URL(..., import.meta.url)`,
+// which the bundler rewrites to a hashed asset on this origin. So the
+// default already keeps the promise, and overriding it made the build
+// carry the same 22.5MB file twice -- once bundled, once in public/ --
+// while serving only the copy named here.
 //
-// It also pins the plain CPU build. Left to choose, the runtime picks
-// one of four (plain, jsep, jspi, asyncify) from what the visitor's
-// browser supports, and all four would have to ship -- 74MB to serve the
-// 13MB anyone actually loads. There is no WebGPU work here, only
-// sentence embeddings on the CPU.
-env.backends.onnx.wasm.wasmPaths = { wasm: '/ort/ort-wasm-simd-threaded.asyncify.wasm' };
+// If this ever has to be set again, it must name the ONE file rather
+// than a directory prefix. A prefix makes the runtime treat its loader
+// as external too and fetch it with a dynamic import(), which Vite's dev
+// server refuses to do for anything in public/ -- so the prefix form
+// works in a build and fails in dev. The file wanted is the asyncify
+// build: transformers.js imports `onnxruntime-web/webgpu`, and that
+// bundle's loader names `ort-wasm-simd-threaded.asyncify.wasm`.
 
 // Loading the model dominates the first run, so the 0-40 band of the
 // progress bar is reserved for it. Without its own progress the tab

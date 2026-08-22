@@ -14,7 +14,7 @@ export const DataStudioContext = createContext(null);
 // Where the user is in the import -> clean -> chart journey. The page
 // renders one screen per stage, so this is the only thing deciding what
 // is on screen.
-export const STAGES = ['idle', 'parsing', 'profiled', 'cleaning', 'canvas'];
+export const STAGES = ['idle', 'parsing', 'profiled', 'cleaning', 'canvas', 'text'];
 
 export const IDLE_STATE = {
   stage: 'idle',
@@ -53,6 +53,21 @@ export const IDLE_STATE = {
   storageFull: false,
   error: '',
   progress: { stage: '', pct: 0 },
+  // --- text analysis ---------------------------------------------------
+  // `rawAnalysis` is what the model said; `textOverrides` is what the
+  // user said about it; `analysis` is the two combined and is the only
+  // one anything renders. Keeping the first two apart is what lets a
+  // re-score leave hand corrections standing.
+  textColumns: [],
+  textColumnName: '',
+  rawAnalysis: null,
+  analysis: null,
+  buckets: [],
+  textOverrides: null,
+  textSettings: { threshold: 0.3, granularity: 0.45 },
+  analysing: false,
+  textProgress: { stage: '', pct: 0 },
+  textError: '',
 };
 
 // Tile widths on the 12-column canvas grid (spec §10.4).

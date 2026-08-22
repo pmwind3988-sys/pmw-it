@@ -6,7 +6,13 @@ import { suggestCharts } from './suggest/suggestCharts.js';
 import { SIZE_ORDER } from './dataStudioStore.js';
 import {
   saveDataset, loadDataset, saveCleanPlan, loadCleanPlan, StorageFullError,
+  saveAnalysis, loadAnalysis,
 } from './store/db.js';
+import { profileDataset } from './profile/profileDataset.js';
+import { detectTextColumns } from './text/detectTextColumns.js';
+import { STARTER_BUCKETS } from './text/buckets.js';
+import { applyOverrides, EMPTY_OVERRIDES } from './text/overrides.js';
+import { deriveColumns, DERIVED_OVERRIDES, DERIVED_HEADERS } from './text/deriveColumns.js';
 
 /**
  * Owns the worker and the stage machine for the whole section.
@@ -21,6 +27,7 @@ import {
 export function DataStudioProvider({ children }) {
   const [state, setState] = useState(IDLE_STATE);
   const workerRef = useRef(null);
+  const textWorkerRef = useRef(null);
   const bytesRef = useRef(null);
   // Monotonic id per clean request. A result whose id is not the latest
   // is stale -- the user has ticked something else since -- and applying
@@ -60,6 +67,14 @@ export function DataStudioProvider({ children }) {
           overrides: {},
           plan: proposeCleanPlan(msg.profile, msg.grid),
           dataset: null,
+          // A different sheet is different writing, so an analysis of
+          // the previous one describes nothing that is still on screen.
+          textColumns: detectTextColumns(msg.profile, { rows: msg.grid.rows }),
+          textColumnName: '',
+          rawAnalysis: null,
+          analysis: null,
+          textOverrides: null,
+          textError: '',
           error: '',
           progress: { stage: '', pct: 100 },
         }));
@@ -101,7 +116,70 @@ export function DataStudioProvider({ children }) {
     return () => {
       worker.terminate();
       workerRef.current = null;
+      // The text worker is created lazily below, so it may never exist.
+      textWorkerRef.current?.terminate();
+      textWorkerRef.current = null;
     };
+  }, []);
+
+  /**
+   * The analysis worker, created on first use rather than on mount.
+   *
+   * Constructing it eagerly would pull the model chunk into every Data
+   * Studio visit, including the ones that never open the tab.
+   */
+  const textWorker = useCallback(() => {
+    if (textWorkerRef.current) return textWorkerRef.current;
+
+    const worker = new Worker(new URL('./worker/text.worker.js', import.meta.url), {
+      type: 'module',
+    });
+
+    worker.onmessage = (e) => {
+      const msg = e.data ?? {};
+
+      if (msg.type === 'progress') {
+        setState((s) => ({ ...s, textProgress: { stage: msg.stage, pct: msg.pct } }));
+        return;
+      }
+
+      if (msg.type === 'analyzed') {
+        setState((s) => {
+          const overrides = s.textOverrides ?? EMPTY_OVERRIDES;
+          return {
+            ...s,
+            rawAnalysis: msg.raw,
+            analysis: applyOverrides(msg.raw, overrides),
+            textOverrides: overrides,
+            analysing: false,
+            textError: '',
+            textProgress: { stage: '', pct: 100 },
+          };
+        });
+        return;
+      }
+
+      if (msg.type === 'error') {
+        setState((s) => ({
+          ...s,
+          analysing: false,
+          textError: msg.message,
+          textProgress: { stage: '', pct: 0 },
+        }));
+      }
+    };
+
+    worker.onerror = (event) => {
+      setState((s) => ({
+        ...s,
+        analysing: false,
+        textError: event?.message || 'The analysis worker stopped unexpectedly.',
+        textProgress: { stage: '', pct: 0 },
+      }));
+    };
+
+    textWorkerRef.current = worker;
+    return worker;
   }, []);
 
   const post = useCallback((sheetName, headerIndex) => {
@@ -458,6 +536,20 @@ export function DataStudioProvider({ children }) {
       }));
 
       requestClean(record.profile, plan, grid);
+
+      // Corrections outlive the session they were made in. The analysis
+      // itself is not stored -- it is re-derived from these on demand,
+      // which is cheaper than keeping a copy that can drift from the data.
+      const saved = await loadAnalysis(id);
+      if (saved) {
+        setState((s) => ({
+          ...s,
+          buckets: saved.buckets ?? [],
+          textOverrides: saved.overrides ?? EMPTY_OVERRIDES,
+          textSettings: saved.settings ?? s.textSettings,
+          textColumnName: saved.columnName ?? '',
+        }));
+      }
     } catch (err) {
       setState((s) => ({ ...s, error: err?.message ?? 'Could not open that dataset.' }));
     }
@@ -473,6 +565,169 @@ export function DataStudioProvider({ children }) {
     selection: null,
     stage: 'canvas',
   })), []);
+
+  // --- text analysis ----------------------------------------------------
+
+  // How many multi-select options each respondent picked, normalised
+  // against the most anyone picked. This is the one severity input that
+  // is measured rather than inferred, and it comes from the structured
+  // column, not from the prose.
+  const breadthsOf = useCallback((grid, profile) => {
+    const multi = (profile?.columns ?? []).find((c) => c.type === 'multi');
+    if (!multi) return grid.rows.map(() => 0);
+
+    const separator = multi.separator ?? ';';
+    const counts = grid.rows.map((row) => String(row?.[multi.index] ?? '')
+      .split(separator)
+      .map((part) => part.trim())
+      .filter(Boolean).length);
+
+    const most = Math.max(1, ...counts);
+    return counts.map((n) => n / most);
+  }, []);
+
+  const startAnalysis = useCallback((columnName) => setState((s) => {
+    const column = s.textColumns.find((c) => c.name === columnName) ?? s.textColumns[0];
+    if (!column || !s.grid) return s;
+
+    const buckets = s.buckets.length > 0 ? s.buckets : STARTER_BUCKETS;
+    textWorker().postMessage({
+      type: 'analyze',
+      columnName: column.name,
+      texts: s.grid.rows.map((row) => row?.[column.index] ?? ''),
+      breadths: breadthsOf(s.grid, s.profile),
+      buckets,
+      settings: s.textSettings,
+    });
+
+    return {
+      ...s,
+      stage: 'text',
+      textColumnName: column.name,
+      buckets,
+      analysing: true,
+      textError: '',
+      textProgress: { stage: 'Loading the model', pct: 1 },
+    };
+  }), [textWorker, breadthsOf]);
+
+  // Re-file against cached vectors. Never re-embeds the fragments --
+  // that is what keeps a slider live rather than a five-second wait.
+  const rescoreNow = useCallback((buckets, settings) => {
+    textWorkerRef.current?.postMessage({ type: 'rescore', buckets, settings });
+  }, []);
+
+  const setTextSetting = useCallback((key, value) => setState((s) => {
+    const textSettings = { ...s.textSettings, [key]: value };
+    if (s.rawAnalysis) rescoreNow(s.buckets, textSettings);
+    return { ...s, textSettings, analysing: Boolean(s.rawAnalysis) };
+  }), [rescoreNow]);
+
+  const updateBucket = useCallback((id, patch) => setState((s) => {
+    const buckets = s.buckets.map((b) => (b.id === id ? { ...b, ...patch } : b));
+    // Only a description or hint change alters what matches. Renaming a
+    // bucket is presentation, and re-running the model for it would make
+    // typing in the name field stutter for no result.
+    const rematches = patch.description !== undefined || patch.hints !== undefined;
+    if (s.rawAnalysis && rematches) rescoreNow(buckets, s.textSettings);
+    return { ...s, buckets, analysing: Boolean(s.rawAnalysis) && rematches };
+  }), [rescoreNow]);
+
+  const addBucket = useCallback(() => setState((s) => ({
+    ...s,
+    buckets: [...s.buckets, {
+      id: `bucket_${Date.now()}`,
+      label: 'New category',
+      description: '',
+      hints: [],
+    }],
+  })), []);
+
+  const removeBucket = useCallback((id) => setState((s) => {
+    const buckets = s.buckets.filter((b) => b.id !== id);
+    if (s.rawAnalysis) rescoreNow(buckets, s.textSettings);
+    return { ...s, buckets, analysing: Boolean(s.rawAnalysis) };
+  }), [rescoreNow]);
+
+  // Every correction is the same shape: change the overrides record and
+  // re-apply it to the raw result. Nothing here touches `rawAnalysis`.
+  const editOverrides = useCallback((edit) => setState((s) => {
+    if (!s.rawAnalysis) return s;
+    const overrides = edit(s.textOverrides ?? EMPTY_OVERRIDES);
+    return { ...s, textOverrides: overrides, analysis: applyOverrides(s.rawAnalysis, overrides) };
+  }), []);
+
+  const retagFragment = useCallback((fragmentId, bucketId) => editOverrides((o) => ({
+    ...o, retags: { ...o.retags, [fragmentId]: bucketId },
+  })), [editOverrides]);
+
+  const toggleNoise = useCallback((fragmentId) => editOverrides((o) => ({
+    ...o,
+    noise: o.noise.includes(fragmentId)
+      ? o.noise.filter((id) => id !== fragmentId)
+      : [...o.noise, fragmentId],
+  })), [editOverrides]);
+
+  const renameTheme = useCallback((themeId, name) => editOverrides((o) => ({
+    ...o, themeNames: { ...o.themeNames, [themeId]: name },
+  })), [editOverrides]);
+
+  const mergeThemes = useCallback((fromId, intoId) => editOverrides((o) => ({
+    ...o, themeMerges: { ...o.themeMerges, [fromId]: intoId },
+  })), [editOverrides]);
+
+  const togglePin = useCallback((id) => editOverrides((o) => ({
+    ...o, pinned: o.pinned.includes(id) ? o.pinned.filter((x) => x !== id) : [...o.pinned, id],
+  })), [editOverrides]);
+
+  const toggleSuppress = useCallback((id) => editOverrides((o) => ({
+    ...o,
+    suppressed: o.suppressed.includes(id)
+      ? o.suppressed.filter((x) => x !== id)
+      : [...o.suppressed, id],
+  })), [editOverrides]);
+
+  const resetOverrides = useCallback(() => editOverrides(() => EMPTY_OVERRIDES), [editOverrides]);
+
+  /**
+   * Append the analysis to the sheet as five more columns.
+   *
+   * The grid is re-profiled afterwards rather than patched, so the new
+   * columns go through the same type inference as every other column and
+   * the canvas needs no special case. `DERIVED_OVERRIDES` supplies the
+   * one thing inference cannot know: the categories column is
+   * multi-valued by construction, even though most respondents raise a
+   * single category and most of its cells therefore carry no separator.
+   */
+  const applyAnalysisColumns = useCallback(() => setState((s) => {
+    if (!s.analysis || !s.grid) return s;
+
+    const { headers, columns } = deriveColumns(s.analysis, s.grid.rows.length);
+
+    // Replace rather than append on a second run, or re-analysing leaves
+    // the user with two columns called "Severity".
+    const keep = s.grid.headers
+      .map((name, i) => ({ name, i }))
+      .filter(({ name }) => !DERIVED_HEADERS.includes(name));
+
+    const grid = {
+      headers: [...keep.map((k) => k.name), ...headers],
+      rows: s.grid.rows.map((row, r) => [
+        ...keep.map(({ i }) => row?.[i] ?? null),
+        ...columns.map((column) => column[r]),
+      ]),
+    };
+    const profile = profileDataset(grid, DERIVED_OVERRIDES);
+
+    return {
+      ...s,
+      grid,
+      profile,
+      plan: proposeCleanPlan(profile, grid),
+      textColumns: detectTextColumns(profile, grid),
+      stage: 'canvas',
+    };
+  }), []);
 
   const dismissStorageFull = useCallback(
     () => setState((s) => ({ ...s, storageFull: false })), [],
@@ -493,6 +748,28 @@ export function DataStudioProvider({ children }) {
     if (stage === 'idle' || stage === 'parsing') return;
     requestClean(profile, plan);
   }, [profile, plan, stage, requestClean]);
+
+  // Corrections are saved against the dataset, not the file, so they
+  // survive a reload -- in this browser only. Nothing here goes to a
+  // server. Only meaningful once the dataset has been saved and so has
+  // an id to hang them on.
+  const {
+    datasetId, buckets, textOverrides, textSettings, textColumnName, rawAnalysis,
+  } = state;
+  useEffect(() => {
+    if (!datasetId || !rawAnalysis) return;
+    saveAnalysis({
+      datasetId,
+      columnName: textColumnName,
+      buckets,
+      overrides: textOverrides ?? EMPTY_OVERRIDES,
+      settings: textSettings,
+      vectors: rawAnalysis.vectors,
+    }).catch(() => {
+      // A failed save must not take the tab down. The work is still on
+      // screen; only its persistence was lost.
+    });
+  }, [datasetId, rawAnalysis, buckets, textOverrides, textSettings, textColumnName]);
 
   const value = useMemo(() => ({
     ...state,
@@ -522,6 +799,19 @@ export function DataStudioProvider({ children }) {
     openSavedDataset,
     applyDashboard,
     dismissStorageFull,
+    startAnalysis,
+    setTextSetting,
+    updateBucket,
+    addBucket,
+    removeBucket,
+    retagFragment,
+    toggleNoise,
+    renameTheme,
+    mergeThemes,
+    togglePin,
+    toggleSuppress,
+    resetOverrides,
+    applyAnalysisColumns,
     reset,
     setStage,
   }), [
@@ -530,6 +820,9 @@ export function DataStudioProvider({ children }) {
     addTile, updateTile, removeTile, duplicateTile, moveTile, cycleTileSize,
     setEditingTile, addFilter, removeFilter, clearFilters, selectMark, clearSelection,
     saveCurrentDataset, openSavedDataset, applyDashboard, dismissStorageFull,
+    startAnalysis, setTextSetting, updateBucket, addBucket, removeBucket,
+    retagFragment, toggleNoise, renameTheme, mergeThemes, togglePin, toggleSuppress,
+    resetOverrides, applyAnalysisColumns,
     reset, setStage,
   ]);
 

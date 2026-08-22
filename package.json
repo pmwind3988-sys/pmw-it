@@ -9,11 +9,14 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "fetch:model": "node scripts/fetch-model.mjs",
+    "prebuild": "node scripts/fetch-model.mjs"
   },
   "dependencies": {
     "@azure/msal-browser": "^5.8.0",
     "@azure/msal-react": "^5.3.1",
+    "@huggingface/transformers": "^4.2.0",
     "@rolldown/plugin-babel": "^0.2.3",
     "babel-plugin-react-compiler": "^1.0.0",
     "echarts": "^5.6.0",

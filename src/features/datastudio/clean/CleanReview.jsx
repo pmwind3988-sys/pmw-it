@@ -236,7 +236,7 @@ function StepRow({ step }) {
 
 export default function CleanReview() {
   const {
-    profile, grid, plan, dataset, cleaning, commitClean, setStage,
+    profile, grid, plan, dataset, cleaning, commitClean, setStage, textColumns, startAnalysis,
   } = useDataStudio();
 
   const rawByColumn = useMemo(() => {
@@ -302,6 +302,16 @@ export default function CleanReview() {
         <Button variant="secondary" size="sm" icon={RefreshCw} onClick={() => setStage('profiled')}>
           Back to columns
         </Button>
+        {/* Only when the sheet holds written answers worth reading. */}
+        {textColumns.length > 0 && (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => startAnalysis(textColumns[0].name)}
+          >
+            Text analysis
+          </Button>
+        )}
         <Button size="sm" disabled={!dataset || cleaning} onClick={commitClean}>
           Build the dashboard
         </Button>

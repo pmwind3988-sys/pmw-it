@@ -149,3 +149,10 @@ describe('dropEmptyRows', () => {
     expect(dropEmptyRows(grid).rows).toEqual([['x', 'y'], ['z', null]]);
   });
 });
+
+describe('castType to multi', () => {
+  it('normalises spacing and drops empty options', () => {
+    const out = castType(['A ; B ;', ';;', 'C'], { type: 'multi', separator: ';' });
+    expect(out).toEqual(['A;B', null, 'C']);
+  });
+});

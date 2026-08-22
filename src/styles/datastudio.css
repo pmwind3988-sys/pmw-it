@@ -1030,3 +1030,116 @@
   max-height: 80vh;
   overflow-y: auto;
 }
+
+/* --- text analysis ---------------------------------------------------
+   The tab reuses .ds-table, .ds-toolbar, .ds-field and .ds-select
+   wholesale. Only what has no equivalent is defined here. Every colour
+   is a token, so the section follows the theme like everything else. */
+
+.ds-text-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 12px 0;
+  border-bottom: 1px solid var(--it-line);
+}
+
+.ds-text-tab {
+  padding: 8px 14px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--it-ink-soft);
+  font: inherit;
+  cursor: pointer;
+}
+
+.ds-text-tab:hover {
+  color: var(--it-ink);
+}
+
+.ds-text-tab-on,
+.ds-text-tab-on:hover {
+  color: var(--it-brand);
+  border-bottom-color: var(--it-brand);
+}
+
+.ds-text-card,
+.ds-text-notice {
+  margin-bottom: 12px;
+}
+
+.ds-text-notice {
+  border-left: 3px solid var(--it-accent);
+  background: var(--it-accent-wash);
+}
+
+.ds-bucket-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ds-bucket {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--it-line);
+  border-radius: var(--it-radius);
+  background: var(--it-panel);
+}
+
+.ds-bucket-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ds-input {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--it-line);
+  border-radius: 8px;
+  background: var(--it-panel);
+  color: var(--it-ink);
+  font: inherit;
+}
+
+.ds-bucket-name {
+  flex: 1;
+  font-weight: 600;
+}
+
+.ds-bucket-description {
+  resize: vertical;
+}
+
+.ds-theme-list {
+  display: grid;
+  gap: 10px;
+}
+
+.ds-theme-examples {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: var(--it-ink-soft);
+  font-size: 0.9em;
+}
+
+.ds-issue-text {
+  max-width: 44rem;
+}
+
+/* Excluded rows stay on screen rather than vanishing: somebody who
+   mis-clicks needs to see what they removed in order to put it back. */
+.ds-issue-noise {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
+.ds-priority-actions {
+  display: flex;
+  gap: 4px;
+  white-space: nowrap;
+}

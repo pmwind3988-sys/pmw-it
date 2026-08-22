@@ -161,23 +161,31 @@ function proposeMerge(values, name) {
 // Ruling F6: a cast is proposed only when something actually needs
 // coercing, or an already-typed column collects a no-op checklist row
 // that the user has to read and dismiss.
-function alreadyTyped(value, type) {
+function alreadyTyped(value, type, column) {
   if (type === 'numeric') return typeof value === 'number';
   if (type === 'boolean') return typeof value === 'boolean';
   if (type === 'date' || type === 'datetime') return value instanceof Date;
+  if (type === 'multi') {
+    // Only worth proposing when normalising would actually change the
+    // cell: the trailing separator every form export leaves behind, or
+    // spaces around the options.
+    const separator = column?.separator ?? ';';
+    const options = String(value).split(separator).map((p) => p.trim()).filter(Boolean);
+    return options.join(separator) === String(value);
+  }
   return true;
 }
 
 function proposeCast(values, column) {
   const { name, type, dateOrder } = column;
-  if (!['numeric', 'boolean', 'date', 'datetime'].includes(type)) return null;
+  if (!['numeric', 'boolean', 'date', 'datetime', 'multi'].includes(type)) return null;
 
   let affected = 0;
   const examples = new Set();
 
   for (const v of values) {
     if (isEmptyCell(v)) continue;
-    if (alreadyTyped(v, type)) continue;
+    if (alreadyTyped(v, type, column)) continue;
     affected++;
     if (examples.size < PREVIEW_EXAMPLES) examples.add(quote(String(v)));
   }
@@ -185,6 +193,7 @@ function proposeCast(values, column) {
   if (affected === 0) return null;
 
   const params = { type };
+  if (type === 'multi') params.separator = column.separator ?? ';';
   if (type === 'date' || type === 'datetime') {
     // A conflicting order is exactly the case the user has to resolve,
     // so never bake a guess into the plan; fall back to the profile's

@@ -199,6 +199,27 @@ function makeXResolver(dataset, xSpec, mask) {
     };
   }
 
+  // A multi column puts one row in SEVERAL categories, so the resolver
+  // returns an array. The grouping loop normalises to an array either
+  // way, which is why every other resolver can keep returning one object.
+  //
+  // This has to come before the dictionary branch: a multi column carries
+  // a dictionary too, and that branch would read the flat option array as
+  // one code per row and collapse everything into nonsense.
+  if (column.type === 'multi') {
+    return (row) => {
+      const start = column.offsets[row];
+      const end = column.offsets[row + 1];
+      if (end <= start) return null;
+      const out = [];
+      for (let j = start; j < end; j++) {
+        const code = column.values[j];
+        out.push({ key: code, label: column.dictionary[code] });
+      }
+      return out;
+    };
+  }
+
   if (column.dictionary) {
     return (row) => {
       const code = column.values[row];
@@ -236,6 +257,11 @@ function makeXResolver(dataset, xSpec, mask) {
 function makeSeriesResolver(dataset, seriesSpec) {
   const column = columnOf(dataset, seriesSpec?.column);
   if (!column) return null;
+
+  // Deliberately unsupported as a series. A row belonging to several
+  // series at once would be counted once per series, and every stacked
+  // total would then exceed the row count -- silently.
+  if (column.type === 'multi') return null;
 
   if (column.dictionary) {
     return (row) => {
@@ -297,14 +323,16 @@ export function aggregate(dataset, mask, spec) {
   const measure = spec?.encoding?.y?.[0] ?? {};
   const agg = measure.agg ?? 'count';
   const measureColumn = columnOf(dataset, measure.column);
-  const seriesName = spec?.encoding?.series?.column
-    ? null
-    : (measure.column ?? 'Count');
 
   const resolveX = makeXResolver(dataset, spec?.encoding?.x, mask);
   const resolveSeries = makeSeriesResolver(dataset, spec?.encoding?.series);
+  // Used whenever no series resolver exists -- because none was asked
+  // for, because the named column is missing, or because it is a multi
+  // column. Deriving this from the SPEC instead would name a series that
+  // nothing can resolve, and every row would then be dropped.
+  const fallbackSeriesName = measure.column ?? 'Count';
 
-  const empty = { categories: [], series: [{ name: seriesName ?? 'Count', data: [] }] };
+  const empty = { categories: [], series: [{ name: fallbackSeriesName, data: [] }] };
   if (!resolveX) return empty;
 
   // key -> { label, sortKey, bySeries: Map<seriesName, bucket>, total }
@@ -319,31 +347,34 @@ export function aggregate(dataset, mask, spec) {
     const x = resolveX(row);
     if (x === null) continue;
 
-    let group = groups.get(x.key);
-    if (!group) {
-      group = { label: x.label, sortKey: x.key, bySeries: new Map(), total: 0 };
-      groups.set(x.key, group);
-    }
+    // One entry for an ordinary column, several for a multi column.
+    for (const one of (Array.isArray(x) ? x : [x])) {
+      let group = groups.get(one.key);
+      if (!group) {
+        group = { label: one.label, sortKey: one.key, bySeries: new Map(), total: 0 };
+        groups.set(one.key, group);
+      }
 
-    const name = resolveSeries ? resolveSeries(row) : seriesName;
-    if (name === null) continue;
-    if (!seenSeries.has(name)) {
-      seenSeries.add(name);
-      seriesNames.push(name);
-    }
+      const name = resolveSeries ? resolveSeries(row) : fallbackSeriesName;
+      if (name === null) continue;
+      if (!seenSeries.has(name)) {
+        seenSeries.add(name);
+        seriesNames.push(name);
+      }
 
-    let bucket = group.bySeries.get(name);
-    if (!bucket) {
-      bucket = newBucket();
-      group.bySeries.set(name, bucket);
-    }
+      let bucket = group.bySeries.get(name);
+      if (!bucket) {
+        bucket = newBucket();
+        group.bySeries.set(name, bucket);
+      }
 
-    bucket.count++;
-    if (measureColumn) {
-      const v = measureColumn.values[row];
-      if (typeof v === 'number' && !Number.isNaN(v)) {
-        bucket.sum += v;
-        bucket.values.push(v);
+      bucket.count++;
+      if (measureColumn) {
+        const v = measureColumn.values[row];
+        if (typeof v === 'number' && !Number.isNaN(v)) {
+          bucket.sum += v;
+          bucket.values.push(v);
+        }
       }
     }
   }
@@ -395,7 +426,7 @@ export function aggregate(dataset, mask, spec) {
   }
 
   const finalRows = other ? [...kept, other] : kept;
-  const names = seriesNames.length > 0 ? seriesNames : [seriesName ?? 'Count'];
+  const names = seriesNames.length > 0 ? seriesNames : [fallbackSeriesName];
 
   return {
     categories: finalRows.map((r) => r.label),

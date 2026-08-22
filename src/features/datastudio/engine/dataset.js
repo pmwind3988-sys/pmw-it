@@ -27,6 +27,7 @@ export const NULL_BOOL = 2;
 const NUMERIC_TYPES = new Set(['numeric']);
 const TEMPORAL_TYPES = new Set(['date', 'datetime']);
 const CATEGORICAL_TYPES = new Set(['categorical']);
+const MULTI_TYPES = new Set(['multi']);
 const BOOLEAN_TYPES = new Set(['boolean']);
 
 function isMissing(value) {
@@ -93,6 +94,42 @@ function encodeCategorical(values) {
   return { values: out, dictionary };
 }
 
+// Multi-select: one row holds several options, so a flat code array plus
+// per-row offsets (compressed-sparse-row) rather than one code per row.
+// Row r's options are values[offsets[r] .. offsets[r + 1]). Both arrays
+// are typed, so this survives structured clone and IndexedDB untouched
+// the same way every other column does.
+//
+// A row with no options is offsets[r] === offsets[r + 1] -- an empty
+// range, which is the null encoding for this type. There is no sentinel
+// code, because there is no single slot to put one in.
+function encodeMulti(values, separator = ';') {
+  const dictionary = [];
+  const codes = new Map();
+  const flat = [];
+  const offsets = new Int32Array(values.length + 1);
+
+  for (let i = 0; i < values.length; i++) {
+    offsets[i] = flat.length;
+    const v = values[i];
+    if (isMissing(v)) continue;
+    for (const part of String(v).split(separator)) {
+      const label = part.trim();
+      if (label === '') continue;
+      let code = codes.get(label);
+      if (code === undefined) {
+        code = dictionary.length;
+        dictionary.push(label);
+        codes.set(label, code);
+      }
+      flat.push(code);
+    }
+  }
+  offsets[values.length] = flat.length;
+
+  return { values: Int32Array.from(flat), offsets, dictionary };
+}
+
 function encodeBoolean(values) {
   const out = new Uint8Array(values.length);
   for (let i = 0; i < values.length; i++) {
@@ -135,11 +172,14 @@ export function buildDataset({ headers, columns, profile }) {
 
     let values;
     let dictionary = null;
+    let offsets = null;
 
     if (NUMERIC_TYPES.has(type)) {
       values = encodeNumeric(raw);
     } else if (TEMPORAL_TYPES.has(type)) {
       values = encodeTemporal(raw);
+    } else if (MULTI_TYPES.has(type)) {
+      ({ values, offsets, dictionary } = encodeMulti(raw, meta.separator ?? ';'));
     } else if (CATEGORICAL_TYPES.has(type)) {
       ({ values, dictionary } = encodeCategorical(raw));
     } else if (BOOLEAN_TYPES.has(type)) {
@@ -154,6 +194,9 @@ export function buildDataset({ headers, columns, profile }) {
       role,
       values,
       dictionary,
+      // Null for every type but `multi`, where it is what turns the flat
+      // option array back into rows.
+      offsets,
       isPercent: Boolean(meta.isPercent),
       // `dateOnly` tells a time axis whether to render a time of day. A
       // date-only column has no meaningful hours, so showing 00:00
@@ -163,8 +206,15 @@ export function buildDataset({ headers, columns, profile }) {
     };
   });
 
+  // Derived from the RAW input, not from the first built column. A multi
+  // column's `values` is the flat option array and is longer than the
+  // grid, so reading the length off it reports the wrong row count for
+  // the whole dataset -- and every mask allocated from it would then be
+  // the wrong size.
+  const rowCount = headers.length > 0 ? (columns[0]?.length ?? 0) : 0;
+
   return {
-    rowCount: built.length > 0 ? built[0].values.length : 0,
+    rowCount,
     columns: built,
     // Name -> position, so a tile spec that names a column can reach it
     // without scanning. Names are unique by construction (`toGrid`

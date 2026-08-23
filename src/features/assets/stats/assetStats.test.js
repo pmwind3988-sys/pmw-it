@@ -1,0 +1,92 @@
+import { describe, it, expect } from 'vitest';
+import { assetStats, recentDeliveries } from './assetStats.js';
+
+const tracked = (overrides = {}) => ({
+  category: 'Laptop', trackingMode: 'Tracked', quantity: 1, status: 'In stock', ...overrides,
+});
+
+const bulk = (overrides = {}) => ({
+  category: 'Mouse', trackingMode: 'Bulk', quantity: 20, status: 'In stock', ...overrides,
+});
+
+describe('assetStats', () => {
+  /** A row reading "× 20" is twenty mice, not one item. */
+  it('counts units, not rows', () => {
+    const stats = assetStats([tracked(), bulk()]);
+
+    expect(stats.rows).toBe(2);
+    expect(stats.units).toBe(21);
+    expect(stats.trackedUnits).toBe(1);
+    expect(stats.bulkUnits).toBe(20);
+  });
+
+  it('treats a row with no quantity as one unit', () => {
+    expect(assetStats([{ category: 'Cable' }]).units).toBe(1);
+  });
+
+  it('counts only tracked things as needing a label', () => {
+    const stats = assetStats([tracked(), tracked({ assetTag: 'PMW-1' }), bulk()]);
+    expect(stats.unlabelled).toBe(1);
+  });
+
+  it('ranks the categories biggest first', () => {
+    const stats = assetStats([tracked(), bulk()]);
+    expect(stats.byCategory[0]).toEqual({ label: 'Mouse', value: 20 });
+  });
+
+  /** Two categories of equal size must not shuffle between renders. */
+  it('breaks a tie alphabetically rather than by chance', () => {
+    const stats = assetStats([
+      { category: 'Zebra', quantity: 2 },
+      { category: 'Apple', quantity: 2 },
+    ]);
+    expect(stats.byCategory.map((entry) => entry.label)).toEqual(['Apple', 'Zebra']);
+  });
+
+  it('treats a row with no status as in stock', () => {
+    expect(assetStats([{ category: 'Cable', quantity: 3 }]).inStock).toBe(3);
+  });
+
+  it('counts faulty units', () => {
+    expect(assetStats([bulk({ condition: 'Faulty' })]).faulty).toBe(20);
+  });
+
+  it('is calm about an empty register', () => {
+    expect(assetStats([])).toMatchObject({ rows: 0, units: 0, byCategory: [] });
+  });
+});
+
+describe('recentDeliveries', () => {
+  /** Thirty rows from one PO is one event, not thirty. */
+  it('groups the rows of a delivery into one entry', () => {
+    const rows = [
+      tracked({ batchId: 'b1', batchTitle: 'PO-1', arrivedOn: 100 }),
+      bulk({ batchId: 'b1', batchTitle: 'PO-1', arrivedOn: 100 }),
+    ];
+    const [delivery] = recentDeliveries(rows);
+
+    expect(delivery.rows).toBe(2);
+    expect(delivery.units).toBe(21);
+  });
+
+  it('puts the newest delivery first', () => {
+    const rows = [
+      tracked({ batchId: 'old', batchTitle: 'PO-1', arrivedOn: 100 }),
+      tracked({ batchId: 'new', batchTitle: 'PO-2', arrivedOn: 500 }),
+    ];
+
+    expect(recentDeliveries(rows)[0].batchId).toBe('new');
+  });
+
+  it('leaves out rows that came from no delivery', () => {
+    expect(recentDeliveries([tracked()])).toEqual([]);
+  });
+
+  it('stops at the limit asked for', () => {
+    const rows = Array.from({ length: 9 }, (unused, index) => tracked({
+      batchId: `b${index}`, batchTitle: `PO-${index}`, arrivedOn: index,
+    }));
+
+    expect(recentDeliveries(rows, 3)).toHaveLength(3);
+  });
+});

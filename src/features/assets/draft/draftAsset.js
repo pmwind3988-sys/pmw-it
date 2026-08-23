@@ -133,10 +133,14 @@ export function draftIssues(draft, { registerTags = new Map(), batchTags = new M
     issues.push({ field: 'quantity', message: 'Quantity must be at least 1.' });
   }
 
+  const key = assetKey(draft);
   const tag = normaliseCode(draft.assetTag);
   if (tag) {
     const owner = registerTags.get(tag);
-    if (owner) {
+    // A labelled machine being re-scanned finds its own row here. That is not
+    // a clash — it is the ordinary case, and blocking it would make a labelled
+    // asset the one kind that can never be updated.
+    if (owner && owner.assetKey !== key) {
       issues.push({
         field: 'assetTag',
         message: `Label ${draft.assetTag} is already on "${owner.title ?? owner.assetKey}".`,
@@ -155,7 +159,7 @@ export function draftIssues(draft, { registerTags = new Map(), batchTags = new M
     }
   }
 
-  if (!hasStableIdentity(assetKey(draft))) {
+  if (!hasStableIdentity(key)) {
     // Not blocking: an unserialised spare is a real thing to own. But it will
     // never be recognised again, and silence about that is how duplicates breed.
     issues.push({

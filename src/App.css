@@ -500,67 +500,14 @@
 }
 
 /* ── Force SurveyJS inputs to always be light ── */
-.survey-light-wrapper {
-  width: 100%;
-  max-width: 100%;
-}
 
-.survey-light-wrapper,
-.survey-light-wrapper .sd-root-modern,
-.survey-light-wrapper .sd-container-modern {
-  color-scheme: light !important;
-  --sd-base-backcolor: #ffffff;
-  --background: #ffffff;
-  --background-dim: #f3f3f3;
-  --background-dim-light: #f9f9f9;
-  --foreground: #161616;
-  --foreground-disabled: rgba(22, 22, 22, 0.25);
-  --foreground-light: rgba(22, 22, 22, 0.45);
-  --border: #d6d6d6;
-  --border-light: rgba(0, 0, 0, 0.08);
-  --border-inside: rgba(0, 0, 0, 0.16);
-  --primary: #19b394;
-  --primary-foreground: #ffffff;
-  --primary-light: rgba(25, 179, 148, 0.1);
-}
 
-.survey-light-wrapper input,
-.survey-light-wrapper textarea,
-.survey-light-wrapper select {
-  color-scheme: light;
-}
 
-.survey-light-wrapper .sv-list,
-.survey-light-wrapper .sv-popup__container,
-.survey-light-wrapper .sv-popup {
-  color-scheme: light !important;
-  background-color: #ffffff !important;
-  color: #161616 !important;
-}
 
-.sd-btn {
-  display: block !important;
-  margin: 24px auto !important;
-}
 
 /* Hide add employee button in edit mode */
-.panel-edit-mode .sv-dynamic-panel .sv-dynamic-panel__add-btn,
-.panel-edit-mode .sv-paneldynamic-panel .sv-paneldynamic-panel__add-btn,
-.panel-edit-mode .sv-dynamic-panel__add-btn,
-.panel-edit-mode [data-name="employeeRequests"] + .sv-dynamic-panel__add-btn,
-.panel-edit-mode > div > .sv-paneldynamic__add-btn,
-.panel-edit-mode button.sv-dynamic-panel__add-btn,
-.panel-edit-mode .sd-element__question .sv-dynamic-panel__add-btn,
-.panel-edit-mode .sv-question__content .sv-dynamic-panel__add-btn,
-.panel-edit-mode div.sv-dynamic-panel button,
-.panel-edit-mode .sd-action-bar .sd-action-bar__item {
-  display: none !important;
-}
 
 /* Alternative selectors */
-.panel-edit-mode button:empty + button:empty {
-  display: none !important;
-}
 
 /* Remove button in edit mode */
 /* ── Asset Checklist Page ── */
@@ -831,8 +778,3 @@
   }
 }
 
-.panel-edit-mode .sv-dynamic-panel__remove-btn,
-.panel-edit-mode button:empty,
-.panel-edit-mode .sv-dynamic-panel__remove-container {
-  display: none !important;
-}

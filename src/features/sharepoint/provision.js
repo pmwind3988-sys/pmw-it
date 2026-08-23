@@ -141,12 +141,19 @@ async function ensureLibrary(siteUrl, token, digest, title, description) {
  * and a column where the two disagree is exactly the broken case below.
  */
 async function existingFields(siteUrl, token, title) {
-  const path = `${listPath(title)}/fields?$select=InternalName,Title`;
+  // `Choices` comes back on this one request rather than being asked for per
+  // column. Fetching them separately cost a round trip for every choice column
+  // on every run — which the device tests catch, and rightly: provisioning is
+  // already the slowest thing this app does.
+  const path = `${listPath(title)}/fields?$select=InternalName,Title,Choices`;
   const response = await spFetch(siteUrl, path, { token });
   if (!response.ok) throw new Error(`Could not read the fields of "${title}" (${response.status})`);
 
   const data = await response.json();
-  return new Map((data.d?.results ?? []).map((field) => [field.InternalName, field.Title]));
+  return new Map((data.d?.results ?? []).map((field) => [
+    field.InternalName,
+    { title: field.Title, choices: field.Choices?.results ?? null },
+  ]));
 }
 
 /**
@@ -158,8 +165,8 @@ async function existingFields(siteUrl, token, title) {
  * happens to share a display name from being mistaken for one of these.
  */
 function staleColumn(column, fields) {
-  for (const [internalName, display] of fields) {
-    if (display === column.Title && internalName.includes('_x00')) return internalName;
+  for (const [internalName, field] of fields) {
+    if (field.title === column.Title && internalName.includes('_x00')) return internalName;
   }
   return null;
 }
@@ -186,13 +193,73 @@ async function renameColumn(siteUrl, token, digest, title, column) {
   }
 }
 
+/**
+ * Bring a choice column's options up to date — by ADDING only.
+ *
+ * An option is never removed, however stale it looks. SharePoint rows saved
+ * with a value no longer in the column's list become unreadable in their own
+ * list, so dropping "pmw-ss" to tidy up would damage every record that used it.
+ * New options are offered from now on; old ones stay valid on old rows and
+ * simply stop being chosen.
+ */
+export function mergeChoices(existing, declared) {
+  const merged = [...existing];
+  for (const choice of declared) {
+    if (!merged.includes(choice)) merged.push(choice);
+  }
+  return merged;
+}
+
+/**
+ * `existing` is what the fields listing already told us this column offers. A
+ * column whose choices could not be read is left alone rather than failing the
+ * run — not knowing is not a reason to rewrite it.
+ */
+async function ensureChoices(siteUrl, token, digest, title, column, existing) {
+  if (!existing) return;
+
+  const merged = mergeChoices(existing, column.choices ?? []);
+  // Nothing new to add. Rewriting an unchanged column costs a request and a
+  // version bump on the field for no reason.
+  if (merged.length === existing.length) return;
+
+  const response = await spFetch(
+    siteUrl,
+    `${listPath(title)}/fields/getByInternalNameOrTitle('${column.StaticName}')`,
+    {
+      token,
+      digest,
+      method: 'POST',
+      body: {
+        __metadata: { type: METADATA_TYPE.choice },
+        Choices: { results: merged },
+      },
+      headers: { 'X-HTTP-Method': 'MERGE', 'IF-MATCH': '*' },
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `Could not update the options on "${column.Title}" (${response.status}): `
+        + `${await response.text()}`,
+    );
+  }
+}
+
 /** One column, from whatever state it is currently in to correct. */
 async function ensureColumn(siteUrl, token, digest, title, column, fields) {
   if (fields.has(column.StaticName)) {
     // Finishes a run that died between creating a column and renaming it,
     // which would otherwise leave the header reading `DeviceType` for good.
-    if (fields.get(column.StaticName) !== column.Title) {
+    const field = fields.get(column.StaticName);
+    if (field.title !== column.Title) {
       await renameColumn(siteUrl, token, digest, title, column);
+    }
+    // An existing choice column may be missing options added to the schema
+    // since it was created — which is otherwise invisible, because the column
+    // exists and nothing complains until somebody cannot pick the value.
+    if (column.kind === 'choice' && column.choices?.length) {
+      await ensureChoices(siteUrl, token, digest, title, column, field.choices);
     }
     return;
   }

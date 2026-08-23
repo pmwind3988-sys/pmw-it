@@ -1,0 +1,405 @@
+/*
+ * The form kit.
+ *
+ * Everything here replaces SurveyJS, which styled itself and so never looked
+ * like the rest of the portal. Tokens come from shell.css; nothing here defines
+ * a colour of its own.
+ */
+
+.ff-panel { padding: 18px; margin-bottom: 14px; }
+
+.ff-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.ff-panel-title { font-size: 15px; font-weight: 600; margin: 0; color: var(--text-primary); }
+
+.ff-section {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin: 20px 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ff-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+@media (min-width: 640px) {
+  .ff-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* --- one field ------------------------------------------------------ */
+
+.ff-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  margin-bottom: 14px;
+}
+
+.ff-grid .ff-field { margin-bottom: 0; }
+.ff-field-wide { grid-column: 1 / -1; }
+
+.ff-label {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.ff-req { color: var(--error, #EF4444); margin-left: 3px; }
+
+/* Visible to a screen reader, not on screen — the asterisk alone announces as
+   nothing, so "required" is said in words as well. */
+.ff-sr,
+.ff-sr-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.ff-help { font-size: 12px; color: var(--text-secondary); margin: 0; line-height: 1.45; }
+
+.ff-input {
+  width: 100%;
+  padding: 10px 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-primary);
+  /* 16px, never smaller: iOS Safari zooms the whole page in on focus for
+     anything under it, and these forms are filled in on phones. */
+  font-size: 16px;
+  font-family: inherit;
+}
+
+.ff-textarea { resize: vertical; line-height: 1.5; }
+.ff-number { max-width: 110px; }
+
+.ff-input:focus {
+  outline: 2px solid var(--text-primary);
+  outline-offset: -1px;
+}
+
+.ff-field-bad .ff-input { border-color: var(--error, #EF4444); }
+
+.ff-error {
+  font-size: 12px;
+  color: var(--error, #EF4444);
+  margin: 0;
+}
+
+.ff-summary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--error, #EF4444);
+  margin: 12px 0 0;
+}
+
+/* --- radio cards ---------------------------------------------------- */
+
+.ff-cards {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+@media (min-width: 720px) {
+  .ff-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+.ff-card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 150ms ease-out;
+}
+
+.ff-card:hover { border-color: var(--text-secondary); }
+
+/* Two ways of showing the choice, not one: the ring survives a high-contrast
+   mode or a forced-colours setting that flattens the border. */
+.ff-card-on {
+  border-color: var(--text-primary);
+  box-shadow: inset 0 0 0 1px var(--text-primary);
+}
+
+/* The real radio is hidden, so the focus ring has to be put back by hand or
+   keyboard users cannot see where they are. */
+.ff-card:focus-within {
+  outline: 2px solid var(--text-primary);
+  outline-offset: 2px;
+}
+
+.ff-card-label { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+.ff-card-desc { font-size: 12.5px; color: var(--text-secondary); line-height: 1.45; }
+
+/* --- tick list ------------------------------------------------------ */
+
+.ff-checks { display: grid; grid-template-columns: 1fr; gap: 8px; }
+
+@media (min-width: 560px) {
+  .ff-checks-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (min-width: 900px) {
+  .ff-checks-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+.ff-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+  font-size: 13.5px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.ff-check:hover { border-color: var(--text-secondary); }
+.ff-check-on { border-color: var(--text-primary); }
+.ff-check:focus-within { outline: 2px solid var(--text-primary); outline-offset: 2px; }
+
+.ff-check-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  flex-shrink: 0;
+  color: var(--bg);
+  background: var(--surface);
+}
+
+.ff-check-on .ff-check-box {
+  background: var(--text-primary);
+  border-color: var(--text-primary);
+}
+
+/* --- repeating rows ------------------------------------------------- */
+
+.ff-rows { display: grid; gap: 8px; }
+.ff-rows-title { font-size: 12px; color: var(--text-secondary); margin: 0; }
+
+.ff-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.ff-row-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-top: 8px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.ff-row-body { flex: 1; min-width: 0; }
+
+.ff-itemrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.ff-itemrow .ff-select { flex: 1 1 180px; min-width: 0; }
+
+.ff-row-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin-top: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.ff-row-remove:hover:not(:disabled) { color: var(--error, #EF4444); }
+
+/* Disabled rather than hidden on the last row: a list that can empty itself
+   leaves nothing to type into and no obvious way back. */
+.ff-row-remove:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.ff-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  align-self: flex-start;
+  padding: 9px 14px;
+  border: 1px dashed var(--border);
+  border-radius: 9px;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.ff-add:hover { color: var(--text-primary); border-color: var(--text-primary); }
+
+/* --- wizard --------------------------------------------------------- */
+
+.ff-steps {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  list-style: none;
+  padding: 0 0 16px;
+  margin: 0 0 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ff-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.ff-step-on { color: var(--text-primary); font-weight: 500; }
+
+.ff-step-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.ff-step-on .ff-step-dot,
+.ff-step-done .ff-step-dot {
+  background: var(--text-primary);
+  border-color: var(--text-primary);
+  color: var(--bg);
+}
+
+.ff-wizard-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.ff-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+/* --- signature ------------------------------------------------------ */
+
+.ff-signbtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 22px;
+  border: 2px dashed var(--border);
+  border-radius: 10px;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.ff-signbtn:hover { border-color: var(--text-primary); color: var(--text-primary); }
+
+.ff-signed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.ff-signed img {
+  max-width: 260px;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  /* The signature is drawn in dark ink on a transparent canvas, so in dark mode
+     it would be invisible against the surface. */
+  background: #fff;
+}
+
+/* --- states --------------------------------------------------------- */
+
+.ff-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+  margin-bottom: 12px;
+  font-size: 13.5px;
+}
+
+.ff-done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 36px 24px;
+  text-align: center;
+  color: var(--text-primary);
+}
+
+.ff-done h2 { font-size: 18px; margin: 0; }
+.ff-done p { color: var(--text-secondary); margin: 0; font-size: 13.5px; }
+.ff-done-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }

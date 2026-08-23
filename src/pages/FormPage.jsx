@@ -1,474 +1,472 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Model } from 'survey-core';
-import { Survey } from 'survey-react-ui';
-import 'survey-core/survey-core.min.css';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useIsAuthenticated } from '@azure/msal-react';
 import { useNavigate } from 'react-router-dom';
+import QRCode from 'qrcode';
 import { useTheme } from '../context/ThemeContext';
 import AppShell from '../components/AppShell';
 import Button from '../components/ui/Button';
-import { ArrowLeft, Share2, Copy, Download } from '../components/ui/Icons';
-import { submitEmployeesToSharePoint, fetchAllColumnChoices, fetchListItemById, updateListItem } from '../services/sharePointService';
+import { Card, ErrorBanner } from '../components/ui/Surfaces';
+import {
+  ArrowLeft, Share2, Copy, Download, Plus, Trash2, Check, AlertTriangle,
+} from '../components/ui/Icons';
+import Field from '../components/form/Field';
+import { TextInput, TextArea, DateInput, SelectInput } from '../components/form/Inputs';
+import { CheckList } from '../components/form/Choices';
+import {
+  submitEmployeesToSharePoint, fetchAllColumnChoices, fetchListItemById, updateListItem,
+} from '../services/sharePointService';
 import { useSharePointToken } from '../hooks/useRequests';
-import QRCode from 'qrcode';
-import { LayeredLightPanelless } from "survey-core/themes";
-
+import {
+  CHOICE_COLUMNS, MAX_EMPLOYEES, newEmployee, employeeFromItem, employeeToItem, dateLabel,
+} from '../features/forms/requestForm';
+import { validateRequest, hasErrors } from '../features/forms/validate';
+import { ENTITIES } from '../features/forms/checklistForm';
+import { mergeChoices } from '../features/sharepoint/provision';
 
 const SHAREPOINT_SITE_URL =
-  import.meta.env.VITE_SHAREPOINT_SITE_URL ||
-  'https://pmwgroupcom.sharepoint.com/sites/IThelpdesk';
+  import.meta.env.VITE_SHAREPOINT_SITE_URL || 'https://pmwgroupcom.sharepoint.com/sites/IThelpdesk';
 
-const CHOICE_COLUMNS = ['Entity', 'Equipment_x0020_Items', 'Software_x0020_Licenses', 'Request_x0020_Type', 'Department'];
+/**
+ * The onboarding / offboarding request — HR or a manager raising an event.
+ *
+ * Not the same thing as `/asset-checklist`, which is an employee signing for
+ * kit. This one feeds `IT Request Form`, which the dashboard and `/requests`
+ * are built on, and it asks exactly what it always asked. Only SurveyJS is
+ * gone: with it went a three-second interval that hunted the DOM for buttons to
+ * hide in edit mode.
+ *
+ * The dropdown options are still read LIVE from the SharePoint columns, so
+ * somebody adding a department there sees it here without a deploy.
+ */
 
-const getSurveyJson = (requestType, choices = {}, isEditMode = false) => {
-
-  // Create choices with value=raw SharePoint value, text=display label
-  const toChoices = (arr) =>
-    arr.map(v => ({ value: v, text: v }));
-
-  return {
-    completeText: isEditMode ? 'Update' : 'Submit',
-    allowAddPanel: !isEditMode,
-    panelAddText: isEditMode ? null : 'Add Employee',
-    panelRemoveText: isEditMode ? null : 'Remove',
-    panelCount: isEditMode ? 1 : 1,
-    minPanelCount: 1,
-    maxPanelCount: isEditMode ? 1 : 10,
-    theme: 'default',
-    elements: [
-      {
-        type: 'paneldynamic',
-        name: 'employeeRequests',
-        title: isEditMode ? 'Employee Request' : 'Employee Requests',
-        templateElements: [
-          {
-            type: 'panel',
-            name: 'personalInfo',
-            title: 'Personal Information',
-            colCount: 2,  // ← this works inside paneldynamic
-            elements: [
-              { type: 'text', name: 'fullName', title: 'Full Name (As per IC)', isRequired: true, placeholder: 'Enter full name' },
-              { type: 'text', name: 'callingName', title: 'Calling Name', placeholder: 'Nickname (optional)' },
-              { type: 'text', name: 'position', title: 'Position/Title', isRequired: true, placeholder: 'Enter position' },
-               { type: 'dropdown', name: 'entity', title: 'Entity', isRequired: true, choices: toChoices(choices['Entity'] || []) },
-               { type: 'dropdown', name: 'department', title: 'Department', isRequired: true, choices: toChoices(choices['Department'] || []) },
-               { type: 'text', name: 'employeeId', title: 'Employee ID', placeholder: 'Enter employee ID (optional)' },
-              { type: 'text', name: 'joinDate', title: requestType?.toLowerCase() === 'onboarding' ? 'Join Date' : 'Last Working Date', isRequired: true, inputType: 'date', defaultValueExpression: 'today()' },
-            ],
-          },
-          {
-            type: 'panel',
-            name: 'equipmentInfo',
-            title: 'Equipment Needs',
-            elements: [
-              {
-                type: 'checkbox', name: 'equipmentItems', title: 'Select Equipment',
-                choices: toChoices(choices['Equipment_x0020_Items'] || []),
-              },
-              { type: 'textarea', name: 'equipmentRemarks', title: 'Special Equipment Remarks', placeholder: 'Describe any special equipment requests...' },
-            ],
-          },
-          {
-            type: 'panel',
-            name: 'softwareInfo',
-            title: 'Software & Access',
-            elements: [
-              {
-                type: 'checkbox', name: 'softwareLicenses', title: 'Software Licenses Required',
-                choices: toChoices(choices['Software_x0020_Licenses'] || []),
-              },
-              { type: 'textarea', name: 'specialPermission', title: 'Special Permission Requests', placeholder: 'Describe any special access or permissions needed...' },
-            ],
-          },
-        ],
-        panelCount: 1,
-        minPanelCount: 1,
-        maxPanelCount: 10,
-        templateTitle: 'Employee #{panelIndex}',
-        panelAddText: 'Add Employee',
-        panelRemoveText: 'Remove',
-      },
-      {
-        type: 'html',
-        name: 'reviewInfo',
-        html: '<div style="text-align:center;padding:30px;background:#f5f5f5;border-radius:12px;"><p style="font-size:16px;margin-bottom:16px;">Please review all employee requests before submitting.</p><p style="color:#666;">Click Submit to send your request.</p></div>',
-      },
-    ],
-  };
-};
+const DRAFT_KEY = (requestType) => `requestDraft_${requestType}`;
 
 export default function FormPage() {
   // Every token on this page comes through the session guard, so an expiry
   // mid-form is a dialog and a silent re-sign-in rather than a dead submit.
-  const getSharePointToken = useSharePointToken();
-  const [retryCount, setRetryCount] = useState(0);
+  const getToken = useSharePointToken();
+  const isAuthenticated = useIsAuthenticated();
+  const { isDarkMode } = useTheme();
+  const navigate = useNavigate();
+
+  const [choices, setChoices] = useState(null);
+  const [choicesError, setChoicesError] = useState('');
+  const [retry, setRetry] = useState(0);
+  const [requestType, setRequestType] = useState('');
+
+  const [editId, setEditId] = useState(null);
+  const [employees, setEmployees] = useState([newEmployee()]);
+  const [errors, setErrors] = useState({});
+  const [state, setState] = useState('idle');
+  const [failure, setFailure] = useState('');
+  const [toast, setToast] = useState('');
+
+  const [sharing, setSharing] = useState(false);
+  const [qrUrl, setQrUrl] = useState('');
+  const shareRef = useRef(null);
 
   useEffect(() => {
     document.title = 'PMW IT — Request form';
   }, []);
 
-  const isAuthenticated = useIsAuthenticated();
-  // The QR code is drawn to match the current theme; the toggle itself lives in
-  // the shell's bar now, not on this page.
-  const { isDarkMode } = useTheme();
-  const navigate = useNavigate();
+  // Read once from the address rather than kept in state and synced: the id in
+  // the URL is the only source of truth for which record is open.
+  const [editParam] = useState(
+    () => new URLSearchParams(window.location.search).get('edit'),
+  );
 
-  const [showSharePanel, setShowSharePanel] = useState(false);
-  const [qrCodeUrl, setQrCodeUrl] = useState('');
-  const [toast, setToast] = useState('');
-  const [formError, setFormError] = useState('');
-  const [submitState, setSubmitState] = useState('idle');
-  const [requestType, setRequestType] = useState('');
-  const [spChoices, setSpChoices] = useState(null);
-  const [choicesError, setChoicesError] = useState('');
-  const [editItemId, setEditItemId] = useState(null);
-  const [editItemData, setEditItemData] = useState(null);
-  const sharePanelRef = useRef(null);
+  const isEdit = Boolean(editId);
 
-  // Check for edit mode from URL params
+  /**
+   * The options and, when editing, the record. One effect because the record's
+   * request type has to win over the default the options would otherwise set.
+   */
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const editId = params.get('edit');
-    if (editId) {
-      setEditItemId(parseInt(editId));
-    }
-  }, []);
-
-  // Close share panel when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (sharePanelRef.current && !sharePanelRef.current.contains(event.target)) {
-        setShowSharePanel(false);
-      }
-    };
-    if (showSharePanel) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [showSharePanel]);
-
-  // Fetch all choices from SharePoint before rendering form
-  useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated) return undefined;
     let cancelled = false;
 
-    async function loadChoices() {
-      setSpChoices(null);
+    (async () => {
+      setChoices(null);
       setChoicesError('');
       try {
-        const tokenRes = await getSharePointToken();
+        const tokenRes = await getToken();
+        const loaded = await fetchAllColumnChoices(
+          SHAREPOINT_SITE_URL, tokenRes.accessToken, CHOICE_COLUMNS,
+        );
 
-        const choices = await fetchAllColumnChoices(SHAREPOINT_SITE_URL, tokenRes.accessToken, CHOICE_COLUMNS);
-        
-        let itemData = null;
-        if (editItemId) {
-          itemData = await fetchListItemById(SHAREPOINT_SITE_URL, tokenRes.accessToken, editItemId);
+        let record = null;
+        if (editParam) {
+          record = await fetchListItemById(
+            SHAREPOINT_SITE_URL, tokenRes.accessToken, Number(editParam),
+          );
         }
-        
-        if (!cancelled) {
-          setSpChoices(choices);
-          setEditItemData(itemData);
-          if (itemData) {
-            setRequestType(itemData.Request_x0020_Type || choices['Request_x0020_Type']?.[0] || '');
-          } else {
-            setRequestType(prev => prev || choices['Request_x0020_Type']?.[0] || '');
+        if (cancelled) return;
+
+        setChoices(loaded);
+
+        if (record) {
+          setEditId(Number(editParam));
+          setEmployees([employeeFromItem(record)]);
+          setRequestType(record.Request_x0020_Type || loaded.Request_x0020_Type?.[0] || '');
+          return;
+        }
+
+        const type = loaded.Request_x0020_Type?.[0] || '';
+        setRequestType(type);
+
+        // A draft only comes back for a NEW request. Restoring one over a
+        // record somebody opened to edit would silently overwrite it.
+        const saved = localStorage.getItem(DRAFT_KEY(type));
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed) && parsed.length) setEmployees(parsed);
+          } catch {
+            // A corrupt draft is not worth telling anybody about; the blank
+            // form underneath it is a perfectly good outcome.
           }
         }
-      } catch (err) {
-        if (!cancelled) setChoicesError(err.message || 'Failed to load form options from SharePoint.');
+      } catch (thrown) {
+        if (!cancelled) setChoicesError(thrown.message || 'Failed to load form options from SharePoint.');
       }
-    }
-    loadChoices();
+    })();
+
     return () => { cancelled = true; };
-  }, [isAuthenticated, retryCount, getSharePointToken]);
+  }, [isAuthenticated, getToken, retry, editParam]);
 
-  const survey = useMemo(() => {
-    if (!spChoices) return null;
-    return new Model(getSurveyJson(requestType, spChoices, !!editItemId));
-  }, [requestType, spChoices, editItemId]);
-
-// Disable add/remove panels in edit mode after survey is created
+  /** Autosaved so a closed tab does not cost somebody ten employees of typing. */
   useEffect(() => {
-    if (!survey || !editItemId) return;
-    
-    // Set paneldynamic to view-only mode via JS after survey renders
-    survey.onCurrentPageChanged = () => {
-      const panel = survey.getPanelByName('employeeRequests');
-      if (panel) {
-        panel.allowAddPanel = false;
-        panel.allowRemovePanel = false;
-        panel.maxPanelCount = 1;
-        panel.minPanelCount = 1;
-      }
-    };
-    
-    // Also apply immediately
-    const panel = survey.getPanelByName('employeeRequests');
-    if (panel) {
-      panel.allowAddPanel = false;
-      panel.allowRemovePanel = false;
-      panel.maxPanelCount = 1;
-      panel.minPanelCount = 1;
-    }
-    
-    // Direct DOM hiding after render
-    const hideButtons = () => {
-      setTimeout(() => {
-        const allButtons = document.querySelectorAll('button');
-        allButtons.forEach(el => {
-          const text = (el.textContent || '').toLowerCase().trim();
-          if (text === 'add employee' || text === '+ add employee') {
-            el.style.display = 'none';
-            el.style.visibility = 'hidden';
-            el.style.height = '0';
-            el.style.padding = '0';
-            el.style.overflow = 'hidden';
-          }
-          if (text === 'remove') {
-            el.style.display = 'none';
-          }
-        });
-      }, 100);
-    };
-    
-    hideButtons();
-    const interval = setInterval(hideButtons, 500);
-    setTimeout(() => clearInterval(interval), 3000);
-    
-    return () => clearInterval(interval);
-  }, [survey, editItemId]);
+    if (isEdit || !requestType) return;
+    localStorage.setItem(DRAFT_KEY(requestType), JSON.stringify(employees));
+  }, [employees, requestType, isEdit]);
 
-  // Restore draft from localStorage or populate edit data
   useEffect(() => {
-    if (!survey) return;
-    
-    if (editItemData && editItemId) {
-      // Populate form with existing data for editing
-      const employeeData = [{
-        fullName: editItemData.Title || '',
-        callingName: editItemData.Calling_x0020_Name || '',
-        position: editItemData.Position || '',
-             entity: editItemData.Entity || '',
-             department: editItemData.Department || '',
-             employeeId: editItemData.Employee_x0020_ID || '',
-        joinDate: editItemData.Join_x0020__x002f__x0020_Last_x0 ? editItemData.Join_x0020__x002f__x0020_Last_x0.split('T')[0] : '',
-        equipmentItems: editItemData.Equipment_x0020_Items ? editItemData.Equipment_x0020_Items.results : [],
-        equipmentRemarks: editItemData.Equipment_x0020_Remarks || '',
-        softwareLicenses: editItemData.Software_x0020_Licenses ? editItemData.Software_x0020_Licenses.results : [],
-        specialPermission: editItemData.Special_x0020_Permission || '',
-      }];
-      survey.data = { employeeRequests: employeeData };
-    } else {
-      // Restore draft from localStorage for new form
-      const saved = localStorage.getItem(`surveyData_${requestType}`);
-      if (saved) {
-        try { survey.data = JSON.parse(saved); } catch (_) { }
-      }
-    }
-  }, [requestType, survey, editItemData, editItemId]);
-
-  // Autosave + submit
-  useEffect(() => {
-    if (!survey) return;
-
-    const handleValueChanged = () => {
-      localStorage.setItem(`surveyData_${requestType}`, JSON.stringify(survey.data));
+    if (!sharing) return undefined;
+    const onClickOutside = (event) => {
+      if (shareRef.current && !shareRef.current.contains(event.target)) setSharing(false);
     };
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, [sharing]);
 
-    const handleComplete = async () => {
-      const employees = survey.data?.employeeRequests || [];
-      if (employees.length === 0) {
-        setToast('No employee data to submit');
-        setTimeout(() => setToast(''), 3000);
+  useEffect(() => {
+    if (!sharing) return;
+    QRCode.toDataURL(window.location.href, {
+      width: 200,
+      margin: 2,
+      color: { dark: isDarkMode ? '#FFFFFF' : '#000000', light: isDarkMode ? '#141414' : '#FFFFFF' },
+    }).then(setQrUrl).catch(() => {});
+  }, [sharing, isDarkMode]);
+
+  const say = useCallback((message) => {
+    setToast(message);
+    setTimeout(() => setToast(''), 3000);
+  }, []);
+
+  const setEmployee = (index) => (patch) => setEmployees(
+    (current) => current.map((entry, position) => (
+      position === index ? { ...entry, ...patch } : entry
+    )),
+  );
+
+  const submit = async () => {
+    const found = validateRequest(employees);
+    setErrors(found);
+    if (hasErrors(found)) return;
+
+    setState('submitting');
+    setFailure('');
+    try {
+      const { accessToken } = await getToken();
+
+      if (isEdit) {
+        await updateListItem(
+          SHAREPOINT_SITE_URL, accessToken, editId,
+          employeeToItem(employees[0], requestType),
+        );
+        setState('success');
+        say('Request updated');
         return;
       }
-      setSubmitState('submitting');
-      setFormError('');
-      try {
-        const { accessToken } = await getSharePointToken();
 
-        if (editItemId) {
-          // Update existing item
-          const emp = employees[0];
-          const itemData = {
-            Title: emp.fullName || '',
-            Calling_x0020_Name: emp.callingName || '',
-            Position: emp.position || '',
-         Entity: emp.entity || '',
-         Department: emp.department || '',
-         Employee_x0020_ID: emp.employeeId || '',
-            Equipment_x0020_Remarks: emp.equipmentRemarks || '',
-            Special_x0020_Permission: emp.specialPermission || '',
-          };
-          if (emp.joinDate) {
-            const d = new Date(emp.joinDate);
-            if (!isNaN(d.getTime())) {
-              itemData.Join_x0020__x002f__x0020_Last_x0 = d.toISOString();
-            }
-          }
-          if (emp.equipmentItems?.length) itemData.Equipment_x0020_Items = emp.equipmentItems;
-          if (emp.softwareLicenses?.length) itemData.Software_x0020_Licenses = emp.softwareLicenses;
-          itemData.Request_x0020_Type = requestType;
-          
-          await updateListItem(SHAREPOINT_SITE_URL, accessToken, editItemId, itemData);
-          setSubmitState('success');
-          setToast('Request updated successfully!');
-          setTimeout(() => setToast(''), 3000);
-        } else {
-          // Create new item
-          await submitEmployeesToSharePoint(SHAREPOINT_SITE_URL, accessToken, employees, requestType);
-          localStorage.removeItem(`surveyData_${requestType}`);
-          setSubmitState('success');
-          setToast('Form submitted successfully!');
-          setTimeout(() => setToast(''), 3000);
-        }
-      } catch (error) {
-        console.error('[FormPage] Submit error:', error);
-        setSubmitState('error');
-        setFormError(error.message || 'An unknown error occurred.');
-      }
-    };
-
-    survey.onValueChanged.add(handleValueChanged);
-    survey.onComplete.add(handleComplete);
-    return () => {
-      survey.onValueChanged.remove(handleValueChanged);
-      survey.onComplete.remove(handleComplete);
-    };
-  }, [survey, requestType, editItemId, getSharePointToken]);
-
-  // QR Code
-  useEffect(() => {
-    if (!showSharePanel) return;
-    QRCode.toDataURL(window.location.href, {
-      width: 200, margin: 2,
-      color: { dark: isDarkMode ? '#FFFFFF' : '#000000', light: isDarkMode ? '#141414' : '#FFFFFF' },
-    }).then(setQrCodeUrl).catch(console.error);
-  }, [showSharePanel, isDarkMode]);
-
-  const handleRetry = () => { setSubmitState('idle'); setFormError(''); };
-  const handleCopyLink = async () => {
-    try { await navigator.clipboard.writeText(window.location.href); setToast('Link copied to clipboard!'); }
-    catch (_) { setToast('Copy failed'); }
-    setTimeout(() => setToast(''), 3000);
+      await submitEmployeesToSharePoint(
+        SHAREPOINT_SITE_URL, accessToken, employees, requestType,
+      );
+      localStorage.removeItem(DRAFT_KEY(requestType));
+      setState('success');
+      say('Request submitted');
+    } catch (thrown) {
+      // The typing stays on screen. Losing ten employees' details to a network
+      // blink is the worst thing this form could do.
+      setState('error');
+      setFailure(thrown.message || 'An unknown error occurred.');
+    }
   };
-  const handleDownloadQR = () => {
-    if (!qrCodeUrl) return;
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      say('Link copied');
+    } catch {
+      say('Copy failed');
+    }
+  };
+
+  const downloadQr = () => {
+    if (!qrUrl) return;
     const link = document.createElement('a');
     link.download = 'it-request-form-qr.png';
-    link.href = qrCodeUrl;
+    link.href = qrUrl;
     link.click();
-    setToast('QR code downloaded!');
-    setTimeout(() => setToast(''), 3000);
+    say('QR code downloaded');
   };
 
-  const isLoading = spChoices === null && !choicesError;
+  const loading = choices === null && !choicesError;
 
   return (
     <AppShell
-      title={editItemId ? 'Request details' : 'New request'}
+      title={isEdit ? 'Request details' : 'New request'}
       subtitle={requestType ? `${requestType} request` : 'Pick a request type to begin'}
-      actions={
+      actions={(
         <>
-          {editItemId && (
+          {isEdit && (
             <Button variant="ghost" icon={ArrowLeft} onClick={() => navigate('/requests')}>
               Back to requests
             </Button>
           )}
-          {/* The request type decides which form is rendered, so it belongs with
-              the page rather than in the shell's bar. It is locked while editing
-              — an existing record's type is not this form's to change. */}
+          {/* The request type decides what the form asks, so it belongs with the
+              page rather than in the shell's bar. Locked while editing — an
+              existing record's type is not this form's to change. */}
           <select
             value={requestType}
-            onChange={(e) => setRequestType(e.target.value)}
+            onChange={(event) => setRequestType(event.target.value)}
             className="type-select"
             aria-label="Request type"
-            disabled={!spChoices || !!editItemId}
+            disabled={!choices || isEdit}
           >
-            {!spChoices ? (
-              <option value="">Loading…</option>
-            ) : (
-              (spChoices?.Request_x0020_Type ?? []).map((v) => (
-                <option key={v} value={v}>
-                  {v}
-                </option>
-              ))
-            )}
+            {!choices
+              ? <option value="">Loading…</option>
+              : (choices.Request_x0020_Type ?? []).map(
+                (value) => <option key={value} value={value}>{value}</option>,
+              )}
           </select>
-          <Button variant="ghost" icon={Share2} onClick={() => setShowSharePanel((v) => !v)}>
+          <Button variant="ghost" icon={Share2} onClick={() => setSharing((open) => !open)}>
             Share
           </Button>
         </>
-      }
+      )}
     >
-      {showSharePanel && (
-        <div className="share-panel" ref={sharePanelRef}>
-          <div className="share-panel-item" onClick={handleCopyLink}>
-            <Copy size={20} />
-            <span>Copy link</span>
-          </div>
-          <div className="share-panel-item" onClick={handleDownloadQR}>
-            <Download size={20} />
-            <span>Download QR</span>
-          </div>
-          {qrCodeUrl && <img src={qrCodeUrl} alt="QR code for this form" className="share-qr-image" />}
+      {sharing && (
+        <div className="share-panel" ref={shareRef}>
+          <button type="button" className="share-panel-item" onClick={copyLink}>
+            <Copy size={20} /> <span>Copy link</span>
+          </button>
+          <button type="button" className="share-panel-item" onClick={downloadQr}>
+            <Download size={20} /> <span>Download QR</span>
+          </button>
+          {qrUrl && <img src={qrUrl} alt="QR code for this form" className="share-qr-image" />}
         </div>
       )}
 
-      <div className="form-content">
-          {isLoading ? (
-            <div className="success-screen">
-              <p style={{ fontSize: 16, color: '#666' }}>Loading form options from SharePoint…</p>
-            </div>
+      {loading && (
+        <Card className="ff-progress">
+          <span className="spinner" /> <span>Loading form options from SharePoint…</span>
+        </Card>
+      )}
 
-          ) : choicesError ? (
-            <div className="error-screen">
-              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2">
-                <circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
-              </svg>
-              <h2>Failed to Load Form</h2>
-              <p className="error-message">{choicesError}</p>
-              <button className="ms-button" onClick={() => { setChoicesError(''); setRetryCount(c => c + 1); }}>
-                Retry
-              </button>
-            </div>
+      {choicesError && (
+        <ErrorBanner
+          message={choicesError}
+          onRetry={() => { setChoicesError(''); setRetry((n) => n + 1); }}
+        />
+      )}
 
-          ) : submitState === 'success' ? (
-            <div className="result-card success-card">
-              <div className="result-icon success-icon">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5">
-                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
-                </svg>
+      {state === 'success' && (
+        <Card className="ff-done">
+          <Check size={28} />
+          <h2>{isEdit ? 'Request updated' : 'Request submitted'}</h2>
+          <p>It has been saved to SharePoint.</p>
+          <div className="ff-done-actions">
+            <Button onClick={() => navigate('/requests')}>See all requests</Button>
+            {!isEdit && (
+              <Button
+                variant="secondary"
+                onClick={() => { setEmployees([newEmployee()]); setState('idle'); }}
+              >
+                Submit another
+              </Button>
+            )}
+          </div>
+        </Card>
+      )}
+
+      {failure && state === 'error' && (
+        <ErrorBanner message={failure} onRetry={() => { setState('idle'); setFailure(''); }} />
+      )}
+
+      {choices && state !== 'success' && (
+        <>
+          {employees.map((employee, index) => (
+            // Employees have no id of their own and are only ever removed from
+            // the end of an edit, so the index is a stable enough key.
+                <Card className="ff-panel" key={index}>
+              <div className="ff-panel-head">
+                <h2 className="ff-panel-title">
+                  {isEdit ? 'Employee request' : `Employee #${index + 1}`}
+                </h2>
+                {!isEdit && employees.length > 1 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    icon={Trash2}
+                    onClick={() => setEmployees(
+                      employees.filter((unused, position) => position !== index),
+                    )}
+                  >
+                    Remove
+                  </Button>
+                )}
               </div>
-              <h2>Form Submitted Successfully</h2>
-              <p>Your request has been saved to SharePoint.</p>
-              <button className="ms-button" onClick={() => window.location.reload()}>Submit Another Request</button>
-            </div>
 
-          ) : submitState === 'error' ? (
-            <div className="result-card error-card">
-              <div className="result-icon error-icon">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2.5">
-                  <circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
-                </svg>
+              <h3 className="ff-section">Personal information</h3>
+              <div className="ff-grid">
+                <Field
+                  label="Full Name (As per IC)"
+                  required
+                  error={errors[index]?.fullName}
+                  htmlFor={`fullName-${index}`}
+                >
+                  <TextInput
+                    id={`fullName-${index}`}
+                    value={employee.fullName}
+                    onChange={(fullName) => setEmployee(index)({ fullName })}
+                    error={errors[index]?.fullName}
+                  />
+                </Field>
+
+                <Field label="Calling Name" help="Optional." htmlFor={`callingName-${index}`}>
+                  <TextInput
+                    id={`callingName-${index}`}
+                    value={employee.callingName}
+                    onChange={(callingName) => setEmployee(index)({ callingName })}
+                  />
+                </Field>
+
+                <Field label="Position / Title" required error={errors[index]?.position} htmlFor={`position-${index}`}>
+                  <TextInput
+                    id={`position-${index}`}
+                    value={employee.position}
+                    onChange={(position) => setEmployee(index)({ position })}
+                    error={errors[index]?.position}
+                  />
+                </Field>
+
+                <Field label="Entity" required error={errors[index]?.entity} htmlFor={`entity-${index}`}>
+                  <SelectInput
+                    id={`entity-${index}`}
+                    value={employee.entity}
+                    onChange={(entity) => setEmployee(index)({ entity })}
+                    /* Both, merged. The column itself is reconciled on submit,
+                       but Entity is PICKED before that — so the new options are
+                       offered here from the first load rather than only after
+                       somebody has already submitted once. */
+                    options={mergeChoices(choices.Entity ?? [], ENTITIES)}
+                    error={errors[index]?.entity}
+                  />
+                </Field>
+
+                <Field label="Department" required error={errors[index]?.department} htmlFor={`department-${index}`}>
+                  <SelectInput
+                    id={`department-${index}`}
+                    value={employee.department}
+                    onChange={(department) => setEmployee(index)({ department })}
+                    options={choices.Department ?? []}
+                    error={errors[index]?.department}
+                  />
+                </Field>
+
+                <Field label="Employee ID" help="Optional." htmlFor={`employeeId-${index}`}>
+                  <TextInput
+                    id={`employeeId-${index}`}
+                    value={employee.employeeId}
+                    onChange={(employeeId) => setEmployee(index)({ employeeId })}
+                  />
+                </Field>
+
+                <Field
+                  label={dateLabel(requestType)}
+                  required
+                  error={errors[index]?.joinDate}
+                  htmlFor={`joinDate-${index}`}
+                >
+                  <DateInput
+                    id={`joinDate-${index}`}
+                    value={employee.joinDate}
+                    onChange={(joinDate) => setEmployee(index)({ joinDate })}
+                    error={errors[index]?.joinDate}
+                  />
+                </Field>
               </div>
-              <h2>Submission Failed</h2>
-              <p className="error-message">{formError}</p>
-              <button className="ms-button" onClick={handleRetry}>Try Again</button>
-            </div>
 
-          ) : submitState === 'submitting' ? (
-            <div className="result-card loading-card">
-              <div className="spinner"></div>
-              <p>Submitting to SharePoint…</p>
-            </div>
+              <h3 className="ff-section">Equipment needs</h3>
+              <Field label="Select equipment" wide>
+                <CheckList
+                  value={employee.equipmentItems}
+                  onChange={(equipmentItems) => setEmployee(index)({ equipmentItems })}
+                  options={choices.Equipment_x0020_Items ?? []}
+                />
+              </Field>
+              <Field label="Special equipment remarks" wide htmlFor={`equipmentRemarks-${index}`}>
+                <TextArea
+                  id={`equipmentRemarks-${index}`}
+                  value={employee.equipmentRemarks}
+                  onChange={(equipmentRemarks) => setEmployee(index)({ equipmentRemarks })}
+                  placeholder="Describe any special equipment requests…"
+                />
+              </Field>
 
-          ) : (
-            <div className={`survey-light-wrapper ${editItemId ? 'panel-edit-mode' : ''}`}>
-              <Survey model={survey} style={{ padding: '20px' }} />
-            </div>
+              <h3 className="ff-section">Software &amp; access</h3>
+              <Field label="Software licences required" wide>
+                <CheckList
+                  value={employee.softwareLicenses}
+                  onChange={(softwareLicenses) => setEmployee(index)({ softwareLicenses })}
+                  options={choices.Software_x0020_Licenses ?? []}
+                />
+              </Field>
+              <Field label="Special permission requests" wide htmlFor={`specialPermission-${index}`}>
+                <TextArea
+                  id={`specialPermission-${index}`}
+                  value={employee.specialPermission}
+                  onChange={(specialPermission) => setEmployee(index)({ specialPermission })}
+                  placeholder="Describe any special access or permissions needed…"
+                />
+              </Field>
+            </Card>
+          ))}
+
+          <div className="ff-actions">
+            {!isEdit && employees.length < MAX_EMPLOYEES && (
+              <Button
+                variant="secondary"
+                icon={Plus}
+                onClick={() => setEmployees([...employees, newEmployee()])}
+              >
+                Add employee
+              </Button>
+            )}
+            <Button icon={Check} onClick={submit} disabled={state === 'submitting'}>
+              {state === 'submitting' ? 'Submitting…' : (isEdit ? 'Update' : 'Submit')}
+            </Button>
+          </div>
+
+          {hasErrors(errors) && (
+            <p className="ff-summary" role="alert">
+              <AlertTriangle size={14} />
+              Some answers are still needed — they are marked above.
+            </p>
           )}
-      </div>
+        </>
+      )}
 
       {toast && <div className="toast">{toast}</div>}
     </AppShell>

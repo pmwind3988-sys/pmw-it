@@ -23,6 +23,7 @@ import './styles/auth.css';
 import './styles/devices.css';
 import './styles/datastudio.css';
 import './styles/assets.css';
+import './styles/forms.css';
 
 // MSAL request timeout (30 seconds)
 const MSAL_TIMEOUT_MS = 30000;

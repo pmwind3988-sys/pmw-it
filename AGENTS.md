@@ -5,7 +5,9 @@
 **Project:** PMW IT Service Portal (formerly "IT Onboarding Portal")
 
 ## OVERVIEW
-React 19 + Vite 8 SPA with Azure AD MSAL authentication and SurveyJS forms. Deployed on Vercel.
+React 19 + Vite 8 SPA with Azure AD MSAL authentication. Deployed on Vercel.
+Forms are plain React over a small in-repo kit; SurveyJS was removed on
+2026-08-23 (it took ~1.4MB of the bundle with it).
 
 The UI is the SI CMMS shell — a branded nav column, a sticky bar, a dashboard of
 stat cards over a canvas — minus everything maintenance-specific (work orders,
@@ -17,6 +19,8 @@ split poster/card layout, with an idle animation of its own.
 pmw-it/
 ├── src/
 │   ├── components/
+│   │   ├── form/             # the form kit: Field, Inputs, Choices,
+│   │   │                     # RepeatRows, Wizard
 │   │   ├── AppShell.jsx      # nav column + sticky bar + main; the one auth gate
 │   │   ├── IdleAnimation.jsx # the sign-in screen's chip/packet animation
 │   │   ├── Logo.jsx          # PMW mark (src/assets/logo-*.png)
@@ -28,6 +32,7 @@ pmw-it/
 │   │   ├── datastudio/       # ingest/ profile/ clean/ engine/ canvas/
 │   │   │                     # intent/ suggest/ store/ text/ time/ worker/
 │   │   ├── devices/          # parse/ derive/ sharepoint/ stats/ ui/
+│   │   ├── forms/            # the two forms' fields, validation and writes
 │   │   ├── assets/           # scan/ draft/ handover/ people/ store/
 │   │   │                     # sharepoint/ stats/ ui/
 │   │   └── sharepoint/       # spClient, writePool, provision (shared plumbing)
@@ -43,6 +48,7 @@ pmw-it/
 │   │   ├── auth.css          # sign-in layout + the idle animation
 │   │   ├── devices.css       # the device list section
 │   │   ├── assets.css        # the asset inventory section
+│   │   ├── forms.css         # the form kit
 │   │   └── datastudio.css    # Data Studio, incl. the chart series palette
 │   ├── context/              # ThemeContext (dark/light), SessionContext (auto
 │   │                         # re-sign-in + its dialog and entrance animation)
@@ -66,8 +72,8 @@ pmw-it/
 | `/dashboard` | Stat cards, charts, latest requests |
 | `/requests` | The records table; filters live in the query string |
 | `/list` | Legacy alias, redirects to `/requests` (keeps the query) |
-| `/it-boarding-form` | SurveyJS request form (`?edit=<id>` opens a record) |
-| `/asset-checklist` | Handover checklist (IN / OUT / individual) |
+| `/it-boarding-form` | HR/manager raises an onboarding or offboarding event; several employees per submission, `?edit=<id>` opens a record |
+| `/asset-checklist` | The EMPLOYEE's own signed record of what they received or handed back — IN / OUT / INDIVIDUAL REQUEST, following the supplied reference form |
 | `/devices` | Device list: fleet dashboard, register and scan-report import (`?view=`) |
 | `/assets` | Asset inventory: what IT owns, its figures, and the deliveries still unsaved on this device (`?category=`, `?status=`, `?condition=`, `?location=`, `?unlabelled=1`) |
 | `/assets/scan` | Purchase details, then the camera. Scans become a batch on this device — nothing reaches SharePoint here |
@@ -94,6 +100,10 @@ pmw-it/
 | Device report parsing | `src/features/devices/parse/` |
 | Device derived fields and risk | `src/features/devices/derive/` |
 | Drives that belong to IT, not to the machine | `src/features/devices/derive/itMedia.js` |
+| A form's fields, branching and validation | `src/features/forms/` |
+| The form controls themselves | `src/components/form/` |
+| What the checklist writes to SharePoint | `src/features/forms/toChecklistItem.js` |
+| Adding options to an existing choice column | `mergeChoices` in `src/features/sharepoint/provision.js` |
 | Which values on a device page read red or green | `src/features/devices/fieldTone.js` |
 | Any SharePoint list/column/view provisioning | `src/features/sharepoint/provision.js` |
 | The SharePoint fetch wrapper and binary upload | `src/features/sharepoint/spClient.js` |
@@ -329,6 +339,33 @@ EVERY column, which is right when a whole record is being saved and catastrophic
 when it is not: a handover setting `quantityOut` through it would blank the
 serial number, supplier and photo of every item it touched. Partial writes go
 through `toUpdateItem`, in both `assetSchema.js` and `handoverSchema.js`.
+
+**The two forms are different things.** `/it-boarding-form` is HR or a manager
+raising an onboarding or offboarding EVENT — a request, feeding `IT Request
+Form`, which the dashboard and `/requests` are built on. `/asset-checklist` is
+the EMPLOYEE signing for what they received or handed back, feeding
+`Asset Checklist Form`. They overlap in subject and in nothing else. Neither
+touches the asset register, which is IT's own.
+
+**A form's fields and rules are data; the page only draws them.**
+`features/forms/checklistForm.js` declares what each mode asks,
+`validate.js` says what counts as complete, and `toChecklistItem.js` builds the
+SharePoint row. All three are pure and tested, which is the point: "an OUT
+checklist needs a signature" and "an individual request needs at least one
+item" are exactly the rules that can be wrong without looking wrong.
+
+**What the checklist READS and what it STORES are deliberately different.** The
+form says IN / OUT / INDIVIDUAL REQUEST, as the reference form does; the list
+keeps `In` / `Out` / `Individual Request`, which is what every checklist ever
+signed already holds. The mapping is `FORM_MODES` and lives in one place.
+
+**Choice columns are reconciled additively, never destructively.**
+`mergeChoices` in `features/sharepoint/provision.js` adds declared options that
+a column is missing and removes nothing. A SharePoint row holding a value no
+longer in its column's list becomes unreadable in that list, so dropping
+`pmw-ss` to tidy up would damage every record that used it. `provisionSchema`
+does this for the sections it owns; `reconcileChoices` in
+`sharePointService.js` does it for `IT Request Form`.
 
 **SharePoint column creation**, verified against the tenant on 2026-08-21 while
 provisioning the device lists. All three of these fail silently or confusingly
@@ -619,6 +656,29 @@ No icon package is installed — add a glyph there rather than a dependency.
   people has no single due date of its own, so the answer only exists per
   handover — the view lives on `IT Asset Handovers`.
 
+- Don't parse a date-only input with `new Date('2026-09-01')`. That is UTC
+  midnight, which in Malaysia is the previous day at 8am — so a date somebody
+  picked stores as the day before. `parseDay` / `parseFormDate` build it at
+  LOCAL noon instead.
+- Don't remove an option from a SharePoint choice column, however stale it
+  looks. Rows already holding that value become unreadable in their own list.
+  `mergeChoices` only ever adds.
+- Don't fetch a column's `Choices` per column. `existingFields` selects
+  `InternalName,Title,Choices` in the ONE request it already makes; asking
+  separately cost a round trip per choice column on every provisioning run,
+  which `provisionLists.test.js` catches by asserting that an already-correct
+  column costs nothing.
+- Don't send an empty multi-choice list to SharePoint — it is rejected.
+  `employeeToItem` omits the column instead.
+- Don't reuse `toListItem` for a partial update; see the asset-register entry
+  above. The same split exists in `features/forms/`.
+- Don't clear a form's values when a submit fails. Retyping ten employees'
+  details because the network blinked is the worst thing a form can do; both
+  pages leave the answers on screen and offer Retry.
+- Don't validate a whole multi-step form on step one. `validateChecklist` takes
+  a `step`, because marking step two's fields red before somebody has reached
+  them is hostile and tells them nothing they can act on yet.
+
 ## COMMANDS
 ```bash
 npm run dev      # Start dev server on port 5173
@@ -630,7 +690,8 @@ npm run preview  # Preview production build
 ## NOTES
 - Vite port 5173 is for local dev; Vercel ignores this
 - MSAL handles Azure AD login flow + token caching
-- SurveyJS drives `/it-boarding-form` and `/asset-checklist`
-- `npm run lint` still reports pre-existing errors in FormPage,
-  AssetChecklistPage, SignatureDialog and ThemeContext (unused imports, SurveyJS
-  model mutation inside hooks). They predate the shell work and are untouched.
+- Forms are plain React over `src/components/form/`
+- `npm run lint` reports ONE remaining error, in `ThemeContext.jsx`
+  (a non-component export breaking Fast Refresh). The FormPage,
+  AssetChecklistPage and SignatureDialog errors are gone — they were SurveyJS
+  model mutation inside hooks and unused imports, cleared by the rewrite.

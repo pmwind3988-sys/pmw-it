@@ -15,7 +15,7 @@
 /** Fields the parser or SharePoint stores as several entries. */
 export const MULTI_VALUE_KEYS = new Set([
   'gpuList', 'riskReasons', 'microsoftOffice', 'adobeProducts', 'manualFields',
-  'antivirusProducts', 'storageDrivesRaw', 'ramSlotInfoRaw', 'monitorsRaw',
+  'antivirusProducts', 'storageDrivesRaw', 'ignoredDrives', 'ramSlotInfoRaw', 'monitorsRaw',
   'serverFolders', 'serverCredentials', 'emailDataFiles', 'extraFields',
 ]);
 

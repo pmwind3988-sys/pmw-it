@@ -80,6 +80,8 @@ pmw-it/
 | SharePoint reads | `src/hooks/useRequests.js` |
 | Device report parsing | `src/features/devices/parse/` |
 | Device derived fields and risk | `src/features/devices/derive/` |
+| Drives that belong to IT, not to the machine | `src/features/devices/derive/itMedia.js` |
+| Which values on a device page read red or green | `src/features/devices/fieldTone.js` |
 | Device SharePoint schema | `src/features/devices/sharepoint/deviceSchema.js` |
 | Device SharePoint list views | `src/features/devices/sharepoint/deviceViews.js` |
 | Editing or removing one device row | `src/features/devices/sharepoint/updateDevice.js` |
@@ -173,6 +175,36 @@ Everything the plan decided is disclosed by `intent/AutoBrief.jsx` at the top of
 the canvas, and every part of it is reversible from there in one click. That
 card is not decoration: it is the reason an autopilot that reads header names
 with a lexicon is safe to ship at all.
+
+**The scan is run off a USB disk, and that disk is in the reports.**
+`derive/itMedia.js` lists it by exact model (`WDC WD10 JPVX-60JC3T1`) and
+`deriveStorage` keeps it out of the total, the drive count, the disk type and
+therefore the risk score -- counted, it adds 932 GB the machine does not have,
+turns an all-SSD laptop into "Mixed", and charges 10 points for a spinning disk
+that is not in it. The drive is still reported, under `ignoredDrives`, so the
+device page can say why the numbers are lower than the report. Match on the
+exact model, never on "WDC" or on the size: a real 1 TB disk inside a desktop
+has to keep counting. Rows already in SharePoint keep their old figures until
+the reports are imported again.
+
+**Every processor lands on one scale: the Intel generation it is contemporary
+with** (`cpuGenerationRank`). A Ryzen badge does not carry its age -- a Ryzen 5
+7530U and a Ryzen 5 7640U are both "7000" and are three years of architecture
+apart -- so `deriveCpu` reads the architecture out of the model number and
+places the Zen it finds against Intel: Zen 3 with 11th gen, Zen 4 with 13th,
+Core Ultra 1 and 2 continuing the count at 14 and 15. Two rules do the work, and
+both matter: on 2022-and-later MOBILE parts the THIRD digit is the architecture
+(7*3*30U is Zen 3, 7*8*40U is Zen 4), and mobile parts before that run one
+series behind their desktop namesakes (a 3500U is Zen+ where a desktop 3600 is
+Zen 2). The digit rule is mobile-only -- applied to a desktop 7950X it would
+read the 5 and call a Zen 4 chip Zen 5.
+
+**A device page colours its values, and can be told not to.** `fieldTone.js`
+holds the judgement -- red for what needs attention, green for what does not --
+and only for fields with a settled right answer. A RAM discrepancy, a static IP
+and a free memory slot stay the colour of the rest of the page on purpose:
+colour that appears everywhere says nothing. The toggle sits in the page header
+and is remembered per browser under `deviceValueTones`.
 
 **Device report parsing keys off a known-label whitelist** (`parse/labels.js`). A
 generic `^Word:` split reads `Total Slots: 2 | Used Slots: 2` and

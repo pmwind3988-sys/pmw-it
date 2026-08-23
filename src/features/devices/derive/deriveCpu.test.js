@@ -21,9 +21,9 @@ describe('deriveCpu — generation', () => {
     expect(deriveCpu(['Intel(R) Core(TM) Ultra 5 125U'], 'DDR5').cpuGeneration).toBe('Ultra 1');
   });
 
-  it('reads an AMD Ryzen series', () => {
+  it('reads an AMD Ryzen series and the architecture hidden inside it', () => {
     expect(deriveCpu(['AMD Ryzen 5 7430U with Radeon Graphics   '], 'DDR4').cpuGeneration)
-      .toBe('Ryzen 7000');
+      .toBe('Ryzen 7000 (Zen 3)');
   });
 
   it('has no generation for a Pentium', () => {
@@ -68,10 +68,13 @@ describe('deriveCpu — age band', () => {
       .toBe('Obsolete');
   });
 
-  it('ranks AMD by series rather than inventing an Intel-comparable generation', () => {
+  it('bands AMD on the same scale as Intel, by architecture rather than badge', () => {
+    // A Zen 3 part is 11th-generation-era whatever its badge says, and a Zen
+    // part is 7th — the same rung as the i5-8250U two tests up.
     expect(deriveCpu(['AMD Ryzen 5 7430U'], 'DDR4').cpuAgeBand).toBe('Current');
     expect(deriveCpu(['AMD Ryzen 5 3500U'], 'DDR4').cpuAgeBand).toBe('Aging');
-    expect(deriveCpu(['AMD Ryzen 3 2200U'], 'DDR4').cpuAgeBand).toBe('Obsolete');
+    expect(deriveCpu(['AMD Ryzen 3 2200U'], 'DDR4').cpuAgeBand).toBe('Aging');
+    expect(deriveCpu(['AMD Ryzen 5 2500U'], 'DDR3').cpuAgeBand).toBe('Obsolete');
   });
 
   it('calls DDR3 Obsolete even when no generation could be read', () => {
@@ -80,5 +83,58 @@ describe('deriveCpu — age band', () => {
 
   it('returns Unknown when there is nothing to go on', () => {
     expect(deriveCpu([], null).cpuAgeBand).toBe('Unknown');
+  });
+});
+
+describe('deriveCpu — one scale for both vendors', () => {
+  const rank = (model, ram = 'DDR4') => deriveCpu([model], ram).cpuGenerationRank;
+
+  it('places an Intel part on its own generation', () => {
+    expect(rank('13th Gen Intel(R) Core(TM) i7-1355U')).toBe(13);
+    expect(rank('Intel(R) Core(TM) i5-8250U')).toBe(8);
+  });
+
+  it('continues the count through Core Ultra', () => {
+    expect(rank('Intel(R) Core(TM) Ultra 5 125U', 'DDR5')).toBe(14);
+    expect(rank('Intel(R) Core(TM) Ultra 7 265U', 'DDR5')).toBe(15);
+  });
+
+  it('reads the architecture digit in a 2022-or-later mobile Ryzen', () => {
+    // Same 7000 badge, three years of architecture between them.
+    expect(rank('AMD Ryzen 5 7530U with Radeon Graphics')).toBe(11);
+    expect(rank('AMD Ryzen 7 7840U with Radeon 780M Graphics')).toBe(13);
+    expect(rank('AMD Ryzen 3 7320U with Radeon Graphics')).toBe(10);
+  });
+
+  it('does not read a desktop model number as if it carried that digit', () => {
+    // 7950X is Zen 4. Its third digit is a 5 and means nothing.
+    expect(rank('AMD Ryzen 9 7950X 16-Core Processor')).toBe(13);
+    expect(rank('AMD Ryzen 7 5800X 8-Core Processor')).toBe(11);
+  });
+
+  it('knows a mobile Ryzen runs a series behind its desktop namesake', () => {
+    expect(rank('AMD Ryzen 5 3600 6-Core Processor')).toBe(10);
+    expect(rank('AMD Ryzen 5 3500U with Radeon Vega Mobile Gfx')).toBe(8);
+    expect(rank('AMD Ryzen 5 5600G with Radeon Graphics')).toBe(11);
+  });
+
+  it('reads a business Ryzen PRO part', () => {
+    expect(rank('AMD Ryzen 5 PRO 5650U with Radeon Graphics')).toBe(11);
+  });
+
+  it('puts Ryzen AI on the newest rung', () => {
+    expect(rank('AMD Ryzen AI 9 HX 370 w/ Radeon 890M', 'DDR5')).toBe(15);
+    expect(deriveCpu(['AMD Ryzen AI 9 HX 370'], 'DDR5').cpuArchitecture).toBe('Zen 5');
+  });
+
+  it('makes the two vendors directly comparable', () => {
+    const ryzen = deriveCpu(['AMD Ryzen 7 5825U with Radeon Graphics'], 'DDR4');
+    const intel = deriveCpu(['11th Gen Intel(R) Core(TM) i5-1135G7'], 'DDR4');
+    expect(ryzen.cpuGenerationRank).toBe(intel.cpuGenerationRank);
+    expect(ryzen.cpuArchitecture).toBe('Zen 3');
+  });
+
+  it('has no rank for a processor it cannot place', () => {
+    expect(rank('Intel(R) Pentium(R) Dual  CPU  E2160  @ 1.80GHz', null)).toBe(null);
   });
 });

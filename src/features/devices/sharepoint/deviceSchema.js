@@ -37,6 +37,8 @@ export const DEVICE_COLUMNS = [
   text('CpuModel', 'CPU'),
   choice('CpuVendor', 'CPU Vendor', ['Intel', 'AMD', 'Other']),
   text('CpuGeneration', 'CPU Generation'),
+  text('CpuArchitecture', 'CPU Architecture'),
+  num('CpuGenerationRank', 'CPU Generation (Intel-equivalent)'),
   choice('CpuAgeBand', 'CPU Age', ['Current', 'Aging', 'Obsolete', 'Unknown']),
 
   num('InstalledRamGB', 'Installed RAM (GB)'),
@@ -54,6 +56,7 @@ export const DEVICE_COLUMNS = [
   choice('StorageType', 'Storage Type', ['SSD only', 'Mixed', 'HDD only', 'Unknown']),
   bool('HasHdd', 'Has HDD'),
   note('StorageDrivesRaw', 'Storage Drives'),
+  note('IgnoredDrives', 'Drives Not Counted'),
 
   choice('AntivirusStatus', 'Antivirus Status',
     ['Active', 'Installed — Inactive', 'Trial', 'Not Installed', 'Unknown']),

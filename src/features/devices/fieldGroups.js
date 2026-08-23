@@ -28,7 +28,8 @@ const GROUPS = [
     hint: 'The machine itself',
     keys: [
       'computerModel', 'motherboardVendor', 'motherboardModel',
-      'cpuModel', 'cpuVendor', 'cpuGeneration', 'cpuAgeBand',
+      'cpuModel', 'cpuVendor', 'cpuGeneration', 'cpuArchitecture',
+      'cpuGenerationRank', 'cpuAgeBand',
     ],
   },
   {
@@ -42,7 +43,10 @@ const GROUPS = [
   {
     id: 'storage',
     title: 'Storage',
-    keys: ['storageTotalGB', 'driveCount', 'storageType', 'hasHdd', 'storageDrivesRaw'],
+    keys: [
+      'storageTotalGB', 'driveCount', 'storageType', 'hasHdd',
+      'storageDrivesRaw', 'ignoredDrives',
+    ],
   },
   {
     id: 'os',

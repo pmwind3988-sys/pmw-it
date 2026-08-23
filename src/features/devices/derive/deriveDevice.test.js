@@ -68,7 +68,11 @@ describe('deriveDevice — the awkward machines', () => {
     expect(device.department).toBe('STOCKYARDF1');
     expect(device.deviceType).toBe('Desktop');
     expect(device.installedRamGB).toBe(2);
-    expect(device.storageType).toBe('Mixed');
+    // The 932 GB disk in its report is IT's own; what is in the machine is
+    // one 224 GB SSD.
+    expect(device.storageType).toBe('SSD only');
+    expect(device.storageTotalGB).toBe(224);
+    expect(device.ignoredDrives).toEqual(['WDC WD10 JPVX-60JC3T1 | 932 GB']);
     expect(device.riskLevel).toBe('Critical');
   });
 
@@ -84,7 +88,10 @@ describe('deriveDevice — the awkward machines', () => {
     const device = deriveDevice(load('[ENGINEERING] AMIR-HP_.txt'));
     expect(device.antivirusProducts).toHaveLength(3);
     expect(device.avProtected).toBe(true);
-    expect(device.hasHdd).toBe(true);
+    // Scanned with IT's disk plugged in, so it no longer reads as a machine
+    // with a spinning disk in it.
+    expect(device.hasHdd).toBe(false);
+    expect(device.riskReasons).not.toContain('Mechanical hard disk');
     expect(device.riskLevel).toBe('High');
   });
 

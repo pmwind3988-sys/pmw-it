@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import AppShell from '../components/AppShell';
 import { Card, EmptyState, ErrorBanner } from '../components/ui/Surfaces';
@@ -8,7 +8,20 @@ import { useDevices } from '../features/devices/useDevices';
 import { groupsFor, RAW_REPORT_KEY } from '../features/devices/fieldGroups';
 import { formatScalar } from '../features/devices/formatValue';
 import ValueCell from '../features/devices/ui/ValueCell';
+import { toneForField, toneForEntry, hasEntryTones } from '../features/devices/fieldTone';
 import { formatMYT } from '../features/datastudio/time/malaysiaTime';
+
+/** Remembered per browser: somebody who turns the colouring off is not asked
+ *  to turn it off again on the next machine they open. */
+const TONE_KEY = 'deviceValueTones';
+
+const readTonePreference = () => {
+  try {
+    return localStorage.getItem(TONE_KEY) !== 'off';
+  } catch {
+    return true;
+  }
+};
 
 /** One machine, everything the scan read out of it, grouped by what it is. */
 export default function DeviceDetailPage() {
@@ -17,6 +30,15 @@ export default function DeviceDetailPage() {
   const { devices, loading, error, reload } = useDevices();
   const [showEmpty, setShowEmpty] = useState(false);
   const [showRaw, setShowRaw] = useState(false);
+  const [showTones, setShowTones] = useState(readTonePreference);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(TONE_KEY, showTones ? 'on' : 'off');
+    } catch {
+      // A browser with storage blocked still gets the colours, just not the memory.
+    }
+  }, [showTones]);
 
   const device = useMemo(
     () => devices.find((row) => String(row.id) === String(id)),
@@ -84,6 +106,14 @@ export default function DeviceDetailPage() {
               />
               Show the fields the scan left blank
             </label>
+            <label className="dd-toggle dd-toggle-tones">
+              <input
+                type="checkbox"
+                checked={showTones}
+                onChange={(event) => setShowTones(event.target.checked)}
+              />
+              Colour the risks red and the healthy values green
+            </label>
           </div>
 
           <div className="dd-groups">
@@ -109,6 +139,10 @@ export default function DeviceDetailPage() {
                           value={device[field.key]}
                           fieldKey={field.key}
                           kind={field.kind}
+                          tone={showTones ? toneForField(device, field.key) : null}
+                          entryTone={showTones && hasEntryTones(field.key)
+                            ? (text) => toneForEntry(field.key, text)
+                            : undefined}
                         />
                       </dd>
                     </div>

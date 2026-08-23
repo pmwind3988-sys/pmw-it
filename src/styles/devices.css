@@ -700,6 +700,41 @@
   cursor: pointer;
 }
 
+/* Two toggles in the same row: only the first is pushed to the right. */
+.dd-toggle + .dd-toggle {
+  margin-left: 0;
+}
+
+/* Red for what needs attention, green for what does not. Weight carries the
+   same signal as the colour, so the page still reads on a mono screen and to
+   anyone who cannot separate the two hues. */
+.vc-tone {
+  font-weight: 600;
+}
+
+.vc-tone-risk {
+  color: var(--it-danger);
+}
+
+.vc-tone-ok {
+  color: var(--it-good);
+}
+
+/* On a chip the colour goes on the border too -- a pill of body text with one
+   tinted word in it reads as a typo rather than as a verdict. */
+.mv-item.vc-tone-risk {
+  border-color: var(--it-danger);
+}
+
+.mv-item.vc-tone-ok {
+  border-color: var(--it-good);
+}
+
+.mv-item.vc-tone .mv-detail {
+  color: inherit;
+  opacity: 0.85;
+}
+
 /* Wide enough that a two-column group still fits a long value, and narrow
    enough that three sit side by side on a desktop. */
 .dd-groups {

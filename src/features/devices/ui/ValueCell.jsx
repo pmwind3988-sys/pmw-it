@@ -10,9 +10,18 @@ import { splitEntries, isMultiValue } from '../multiValue';
  * together, with everything after the first shown as its detail. Anything that
  * is not a multi-value field falls through to the plain rendering, so a caller
  * can hand every field to this component.
+ *
+ * `tone` colours the whole value and `entryTone` colours one chip at a time --
+ * red for what needs attention, green for what does not. Both are optional and
+ * both are off unless the caller asks, so the register stays plain.
  */
-export default function ValueCell({ value, fieldKey, kind, limit = 0 }) {
-  if (!isMultiValue(fieldKey)) return formatScalar(value, kind);
+export default function ValueCell({ value, fieldKey, kind, limit = 0, tone = null, entryTone }) {
+  const toneClass = (name) => (name ? ` vc-tone vc-tone-${name}` : '');
+
+  if (!isMultiValue(fieldKey)) {
+    const text = formatScalar(value, kind);
+    return tone ? <span className={toneClass(tone).trim()}>{text}</span> : text;
+  }
 
   const entries = splitEntries(value, fieldKey);
   if (entries.length === 0) return '—';
@@ -25,7 +34,11 @@ export default function ValueCell({ value, fieldKey, kind, limit = 0 }) {
       {shown.map((entry, index) => (
         // Entries can repeat (two identical sticks of RAM), so the position is
         // the only stable key here.
-        <span className="mv-item" key={`${entry.text}-${index}`} title={entry.text}>
+        <span
+          className={`mv-item${toneClass(entryTone ? entryTone(entry.text) : tone)}`}
+          key={`${entry.text}-${index}`}
+          title={entry.text}
+        >
           <span className="mv-main">{entry.parts[0] ?? entry.text}</span>
           {entry.parts.length > 1 && (
             <span className="mv-detail">{entry.parts.slice(1).join(' · ')}</span>

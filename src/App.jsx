@@ -12,6 +12,9 @@ import AssetsPage from './pages/AssetsPage';
 import AssetScanPage from './pages/AssetScanPage';
 import AssetBatchPage from './pages/AssetBatchPage';
 import AssetDetailPage from './pages/AssetDetailPage';
+import AssetHandoverPage from './pages/AssetHandoverPage';
+import AssetPeoplePage from './pages/AssetPeoplePage';
+import AssetPersonPage from './pages/AssetPersonPage';
 
 // Lazy on purpose, not for tidiness: this page's chunk carries SheetJS and
 // ECharts, which together are larger than the rest of the app. Loading it
@@ -44,6 +47,12 @@ function App() {
         <Route path="/assets" element={<AssetsPage />} />
         <Route path="/assets/scan" element={<AssetScanPage />} />
         <Route path="/assets/batch/:id" element={<AssetBatchPage />} />
+        <Route path="/assets/handover" element={<AssetHandoverPage />} />
+        <Route path="/assets/people" element={<AssetPeoplePage />} />
+        {/* The email is URL-encoded into the path; it is the identity every
+            per-person question keys on, and a name would break the moment
+            somebody's changed. */}
+        <Route path="/assets/people/:email" element={<AssetPersonPage />} />
         <Route path="/assets/:id" element={<AssetDetailPage />} />
         <Route
           path="/data-studio"

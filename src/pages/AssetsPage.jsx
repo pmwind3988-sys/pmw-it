@@ -5,10 +5,12 @@ import Button from '../components/ui/Button';
 import StatCard from '../components/ui/StatCard';
 import { Card, ErrorBanner, EmptyState } from '../components/ui/Surfaces';
 import {
-  ScanLine, Plus, Package, Boxes, Tag, AlertTriangle, Truck, RefreshCw,
+  ScanLine, Plus, Package, Tag, AlertTriangle, Truck, RefreshCw, Users, Clock,
 } from '../components/ui/Icons';
 import { useAssets } from '../features/assets/useAssets';
 import { useBatches } from '../features/assets/useBatches';
+import { useHandovers } from '../features/assets/useHandovers';
+import { isOverdue } from '../features/assets/handover/availability';
 import { assetStats } from '../features/assets/stats/assetStats';
 import {
   filterAssets, sortAssets, optionsFor,
@@ -29,6 +31,7 @@ export default function AssetsPage() {
   const navigate = useNavigate();
   const { assets, loading, error, reload } = useAssets();
   const { batches, pendingItems, discard } = useBatches();
+  const { handovers } = useHandovers();
   const [params, setParams] = useSearchParams();
   const [query, setQuery] = useState(params.get('q') ?? '');
 
@@ -49,6 +52,10 @@ export default function AssetsPage() {
   };
 
   const stats = useMemo(() => assetStats(assets), [assets]);
+  const overdue = useMemo(
+    () => handovers.filter((row) => isOverdue(row)).length,
+    [handovers],
+  );
   const shown = useMemo(
     () => sortAssets(filterAssets(assets, filters)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -69,7 +76,10 @@ export default function AssetsPage() {
       search={{ value: query, onChange: setQuery, placeholder: 'Serial, model, label…' }}
       actions={(
         <>
-          <Button variant="secondary" icon={Plus} onClick={addByHand}>Add by hand</Button>
+          <Button variant="ghost" icon={Plus} onClick={addByHand}>Add by hand</Button>
+          <Button variant="secondary" icon={Users} onClick={() => navigate('/assets/handover')}>
+            Hand over
+          </Button>
           <Button icon={ScanLine} onClick={() => navigate('/assets/scan')}>Scan a delivery</Button>
         </>
       )}
@@ -100,11 +110,18 @@ export default function AssetsPage() {
       <div className="stat-grid">
         <StatCard icon={Package} label="Items owned" value={stats.units} loading={loading} />
         <StatCard
-          icon={Boxes}
-          label="Tracked units"
-          value={stats.trackedUnits}
+          icon={Users}
+          label="Out with people"
+          value={stats.out}
           loading={loading}
-          onClick={() => setFilter('trackingMode', 'Tracked')}
+          onClick={() => navigate('/assets/people')}
+        />
+        <StatCard
+          icon={Clock}
+          label="Overdue"
+          value={overdue}
+          loading={loading}
+          onClick={() => navigate('/assets/people')}
         />
         <StatCard
           icon={Tag}

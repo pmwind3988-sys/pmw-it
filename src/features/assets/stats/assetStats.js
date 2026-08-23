@@ -1,4 +1,5 @@
 import { TRACKED } from '../assetKinds.js';
+import { available, out as unitsOut } from '../handover/availability.js';
 
 /**
  * The figures at the top of the register.
@@ -19,6 +20,8 @@ export function assetStats(assets = []) {
   let trackedUnits = 0;
   let unlabelled = 0;
   let faulty = 0;
+  let out = 0;
+  let free = 0;
 
   for (const asset of assets) {
     const count = unitsOf(asset);
@@ -35,6 +38,11 @@ export function assetStats(assets = []) {
     }
 
     if (asset.condition === 'Faulty') faulty += count;
+
+    // Units, not rows: a box with three of twenty out contributes three, and
+    // seventeen to what is still on the shelf.
+    out += unitsOut(asset);
+    free += available(asset);
   }
 
   return {
@@ -44,6 +52,8 @@ export function assetStats(assets = []) {
     bulkUnits: units - trackedUnits,
     unlabelled,
     faulty,
+    out,
+    available: free,
     inStock: byStatus.get('In stock') ?? 0,
     byCategory: ranked(byCategory),
     byStatus: ranked(byStatus),

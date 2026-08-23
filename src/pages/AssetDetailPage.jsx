@@ -1,17 +1,21 @@
 import { useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMsal } from '@azure/msal-react';
 import AppShell from '../components/AppShell';
 import Button from '../components/ui/Button';
 import { Card, ErrorBanner, EmptyState } from '../components/ui/Surfaces';
 import {
-  ArrowLeft, Save, Trash2, Tag, Barcode, Check,
+  ArrowLeft, Save, Trash2, Tag, Barcode, Check, Users, Clock,
 } from '../components/ui/Icons';
 import { useAssets, SHAREPOINT_SITE_URL } from '../features/assets/useAssets';
 import { useSharePointToken } from '../hooks/useRequests';
 import { updateAsset, deleteAsset, EDITABLE_FIELDS } from '../features/assets/sharepoint/updateAsset';
 import { CATEGORIES, CONDITIONS, STATUSES, TRACKED, BULK } from '../features/assets/assetKinds';
 import { formatMYT } from '../features/datastudio/time/malaysiaTime';
+import { useHandovers } from '../features/assets/useHandovers';
+import {
+  holdersOf, outstanding, isOpen, isOverdue, available, owned,
+} from '../features/assets/handover/availability';
 
 /**
  * One item, in full, and editable.
@@ -46,10 +50,26 @@ export default function AssetDetailPage() {
   const { instance } = useMsal();
   const getToken = useSharePointToken();
   const { assets, loading, reload } = useAssets();
+  const { handovers } = useHandovers();
 
   const asset = useMemo(
     () => assets.find((row) => String(row.id) === String(id)),
     [assets, id],
+  );
+
+  // Split rather than one list: who has it NOW is the answer somebody opened
+  // this page for, and its history is the answer they might scroll to.
+  const holders = useMemo(
+    () => (asset ? holdersOf(handovers, asset.assetKey) : []),
+    [handovers, asset],
+  );
+  const history = useMemo(
+    () => (asset
+      ? handovers
+        .filter((row) => row.assetKey === asset.assetKey && !isOpen(row))
+        .sort((a, b) => (b.issuedOn ?? 0) - (a.issuedOn ?? 0))
+      : []),
+    [handovers, asset],
   );
 
   const [edits, setEdits] = useState({});
@@ -205,6 +225,62 @@ export default function AssetDetailPage() {
             <Card className="as-panel">
               <h2 className="as-h2">Photo</h2>
               <img src={asset.photoUrl} alt={asset.title} className="as-detail-photo" />
+            </Card>
+          )}
+
+          <Card className="as-panel">
+            <h2 className="as-h2">Who has it</h2>
+            {holders.length === 0 ? (
+              <p className="as-sub">
+                Nothing is out — {available(asset)} of {owned(asset)} on the shelf.
+              </p>
+            ) : (
+              <ul className="as-holders">
+                {holders.map((row) => (
+                  <li key={row.id} className={isOverdue(row) ? 'as-row-overdue' : undefined}>
+                    <Link
+                      to={`/assets/people/${encodeURIComponent(row.personEmail)}`}
+                      className="as-link"
+                    >
+                      <Users size={13} /> {row.personName || row.personEmail}
+                    </Link>
+                    <span className="as-sub">
+                      {outstanding(row)} · {row.kind}
+                      {row.dueOnMYT ? ` · due ${row.dueOnMYT}` : ''}
+                    </span>
+                    {isOverdue(row) && (
+                      <span className="as-overdue"><Clock size={12} /> overdue</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={Users}
+              onClick={() => navigate('/assets/handover')}
+              disabled={available(asset) < 1}
+            >
+              Hand this out
+            </Button>
+          </Card>
+
+          {history.length > 0 && (
+            <Card className="as-panel">
+              <h2 className="as-h2">Handover history</h2>
+              <ul className="as-holders">
+                {history.map((row) => (
+                  <li key={row.id}>
+                    <span>{row.personName || row.personEmail}</span>
+                    <span className="as-sub">
+                      {row.quantity} · {row.issuedOnMYT || ''}
+                      {row.returnedOnMYT ? ` — back ${row.returnedOnMYT}` : ''}
+                      {row.returnCondition ? ` (${row.returnCondition})` : ''}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </Card>
           )}
 

@@ -589,3 +589,251 @@
 .as-facts dd { margin: 0; color: var(--text-primary); }
 
 .as-key { word-break: break-all; }
+
+/* --- handovers ------------------------------------------------------ */
+
+.as-searchbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.as-searchbox input {
+  border: none;
+  background: none;
+  padding: 9px 0;
+  flex: 1;
+  min-width: 0;
+  color: var(--text-primary);
+  /* 16px for the same reason as every other input here: iOS zooms the page in
+     on focus for anything smaller. */
+  font-size: 16px;
+  font-family: inherit;
+}
+
+.as-searchbox input:focus { outline: none; }
+.as-searchbox:focus-within { outline: 2px solid var(--text-primary); outline-offset: -1px; }
+
+.as-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.as-avatar-lg { width: 46px; height: 46px; font-size: 15px; }
+
+.as-people {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 0;
+  display: grid;
+  gap: 6px;
+}
+
+.as-people-grid { grid-template-columns: 1fr; }
+
+@media (min-width: 640px) {
+  .as-people-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (min-width: 1100px) {
+  .as-people-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+.as-person {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-primary);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+}
+
+.as-person:hover { border-color: var(--text-primary); }
+.as-person-picked { cursor: default; }
+.as-person-picked:hover { border-color: var(--border); }
+
+.as-person-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.as-person-text strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.as-manual { margin-top: 12px; font-size: 13px; }
+
+.as-manual summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+}
+
+.as-addrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.as-matches {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px;
+  display: grid;
+  gap: 5px;
+}
+
+.as-match {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+}
+
+.as-match:hover { border-color: var(--text-primary); }
+
+.as-basket {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+  display: grid;
+  gap: 8px;
+}
+
+.as-basketline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  font-size: 13px;
+}
+
+.as-basketline.bad { border-color: var(--error, #EF4444); }
+
+.as-qtybox { display: flex; align-items: center; gap: 6px; }
+
+.as-qtybox input {
+  width: 68px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 16px;
+  font-family: inherit;
+}
+
+.as-linekind,
+.as-conditionpick {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+}
+
+/* Shorter than the delivery scanner's: this camera sits inside a form with a
+   basket under it, and a full-height viewfinder would push the basket off the
+   screen on a phone — which is where the confirmation of a scan appears. */
+.as-viewfinder-short {
+  aspect-ratio: 4 / 3;
+  max-height: 38vh;
+  margin: 10px 0;
+}
+
+.as-personhead {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.as-facts-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 13.5px;
+  color: var(--text-secondary);
+}
+
+.as-overdue {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--error, #EF4444);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* Left border rather than a background wash: the row still has to be readable,
+   and a tinted row in dark mode either vanishes or shouts. */
+.as-row-overdue td:first-child { box-shadow: inset 3px 0 0 var(--error, #EF4444); }
+
+.as-holders {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px;
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.as-holders li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.as-holders li:last-child { border-bottom: none; padding-bottom: 0; }
+.as-holders .as-link { display: inline-flex; align-items: center; gap: 6px; }

@@ -28,14 +28,16 @@ pmw-it/
 │   │   ├── datastudio/       # ingest/ profile/ clean/ engine/ canvas/
 │   │   │                     # intent/ suggest/ store/ text/ time/ worker/
 │   │   ├── devices/          # parse/ derive/ sharepoint/ stats/ ui/
-│   │   ├── assets/           # scan/ draft/ store/ sharepoint/ stats/ ui/
+│   │   ├── assets/           # scan/ draft/ handover/ people/ store/
+│   │   │                     # sharepoint/ stats/ ui/
 │   │   └── sharepoint/       # spClient, writePool, provision (shared plumbing)
 │   ├── hooks/
 │   │   ├── useRequests.js    # the one SharePoint read + row helpers + token
 │   │   └── useSession.js     # session context + phases (no component here)
 │   ├── pages/                # Homepage, LoginPage, DashboardPage, ListPage,
 │   │                         # FormPage, AssetChecklistPage, DevicesPage,
-│   │                         # AssetsPage + Scan/Batch/Detail
+│   │                         # AssetsPage + Scan/Batch/Detail/
+│   │                         # Handover/People/Person
 │   ├── styles/
 │   │   ├── shell.css         # tokens, brand surface, shell, UI, dashboard
 │   │   ├── auth.css          # sign-in layout + the idle animation
@@ -70,7 +72,10 @@ pmw-it/
 | `/assets` | Asset inventory: what IT owns, its figures, and the deliveries still unsaved on this device (`?category=`, `?status=`, `?condition=`, `?location=`, `?unlabelled=1`) |
 | `/assets/scan` | Purchase details, then the camera. Scans become a batch on this device — nothing reaches SharePoint here |
 | `/assets/batch/:id` | Review a scanned delivery and save it |
-| `/assets/:id` | One item in full, editable and removable |
+| `/assets/:id` | One item in full, editable and removable, with who holds it and its handover history |
+| `/assets/handover` | Pick a person, fill a basket by search or camera, hand it over |
+| `/assets/people` | Everyone currently holding something, overdue first |
+| `/assets/people/:email` | One person, everything they hold, and returning it |
 | `/data-studio` | Drop a spreadsheet and land on a dashboard. It reads the file name for the subject, parks the form's bookkeeping columns, charts the rest and reads the written answers. Every chart drills down to the rows behind it and to one record in full. Lazy route. |
 
 ## WHERE TO LOOK
@@ -101,6 +106,12 @@ pmw-it/
 | Tracked-vs-bulk, and the category list | `src/features/assets/assetKinds.js` |
 | A delivery held offline | `src/features/assets/draft/batch.js`, `store/assetDb.js` |
 | What a save writes, updates or refuses | `src/features/assets/sharepoint/planSave.js` |
+| Owned vs out vs available | `src/features/assets/handover/availability.js` |
+| What a handover writes or refuses | `src/features/assets/handover/planHandover.js` |
+| What a return writes | `src/features/assets/handover/planReturn.js` |
+| Finding a person in the directory | `src/features/assets/people/peopleSearch.js` |
+| Handover SharePoint schema | `src/features/assets/sharepoint/handoverSchema.js` |
+| The handover and return writes | `src/features/assets/sharepoint/writeHandover.js` |
 | Asset SharePoint schema and views | `src/features/assets/sharepoint/assetSchema.js`, `assetViews.js` |
 | Editing or removing one asset | `src/features/assets/sharepoint/updateAsset.js` |
 | Device SharePoint schema | `src/features/devices/sharepoint/deviceSchema.js` |
@@ -290,6 +301,34 @@ holds `spClient.js`, `writePool.js` and `provision.js`. `provisionSchema` takes
 provisionLists.js` and `assets/sharepoint/provisionAssets.js` are both thin
 declarations over it. Every SharePoint column rule listed below lives in that one
 file now.
+
+**`Quantity` is what the company OWNS and never moves when something is handed
+out.** `QuantityOut` counts what is with people, and available is the
+difference (`handover/availability.js`). A box of twenty with three out reads
+20 / 3 / 17, not a box of seventeen. This means a return only ever moves the
+derived figure, so a handover nobody recorded cannot silently change how much
+the company believes it bought. Every row saved before handovers existed reads
+`quantityOut` as 0, which is correct and needed no migration.
+
+**The handover list is the truth; the register row carries a readable copy.**
+`AssignedTo`, `AssignedOn`, `DueOn` and `Status` on an asset are copies of its
+open handover so a row opened in SharePoint reads without a join — and they are
+only ever written on a TRACKED row, because a box of cables can be with five
+people at once and there is no honest single value. On a bulk row those stay
+empty and `QuantityOut` carries the answer.
+
+**A person is identified by email, never by name.** `peopleSearch.js` uses
+SharePoint's own people picker (`clientPeoplePickerSearchUser`) rather than
+Graph `/users`, which would need `User.ReadBasic.All` consented by an admin
+before the feature worked at all. The picker answers with a JSON STRING inside
+its JSON, and email lives in three different places depending on how the
+account reached the directory — `normalisePerson` handles both.
+
+**`toUpdateItem` and `toListItem` are not interchangeable.** `toListItem` writes
+EVERY column, which is right when a whole record is being saved and catastrophic
+when it is not: a handover setting `quantityOut` through it would blank the
+serial number, supplier and photo of every item it touched. Partial writes go
+through `toUpdateItem`, in both `assetSchema.js` and `handoverSchema.js`.
 
 **SharePoint column creation**, verified against the tenant on 2026-08-21 while
 provisioning the device lists. All three of these fail silently or confusingly
@@ -552,6 +591,33 @@ No icon package is installed — add a glyph there rather than a dependency.
   `RootFolder/ServerRelativeUrl` once per save instead of 404ing on every upload.
 - Don't send a Blob through `spFetch` — it JSON-stringifies the body and uploads
   the string "[object Blob]". Binary goes through `spUpload`.
+
+- Don't add a nav item without importing its icon. `NAV_ITEMS` in `AppShell.jsx`
+  references the glyph by identifier, so a missing import is a ReferenceError
+  inside the shell — which blanks EVERY page, passes `npm run build` (Vite does
+  not type-check), and passes every test. Only opening the app catches it.
+- Don't check a handover line's availability without first adding up the other
+  lines of the same basket. Two lines of three each pass individually against a
+  stock of five and hand out six; `coalesceLines` sums before the check, and
+  `lineRefusal` counts sibling lines for the same reason.
+- Don't clamp a return to what is out. "Two came back" and "three came back" is
+  a real disagreement about what happened, and rounding it hides a miscount.
+  `planReturn` refuses with the figure.
+- Don't write two returns of the same box as two independent register updates.
+  They have to accumulate against one row (`outByAsset` in `planReturn`), or the
+  second write overwrites the first's arithmetic and half the return is lost.
+- Don't clear an asset's assignment fields on a partial return. A bulk row with
+  two of five still out must keep reading as partly out; only `fullyBack` clears.
+- Don't write the register copies before the handover rows. The handover list is
+  the truth, so a failed register update leaves an item's copied fields stale —
+  recoverable. The reverse loses the record. `commitHandover` writes handovers
+  first and only updates the rows whose handover actually landed.
+- Don't trust the register as the screen had it when handing over. `commitHandover`
+  re-reads it immediately before planning, which is what makes two people issuing
+  the same laptop from two phones refuse the second one rather than both succeed.
+- Don't put the overdue view on the register list. A box of cables held by three
+  people has no single due date of its own, so the answer only exists per
+  handover — the view lives on `IT Asset Handovers`.
 
 ## COMMANDS
 ```bash

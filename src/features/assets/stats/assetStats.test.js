@@ -90,3 +90,33 @@ describe('recentDeliveries', () => {
     expect(recentDeliveries(rows, 3)).toHaveLength(3);
   });
 });
+
+describe('what is out and what is left', () => {
+  /** Owned stays put when stock goes out; available is the derived figure. */
+  it('counts units out and units available separately from units owned', () => {
+    const stats = assetStats([bulk({ quantity: 20, quantityOut: 3 })]);
+
+    expect(stats.units).toBe(20);
+    expect(stats.out).toBe(3);
+    expect(stats.available).toBe(17);
+  });
+
+  it('counts a tracked item that is out as one out and none available', () => {
+    const stats = assetStats([tracked({ quantityOut: 1 })]);
+
+    expect(stats.out).toBe(1);
+    expect(stats.available).toBe(0);
+  });
+
+  /** Every row saved before handovers existed has none out. */
+  it('reads a row with no out-count as nothing out', () => {
+    const stats = assetStats([{ category: 'Cable', trackingMode: 'Bulk', quantity: 5 }]);
+
+    expect(stats.out).toBe(0);
+    expect(stats.available).toBe(5);
+  });
+
+  it('reports nothing out for an empty register', () => {
+    expect(assetStats([])).toMatchObject({ out: 0, available: 0 });
+  });
+});

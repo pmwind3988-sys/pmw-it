@@ -1,0 +1,591 @@
+/*
+ * The asset inventory section.
+ *
+ * Built for a phone held in one hand in a store room first and a desk second,
+ * which is the opposite of the rest of the portal. Everything below 720px is a
+ * single column of cards; the table and the two-column detail layout only
+ * appear once there is room for them.
+ *
+ * Tokens come from shell.css. Nothing here defines a colour of its own.
+ */
+
+/* --- shared bits ---------------------------------------------------- */
+
+.as-h2 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 4px;
+  color: var(--text-primary);
+}
+
+.as-hint {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0 0 12px;
+}
+
+.as-hint-inline { margin: 8px 0 0; }
+
+.as-sub {
+  display: block;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.as-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.as-link {
+  color: var(--text-primary);
+  font-weight: 500;
+  text-decoration: none;
+}
+.as-link:hover { text-decoration: underline; }
+
+.as-panel { padding: 16px; }
+
+.as-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.as-iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.as-iconbtn:hover { color: var(--text-primary); }
+
+/* --- fields --------------------------------------------------------- */
+
+.as-form {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 640px) {
+  .as-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.as-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.as-field-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.as-field input,
+.as-field select,
+.as-field textarea {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-primary);
+  /* 16px, not smaller: iOS Safari zooms the whole page in on focus for
+     anything under 16px, and a zoomed viewfinder is unusable. */
+  font-size: 16px;
+  font-family: inherit;
+}
+
+.as-field textarea { resize: vertical; }
+
+.as-field input:focus,
+.as-field select:focus,
+.as-field textarea:focus {
+  outline: 2px solid var(--text-primary);
+  outline-offset: -1px;
+}
+
+.as-field-bad input,
+.as-field-bad select { border-color: var(--error, #EF4444); }
+
+.as-field-issue {
+  font-size: 11.5px;
+  color: var(--error, #EF4444);
+}
+
+.as-guess {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+/* --- notices -------------------------------------------------------- */
+
+.as-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.as-notice-warn { border-left: 3px solid #F59E0B; }
+.as-notice-bad { border-left: 3px solid var(--error, #EF4444); }
+.as-notice-ok { border-left: 3px solid var(--success, #10B981); }
+
+.as-notice-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  width: 100%;
+}
+
+/* --- the register --------------------------------------------------- */
+
+.as-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.as-filters select {
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.as-table-wrap {
+  /* The table scrolls inside its own box rather than pushing the page
+     sideways — a body that scrolls horizontally on a phone feels broken. */
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.as-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  min-width: 720px;
+}
+
+.as-table th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.as-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+  color: var(--text-primary);
+}
+
+.as-table tr:last-child td { border-bottom: none; }
+
+.as-qty { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.as-when { white-space: nowrap; color: var(--text-secondary); }
+
+.as-chip,
+.as-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  padding: 2px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.as-tag { margin-left: 6px; }
+
+.as-batchlist { margin-top: 20px; font-size: 13px; }
+.as-batchlist summary { cursor: pointer; color: var(--text-secondary); }
+.as-batchlist ul { list-style: none; padding: 10px 0 0; margin: 0; }
+.as-batchlist li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+/* --- scanning ------------------------------------------------------- */
+
+.as-modes {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 720px) {
+  .as-modes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .as-modes .as-actions { grid-column: 1 / -1; }
+}
+
+.as-mode {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 20px;
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.as-mode:hover { border-color: var(--text-primary); }
+.as-mode strong { font-size: 15px; }
+.as-mode span { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+
+.as-viewfinder {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #000;
+  /* Tall on a phone, where the camera is held portrait over a box. */
+  aspect-ratio: 3 / 4;
+  max-height: 60vh;
+}
+
+@media (min-width: 720px) {
+  .as-viewfinder { aspect-ratio: 16 / 9; }
+}
+
+.as-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* A window rather than a box: the detector reads the whole frame, and a
+   reticle that implies otherwise makes people aim more carefully than they
+   need to and scan more slowly. It marks where to point, nothing more. */
+.as-reticle {
+  position: absolute;
+  inset: 22% 12%;
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  border-radius: 10px;
+  box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+}
+
+.as-flash {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 13px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #fff;
+  max-width: 88%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.as-flash-ok { background: rgba(16, 185, 129, 0.92); }
+.as-flash-dup { background: rgba(107, 107, 107, 0.92); }
+
+.as-camera-msg {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  text-align: center;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.72);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.as-scanbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0;
+}
+
+.as-pool {
+  flex: 1 1 auto;
+  min-width: 140px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.as-strip {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0;
+  margin: 8px 0 0;
+}
+
+.as-strip li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 12px;
+}
+
+.as-strip-index {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+.as-strip-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.as-strip .as-iconbtn { width: 20px; height: 20px; border: none; }
+
+/* --- photos --------------------------------------------------------- */
+
+.as-photo { flex-shrink: 0; }
+
+.as-photo-add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 104px;
+  height: 104px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  text-align: center;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 6px;
+}
+
+.as-photo-add:hover { color: var(--text-primary); border-color: var(--text-primary); }
+
+.as-photo-shot { position: relative; width: 104px; height: 104px; }
+
+.as-photo-shot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+.as-photo-clear {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.as-photo-error { font-size: 11.5px; color: var(--error, #EF4444); margin: 6px 0 0; }
+
+.as-po-photo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 16px;
+}
+
+/* --- review --------------------------------------------------------- */
+
+.as-review { display: grid; gap: 12px; }
+
+.as-draft {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 14px;
+}
+
+.as-draft-blocked { border-color: var(--error, #EF4444); }
+
+.as-draft-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.as-draft-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.as-draft-name {
+  flex: 1;
+  font-size: 14px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.as-draft-block {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--error, #EF4444);
+  margin: 0 0 10px;
+}
+
+.as-draft-body { display: flex; gap: 14px; align-items: flex-start; }
+
+.as-draft-fields {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  min-width: 0;
+}
+
+@media (min-width: 560px) {
+  .as-draft-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (min-width: 900px) {
+  .as-draft-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+.as-draft-codes {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+.as-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+
+.as-progress-count { font-size: 12px; color: var(--text-secondary); }
+
+/* --- one item ------------------------------------------------------- */
+
+.as-detail {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+@media (min-width: 960px) {
+  .as-detail { grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); }
+}
+
+.as-detail-side { display: grid; gap: 14px; }
+
+.as-detail-photo {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+.as-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 14px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.as-facts dt { color: var(--text-secondary); }
+.as-facts dd { margin: 0; color: var(--text-primary); }
+
+.as-key { word-break: break-all; }

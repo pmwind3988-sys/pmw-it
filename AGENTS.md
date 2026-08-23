@@ -1,7 +1,7 @@
 # PROJECT KNOWLEDGE BASE
 
 **Generated:** 2026-05-04
-**Updated:** 2026-08-21
+**Updated:** 2026-08-23
 **Project:** PMW IT Service Portal (formerly "IT Onboarding Portal")
 
 ## OVERVIEW
@@ -27,16 +27,20 @@ pmw-it/
 │   ├── features/
 │   │   ├── datastudio/       # ingest/ profile/ clean/ engine/ canvas/
 │   │   │                     # intent/ suggest/ store/ text/ time/ worker/
-│   │   └── devices/          # parse/ derive/ sharepoint/ stats/ ui/
+│   │   ├── devices/          # parse/ derive/ sharepoint/ stats/ ui/
+│   │   ├── assets/           # scan/ draft/ store/ sharepoint/ stats/ ui/
+│   │   └── sharepoint/       # spClient, writePool, provision (shared plumbing)
 │   ├── hooks/
 │   │   ├── useRequests.js    # the one SharePoint read + row helpers + token
 │   │   └── useSession.js     # session context + phases (no component here)
 │   ├── pages/                # Homepage, LoginPage, DashboardPage, ListPage,
-│   │                         # FormPage, AssetChecklistPage, DevicesPage
+│   │                         # FormPage, AssetChecklistPage, DevicesPage,
+│   │                         # AssetsPage + Scan/Batch/Detail
 │   ├── styles/
 │   │   ├── shell.css         # tokens, brand surface, shell, UI, dashboard
 │   │   ├── auth.css          # sign-in layout + the idle animation
 │   │   ├── devices.css       # the device list section
+│   │   ├── assets.css        # the asset inventory section
 │   │   └── datastudio.css    # Data Studio, incl. the chart series palette
 │   ├── context/              # ThemeContext (dark/light), SessionContext (auto
 │   │                         # re-sign-in + its dialog and entrance animation)
@@ -63,6 +67,10 @@ pmw-it/
 | `/it-boarding-form` | SurveyJS request form (`?edit=<id>` opens a record) |
 | `/asset-checklist` | Handover checklist (IN / OUT / individual) |
 | `/devices` | Device list: fleet dashboard, register and scan-report import (`?view=`) |
+| `/assets` | Asset inventory: what IT owns, its figures, and the deliveries still unsaved on this device (`?category=`, `?status=`, `?condition=`, `?location=`, `?unlabelled=1`) |
+| `/assets/scan` | Purchase details, then the camera. Scans become a batch on this device — nothing reaches SharePoint here |
+| `/assets/batch/:id` | Review a scanned delivery and save it |
+| `/assets/:id` | One item in full, editable and removable |
 | `/data-studio` | Drop a spreadsheet and land on a dashboard. It reads the file name for the subject, parks the form's bookkeeping columns, charts the rest and reads the written answers. Every chart drills down to the rows behind it and to one record in full. Lazy route. |
 
 ## WHERE TO LOOK
@@ -82,6 +90,19 @@ pmw-it/
 | Device derived fields and risk | `src/features/devices/derive/` |
 | Drives that belong to IT, not to the machine | `src/features/devices/derive/itMedia.js` |
 | Which values on a device page read red or green | `src/features/devices/fieldTone.js` |
+| Any SharePoint list/column/view provisioning | `src/features/sharepoint/provision.js` |
+| The SharePoint fetch wrapper and binary upload | `src/features/sharepoint/spClient.js` |
+| Concurrency and retry for SharePoint writes | `src/features/sharepoint/writePool.js` |
+| Which barcode on a box is the serial | `src/features/assets/scan/classifyCode.js` |
+| Why a code held in frame is not counted twice | `src/features/assets/scan/scanSession.js` |
+| The camera, its permissions and the decode loop | `src/features/assets/scan/useScanner.js` |
+| Native vs ponyfill barcode decoding | `src/features/assets/scan/detector.js` |
+| What makes two rows the same asset | `src/features/assets/identity.js` |
+| Tracked-vs-bulk, and the category list | `src/features/assets/assetKinds.js` |
+| A delivery held offline | `src/features/assets/draft/batch.js`, `store/assetDb.js` |
+| What a save writes, updates or refuses | `src/features/assets/sharepoint/planSave.js` |
+| Asset SharePoint schema and views | `src/features/assets/sharepoint/assetSchema.js`, `assetViews.js` |
+| Editing or removing one asset | `src/features/assets/sharepoint/updateAsset.js` |
 | Device SharePoint schema | `src/features/devices/sharepoint/deviceSchema.js` |
 | Device SharePoint list views | `src/features/devices/sharepoint/deviceViews.js` |
 | Editing or removing one device row | `src/features/devices/sharepoint/updateDevice.js` |
@@ -234,6 +255,41 @@ against every future import for good.
 the integrated GPU's reserved share, so a 16 GB laptop reports 15 GB and an 8 GB one
 reports 7 GB. Sum `RAM Slot Info` for the real figure; ranking on the reported one
 puts a 16 GB machine below an 8 GB machine.
+
+**A scanning session is an object, not a connection.** `/assets/scan` writes
+nothing to SharePoint. Codes and photos go to IndexedDB (`assets/store/assetDb.js`)
+as a BATCH, and only `/assets/batch/:id` reaches the network. That is what makes
+a store room with no signal a non-issue rather than a feature, and it is why
+there is no retry queue: a batch that has not been saved has no half-written
+state to reason about. The price is that an unsaved batch is invisible to
+everybody else, which is what the undismissable banner on `/assets` is for.
+
+**An asset is identified by `AssetKey`, never by its name.** `assets/identity.js`
+derives it: `serial:<make>|<serial>` for a tracked unit, `bulk:<category>|<make>|<model>`
+for a bulk line, falling back to the sticker label and then to a `local:` key that
+admits it will never match again. Re-scanning a laptop updates its row; a second
+bag of the same mice ADDS to the quantity. Correcting a serial number re-derives
+the key, because it changed which physical thing the row claims to be.
+
+**Two kinds of asset, decided by the category.** `assetKinds.js` maps category to
+tracked-or-bulk so the question is never answered twice or differently by two
+people. Tracked rows are pinned to a quantity of 1 wherever they are touched —
+twenty units cannot share one serial number.
+
+**Which barcode is the serial is a guess, and is labelled as one.** A printed
+label does not say. `scan/classifyCode.js` takes an explicit `S/N:` prefix as
+fact, a colon-separated MAC as fact, a retail EAN/UPC as a PART number (every
+identical monitor on the pallet carries the same one), and scores the rest by
+shape. Everything it infers lands in `guessed` and renders as `guessed` in the
+review grid — same contract as the device import's derived values, and the
+reason a shape heuristic is safe to ship.
+
+**SharePoint plumbing is shared, not per-section.** `features/sharepoint/`
+holds `spClient.js`, `writePool.js` and `provision.js`. `provisionSchema` takes
+`{ lists, views }` and knows nothing about what is in them; `devices/sharepoint/
+provisionLists.js` and `assets/sharepoint/provisionAssets.js` are both thin
+declarations over it. Every SharePoint column rule listed below lives in that one
+file now.
 
 **SharePoint column creation**, verified against the tenant on 2026-08-21 while
 provisioning the device lists. All three of these fail silently or confusingly
@@ -455,6 +511,47 @@ No icon package is installed — add a glyph there rather than a dependency.
 - Don't export a helper next to a component from the same file — it drops the
   file out of Fast Refresh (and eslint fails the build). `initialsOf` lives in
   `src/utils/initials.js` for exactly this reason.
+
+- Don't let a photo failure take its row down with it. In `assets/sharepoint/
+  saveBatch.js` the upload is caught per item and reported in `photoFailures`;
+  the row saves without it. Losing the serial number of a laptop because the
+  camera produced an odd JPEG is the wrong trade.
+- Don't call `formatMYT` on a value that might not be an instant. It throws
+  `RangeError: Invalid time value`, and one undated row would take a whole
+  delivery's save down with it. `assetSchema.js` guards it in `readableMYT`.
+- Don't block a labelled machine from being re-scanned. The tag-uniqueness check
+  in `draftIssues` finds the row's OWN entry in the register, so it compares
+  `owner.assetKey` against the draft's key first — without that, a labelled
+  asset becomes the one kind that can never be updated.
+- Don't drop the in-batch tag check and rely on the register one. Two rows in a
+  single delivery can both claim `PMW-0142`, and neither is in SharePoint yet.
+  `planSave` carries `claimedTags` for exactly this.
+- Don't let one blocked row fail a whole delivery. A duplicate sticker label is
+  one row's problem; `planSave` returns `blocked` beside `inserts`/`updates` and
+  the rest still save.
+- Don't re-save the rows that already landed. `remainingDrafts` leaves only what
+  failed on the batch — the register would survive a re-write (the key upserts)
+  but the change log would fill with phantom edits.
+- Don't import the barcode ponyfill statically. `scan/detector.js` reaches it
+  through `await import('barcode-detector/pure')` only when the browser has no
+  native `BarcodeDetector`, which keeps 43KB of WebAssembly loader off every
+  Android phone that never needs it.
+- Don't set a font-size under 16px on an input in `assets.css`. iOS Safari zooms
+  the whole page in on focus for anything smaller, and a zoomed viewfinder
+  cannot be aimed.
+- Don't write a ref during render (`handlerRef.current = onCodes`) — eslint's
+  `react-hooks/refs` fails the build. `useScanner` assigns it in an effect, and
+  keeps the handler in a ref at all so that a scan changing the session does not
+  restart the decode loop and drop frames exactly when it is busiest.
+- Don't clear per-row state from an effect on an id change. `AssetDetailPage`
+  adjusts it during render against a `shownId`, because an effect paints one
+  frame of the new item wearing the previous item's unsaved edits, and
+  `react-hooks/set-state-in-effect` fails the build besides.
+- Don't guess the photo library's folder path. A library titled "IT Asset Photos"
+  does not reliably live at `/sites/…/IT Asset Photos`; `uploadPhoto.js` asks for
+  `RootFolder/ServerRelativeUrl` once per save instead of 404ing on every upload.
+- Don't send a Blob through `spFetch` — it JSON-stringifies the body and uploads
+  the string "[object Blob]". Binary goes through `spUpload`.
 
 ## COMMANDS
 ```bash

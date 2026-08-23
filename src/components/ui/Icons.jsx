@@ -266,3 +266,73 @@ export const MemoryStick = make('MemoryStick', (
     <path d="M6 19v-4M10 19v-4M14 19v-4M18 19v-4" />
   </>
 ));
+
+export const Camera = make('Camera', (
+  <>
+    <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z" />
+    <circle cx="12" cy="13" r="3.5" />
+  </>
+));
+
+export const ScanLine = make('ScanLine', (
+  <>
+    <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2" />
+    <path d="M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2" />
+    <path d="M3 12h18" />
+  </>
+));
+
+export const Barcode = make('Barcode', (
+  <>
+    <path d="M3 5v14M7 5v14M11 5v10M15 5v14M18 5v10M21 5v14" />
+  </>
+));
+
+export const Package = make('Package', (
+  <>
+    <path d="M21 8v8a2 2 0 0 1-1 1.73l-7 4a2 2 0 0 1-2 0l-7-4A2 2 0 0 1 3 16V8a2 2 0 0 1 1-1.73l7-4a2 2 0 0 1 2 0l7 4A2 2 0 0 1 21 8z" />
+    <path d="m3.3 7 8.7 5 8.7-5" />
+    <path d="M12 22V12" />
+  </>
+));
+
+export const Tag = make('Tag', (
+  <>
+    <path d="M20.6 13.4 12 22l-9-9V4a1 1 0 0 1 1-1h8z" />
+    <circle cx="7.5" cy="7.5" r="1.2" />
+  </>
+));
+
+export const Boxes = make('Boxes', (
+  <>
+    <path d="M3 9V5.5L7.5 3 12 5.5V9L7.5 11.5z" />
+    <path d="M12 9V5.5L16.5 3 21 5.5V9l-4.5 2.5z" />
+    <path d="M7.5 18v-3.5L12 12l4.5 2.5V18L12 20.5z" />
+  </>
+));
+
+export const Truck = make('Truck', (
+  <>
+    <path d="M2 6.5A1.5 1.5 0 0 1 3.5 5H14v11H2z" />
+    <path d="M14 9h4l4 4v3h-8z" />
+    <circle cx="6.5" cy="18" r="2" />
+    <circle cx="17.5" cy="18" r="2" />
+  </>
+));
+
+export const Save = make('Save', (
+  <>
+    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+    <path d="M17 21v-8H7v8M7 3v5h8" />
+  </>
+));
+
+export const WifiOff = make('WifiOff', (
+  <>
+    <path d="M2 2l20 20" />
+    <path d="M8.5 16.4a5 5 0 0 1 7 0" />
+    <path d="M5 12.9a10 10 0 0 1 4-2.4M19 12.9a10 10 0 0 0-4.6-2.6" />
+    <path d="M2 8.8A15 15 0 0 1 7 6M22 8.8a15 15 0 0 0-9.7-2.7" />
+    <path d="M12 20h.01" />
+  </>
+));

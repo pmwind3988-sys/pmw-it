@@ -8,6 +8,10 @@ import LoginPage from './pages/LoginPage';
 import ListPage from './pages/ListPage';
 import DevicesPage from './pages/DevicesPage';
 import DeviceDetailPage from './pages/DeviceDetailPage';
+import AssetsPage from './pages/AssetsPage';
+import AssetScanPage from './pages/AssetScanPage';
+import AssetBatchPage from './pages/AssetBatchPage';
+import AssetDetailPage from './pages/AssetDetailPage';
 
 // Lazy on purpose, not for tidiness: this page's chunk carries SheetJS and
 // ECharts, which together are larger than the rest of the app. Loading it
@@ -34,6 +38,13 @@ function App() {
         <Route path="/asset-checklist" element={<AssetChecklistPage />} />
         <Route path="/devices" element={<DevicesPage />} />
         <Route path="/devices/:id" element={<DeviceDetailPage />} />
+        {/* `scan` and `batch` are declared above `:id` so they are not read as
+            an item id. The register's ids are numbers, but the router has no
+            way to know that. */}
+        <Route path="/assets" element={<AssetsPage />} />
+        <Route path="/assets/scan" element={<AssetScanPage />} />
+        <Route path="/assets/batch/:id" element={<AssetBatchPage />} />
+        <Route path="/assets/:id" element={<AssetDetailPage />} />
         <Route
           path="/data-studio"
           element={(

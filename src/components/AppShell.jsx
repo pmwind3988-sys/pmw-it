@@ -22,6 +22,7 @@ import {
   ShieldCheck,
   Laptop,
   BarChart3,
+  Package,
 } from './ui/Icons';
 
 /**
@@ -43,6 +44,7 @@ const NAV_ITEMS = [
   { to: '/it-boarding-form', label: 'New request', icon: FilePlus },
   { to: '/asset-checklist', label: 'Asset checklist', icon: CheckSquare },
   { to: '/devices', label: 'Device list', icon: Laptop },
+  { to: '/assets', label: 'Asset inventory', icon: Package },
   { to: '/data-studio', label: 'Data Studio', icon: BarChart3 },
 ];
 

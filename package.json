@@ -19,6 +19,7 @@
     "@huggingface/transformers": "^4.2.0",
     "@rolldown/plugin-babel": "^0.2.3",
     "babel-plugin-react-compiler": "^1.0.0",
+    "barcode-detector": "^3.2.2",
     "echarts": "^5.6.0",
     "qrcode": "^1.5.4",
     "react": "^19.2.5",

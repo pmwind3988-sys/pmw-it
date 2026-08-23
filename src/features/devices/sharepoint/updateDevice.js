@@ -1,8 +1,8 @@
 import {
   spFetch, listPath, ITEM_ACCEPT, getFormDigest,
-} from './spClient.js';
+} from '../../sharepoint/spClient.js';
 import { DEVICE_LIST_NAME, CHANGE_LIST_NAME } from './deviceSchema.js';
-import { withRetry } from './writePool.js';
+import { withRetry } from '../../sharepoint/writePool.js';
 import { formatMYT } from '../../datastudio/time/malaysiaTime.js';
 
 /**

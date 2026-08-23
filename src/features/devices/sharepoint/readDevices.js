@@ -1,4 +1,4 @@
-import { spFetch, listPath } from './spClient.js';
+import { spFetch, listPath } from '../../sharepoint/spClient.js';
 import { DEVICE_LIST_NAME, fromListItem } from './deviceSchema.js';
 
 const PAGE_SIZE = 500;

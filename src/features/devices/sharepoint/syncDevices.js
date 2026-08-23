@@ -1,9 +1,9 @@
-import { spFetch, listPath, ITEM_ACCEPT } from './spClient.js';
+import { spFetch, listPath, ITEM_ACCEPT } from '../../sharepoint/spClient.js';
 import { provisionLists } from './provisionLists.js';
 import { DEVICE_LIST_NAME, CHANGE_LIST_NAME, toListItem } from './deviceSchema.js';
 import { readAllDevices } from './readDevices.js';
 import { diffDevice, indexByName } from './diffDevice.js';
-import { runPool, withRetry } from './writePool.js';
+import { runPool, withRetry } from '../../sharepoint/writePool.js';
 import { formatMYT } from '../../datastudio/time/malaysiaTime.js';
 
 /**

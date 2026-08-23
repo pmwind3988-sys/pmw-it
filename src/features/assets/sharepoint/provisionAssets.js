@@ -4,6 +4,7 @@ import {
   ASSET_LIST_NAME, BATCH_LIST_NAME, CHANGE_LIST_NAME, PHOTO_LIBRARY_NAME,
 } from './assetSchema.js';
 import { ASSET_VIEWS } from './assetViews.js';
+import { HANDOVER_COLUMNS, HANDOVER_LIST_NAME } from './handoverSchema.js';
 
 /**
  * What the asset register needs to exist in SharePoint. Every rule about HOW
@@ -26,6 +27,11 @@ export function provisionAssets(siteUrl, token, { onProgress } = {}) {
         title: BATCH_LIST_NAME,
         description: 'One row per delivery, holding the purchase details its items share',
         columns: BATCH_COLUMNS,
+      },
+      {
+        title: HANDOVER_LIST_NAME,
+        description: 'One row per item handed to a person, and when it came back',
+        columns: HANDOVER_COLUMNS,
       },
       {
         title: CHANGE_LIST_NAME,

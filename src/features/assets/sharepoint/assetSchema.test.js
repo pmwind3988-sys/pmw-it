@@ -1,12 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import {
-  ASSET_COLUMNS, BATCH_COLUMNS, CHANGE_COLUMNS, toListItem, fromListItem,
+  ASSET_COLUMNS, BATCH_COLUMNS, CHANGE_COLUMNS, toListItem, fromListItem, toUpdateItem,
+  ASSET_LIST_NAME, BATCH_LIST_NAME, CHANGE_LIST_NAME,
 } from './assetSchema.js';
 import { ASSET_VIEWS } from './assetViews.js';
+import { HANDOVER_COLUMNS, HANDOVER_LIST_NAME } from './handoverSchema.js';
 
 describe('the column declaration', () => {
   it('names every column exactly once', () => {
-    for (const columns of [ASSET_COLUMNS, BATCH_COLUMNS, CHANGE_COLUMNS]) {
+    for (const columns of [ASSET_COLUMNS, BATCH_COLUMNS, CHANGE_COLUMNS, HANDOVER_COLUMNS]) {
       const names = columns.map((column) => column.StaticName);
       expect(new Set(names).size).toBe(names.length);
     }
@@ -19,7 +21,7 @@ describe('the column declaration', () => {
    * StaticName; this pins that StaticName is safe to create under.
    */
   it('uses internal names that survive being created', () => {
-    for (const columns of [ASSET_COLUMNS, BATCH_COLUMNS, CHANGE_COLUMNS]) {
+    for (const columns of [ASSET_COLUMNS, BATCH_COLUMNS, CHANGE_COLUMNS, HANDOVER_COLUMNS]) {
       for (const column of columns) {
         expect(column.StaticName).toMatch(/^[A-Za-z][A-Za-z0-9]*$/);
       }
@@ -32,18 +34,40 @@ describe('the column declaration', () => {
     }
   });
 
-  /** A view can only show a column that exists. */
+  /**
+   * A view can only show a column that exists — a view naming a column that
+   * does not fails provisioning outright, and does so at the very end of a
+   * minute-long first run.
+   *
+   * Reported as a list of names rather than a bare boolean: "expected false to
+   * be true" does not say which column, and this test exists precisely for the
+   * moment somebody adds a view faster than they add its column.
+   */
   it('only shows columns the lists actually have', () => {
     const known = new Set([
       'LinkTitle', 'Title',
       ...ASSET_COLUMNS.map((c) => c.StaticName),
       ...BATCH_COLUMNS.map((c) => c.StaticName),
       ...CHANGE_COLUMNS.map((c) => c.StaticName),
+      ...HANDOVER_COLUMNS.map((c) => c.StaticName),
     ]);
 
-    for (const view of ASSET_VIEWS) {
-      for (const field of view.fields) expect(known.has(field)).toBe(true);
-    }
+    const unknown = ASSET_VIEWS.flatMap(
+      (view) => view.fields
+        .filter((field) => !known.has(field))
+        .map((field) => `${view.list} / ${view.title}: ${field}`),
+    );
+
+    expect(unknown).toEqual([]);
+  });
+
+  /** Every view must name a list that is actually provisioned. */
+  it('only names lists that are provisioned', () => {
+    const lists = new Set([
+      ASSET_LIST_NAME, BATCH_LIST_NAME, CHANGE_LIST_NAME, HANDOVER_LIST_NAME,
+    ]);
+
+    expect(ASSET_VIEWS.filter((view) => !lists.has(view.list))).toEqual([]);
   });
 });
 
@@ -148,5 +172,48 @@ describe('fromListItem', () => {
       quantity: 20,
       location: 'Store room',
     });
+  });
+});
+
+describe('toUpdateItem', () => {
+  /**
+   * The whole reason this exists apart from `toListItem`. A handover setting
+   * `quantityOut` through `toListItem` would send an empty Serial Number,
+   * Supplier and Photo for every item it touched, because a record built from
+   * a patch has nothing in the rest.
+   */
+  it('sends only what it was given', () => {
+    const item = toUpdateItem({ quantityOut: 3 });
+
+    expect(item).toEqual({ QuantityOut: 3 });
+    expect('SerialNumber' in item).toBe(false);
+    expect('Supplier' in item).toBe(false);
+  });
+
+  it('sends zero, which is a real number of things out', () => {
+    expect(toUpdateItem({ quantityOut: 0 })).toEqual({ QuantityOut: 0 });
+  });
+
+  /** How a return stops the row advertising a deadline that has passed. */
+  it('clears a date by sending null', () => {
+    expect(toUpdateItem({ dueOn: null })).toEqual({ DueOn: null });
+  });
+
+  it('writes a date as an ISO instant', () => {
+    expect(toUpdateItem({ assignedOn: 1755950400000 }))
+      .toEqual({ AssignedOn: new Date(1755950400000).toISOString() });
+  });
+
+  /** A choice column accepts null to clear it, but not an empty string. */
+  it('clears a choice with null rather than with an empty string', () => {
+    expect(toUpdateItem({ handoverKind: '' })).toEqual({ HandoverKind: null });
+  });
+
+  it('clears a text column with an empty string', () => {
+    expect(toUpdateItem({ assignedTo: '' })).toEqual({ AssignedTo: '' });
+  });
+
+  it('ignores a key that is not a column', () => {
+    expect(toUpdateItem({ notAColumn: 'x' })).toEqual({});
   });
 });

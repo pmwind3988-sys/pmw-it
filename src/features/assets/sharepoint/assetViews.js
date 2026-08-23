@@ -1,6 +1,7 @@
 import {
   ASSET_LIST_NAME, BATCH_LIST_NAME, CHANGE_LIST_NAME, ASSET_COLUMNS,
 } from './assetSchema.js';
+import { HANDOVER_LIST_NAME } from './handoverSchema.js';
 
 /**
  * `LinkTitle` rather than `Title`: it renders the name as the link into the
@@ -65,6 +66,56 @@ export const ASSET_VIEWS = [
       'PoNumber', 'ArrivedOnMYT', 'BatchTitle',
     ],
     query: '<OrderBy><FieldRef Name="ArrivedOn" Ascending="FALSE" /></OrderBy>',
+  },
+  {
+    list: ASSET_LIST_NAME,
+    title: 'Out on loan',
+    fields: [
+      NAME, 'Category', 'AssignedTo', 'HandoverKind', 'DueOn', 'Quantity',
+      'QuantityOut', 'SerialNumber', 'AssetTag',
+    ],
+    query:
+      '<Where><Or>'
+      + '<Eq><FieldRef Name="Status" /><Value Type="Text">Assigned</Value></Eq>'
+      + '<Eq><FieldRef Name="Status" /><Value Type="Text">Borrowed</Value></Eq>'
+      + '</Or></Where>'
+      + '<OrderBy><FieldRef Name="DueOn" Ascending="TRUE" /></OrderBy>',
+  },
+  {
+    list: HANDOVER_LIST_NAME,
+    isDefault: true,
+    title: 'All Items',
+    fields: [
+      NAME, 'ItemTitle', 'Category', 'PersonName', 'PersonEmail', 'Quantity',
+      'ReturnedQuantity', 'Kind', 'HandoverStatus', 'IssuedOnMYT', 'DueOnMYT',
+      'ReturnedOnMYT', 'ReturnCondition', 'IssuedBy', 'Remarks',
+    ],
+    query: '<OrderBy><FieldRef Name="IssuedOn" Ascending="FALSE" /></OrderBy>',
+  },
+  {
+    list: HANDOVER_LIST_NAME,
+    title: 'Currently out',
+    fields: [
+      NAME, 'ItemTitle', 'PersonName', 'Quantity', 'ReturnedQuantity', 'Kind',
+      'DueOnMYT', 'IssuedOnMYT',
+    ],
+    query:
+      '<Where><Neq><FieldRef Name="HandoverStatus" /><Value Type="Text">Returned</Value></Neq></Where>'
+      + '<OrderBy><FieldRef Name="IssuedOn" Ascending="FALSE" /></OrderBy>',
+  },
+  {
+    // The overdue view lives on the HANDOVER list rather than the register: a
+    // box of cables held by three people has no single due date of its own,
+    // so the answer only exists per handover.
+    list: HANDOVER_LIST_NAME,
+    title: 'Overdue',
+    fields: [NAME, 'ItemTitle', 'PersonName', 'PersonEmail', 'Quantity', 'DueOnMYT'],
+    query:
+      '<Where><And>'
+      + '<Neq><FieldRef Name="HandoverStatus" /><Value Type="Text">Returned</Value></Neq>'
+      + '<Lt><FieldRef Name="DueOn" /><Value Type="DateTime"><Today /></Value></Lt>'
+      + '</And></Where>'
+      + '<OrderBy><FieldRef Name="DueOn" Ascending="TRUE" /></OrderBy>',
   },
   {
     list: BATCH_LIST_NAME,

@@ -31,6 +31,10 @@ export const ASSET_COLUMNS = [
 
   text('AssetTag', 'Asset Label'),
   num('Quantity', 'Quantity'),
+  // What is with people. `Quantity` stays what the company OWNS and never moves
+  // when something is handed out, so a handover nobody recorded cannot silently
+  // change how much the company believes it bought (handovers spec §4.1).
+  num('QuantityOut', 'Out With People'),
   choice('Condition', 'Condition', CONDITIONS),
   choice('Status', 'Status', STATUSES),
   text('Location', 'Location'),
@@ -52,11 +56,15 @@ export const ASSET_COLUMNS = [
   note('GuessedFields', 'Guessed Fields'),
   note('ManualFields', 'Manually Set Fields'),
 
-  // Provisioned now, filled by the assignment project. Adding a column to a
-  // list with rows in it is a migration; adding it up front is a line here.
+  // Copies of the open handover, so a row read directly in SharePoint says who
+  // has it without a join. The handover list is the truth. Only ever filled on
+  // a TRACKED row: a box of cables can be with five people at once and there is
+  // no honest single value for it.
   text('AssignedTo', 'Assigned To'),
   text('AssignedToEmail', 'Assigned To (email)'),
   date('AssignedOn', 'Assigned On'),
+  date('DueOn', 'Due Back'),
+  choice('HandoverKind', 'Handover Kind', ['Issued', 'Borrowed']),
 
   date('AddedOn', 'Added On'),
   text('AddedOnMYT', 'Added On (MYT)'),
@@ -95,7 +103,7 @@ export const TRACKED_FIELDS = [
   'category', 'trackingMode', 'manufacturer', 'model',
   'serialNumber', 'partNumber', 'assetTag',
   'quantity', 'condition', 'status', 'location',
-  'supplier', 'poNumber', 'assignedTo',
+  'supplier', 'poNumber', 'assignedTo', 'quantityOut',
 ];
 
 /** camelCase record key for a StaticName: first letter lowered. */
@@ -149,6 +157,48 @@ export function toListItem(asset) {
   return item;
 }
 
+/**
+ * A body for a PARTIAL update — only the fields named in `patch`.
+ *
+ * `toListItem` writes every column, which is right when a whole record is being
+ * saved and catastrophic when it is not: a handover setting `quantityOut` with
+ * that would blank the serial number, the supplier and the photo of every item
+ * it touched, because a record built from a patch has nothing in the rest.
+ *
+ * A null date is written as null deliberately — that is how a return CLEARS the
+ * due date rather than leaving it advertising a deadline that has passed.
+ */
+export function toUpdateItem(patch) {
+  const item = {};
+
+  for (const column of ASSET_COLUMNS) {
+    const key = keyFor(column.StaticName);
+    if (!(key in patch)) continue;
+
+    const value = patch[key];
+
+    switch (column.kind) {
+      case 'datetime':
+        item[column.StaticName] = typeof value === 'number' && Number.isFinite(value)
+          ? new Date(value).toISOString()
+          : null;
+        break;
+      case 'number':
+        if (typeof value === 'number' && Number.isFinite(value)) item[column.StaticName] = value;
+        break;
+      case 'choice':
+        // A choice column accepts null to clear it, but not an empty string.
+        item[column.StaticName] = value ? String(value) : null;
+        break;
+      default:
+        item[column.StaticName] = serialise(value);
+        break;
+    }
+  }
+
+  return item;
+}
+
 const ARRAY_COLUMNS = new Set(['AdditionalCodes', 'GuessedFields', 'ManualFields']);
 
 export function fromListItem(row) {
@@ -174,6 +224,9 @@ export function fromListItem(row) {
   // column existed reads as null, and `null + 1` is 1 — so it defaults here,
   // once, rather than at each of the places that add it up.
   if (record.quantity == null) record.quantity = 1;
+  // Every row saved before handovers existed has none out, which is correct
+  // and needs no migration.
+  if (record.quantityOut == null) record.quantityOut = 0;
 
   return record;
 }

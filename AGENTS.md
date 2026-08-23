@@ -199,6 +199,16 @@ series behind their desktop namesakes (a 3500U is Zen+ where a desktop 3600 is
 Zen 2). The digit rule is mobile-only -- applied to a desktop 7950X it would
 read the 5 and call a Zen 4 chip Zen 5.
 
+AMD is more than Ryzen, and the rest of it has to be recognised too. A
+Threadripper carries no tier digit; a `PRO` sits where the tier digit would be;
+the Zen-based Athlons (3000G, 3050U, the Gold and Silver laptop parts) are on
+the scale at Zen; and everything AMD built before Zen -- `A8-7410`, `FX-8350`,
+Phenom, Sempron, Turion, `Athlon II` -- is named in `OBSOLETE_FAMILIES`
+alongside Pentium and Celeron. That last list is load-bearing: without it those
+parts reach the RAM-type fallback and a DDR4 board alone calls a 2014 APU
+Aging. Vendor detection reads the family names as well, so a report that says
+`Athlon(tm) II X2 240` and never says "AMD" is not counted as `Other`.
+
 **A device page colours its values, and can be told not to.** `fieldTone.js`
 holds the judgement -- red for what needs attention, green for what does not --
 and only for fields with a settled right answer. A RAM discrepancy, a static IP

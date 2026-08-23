@@ -138,3 +138,44 @@ describe('deriveCpu — one scale for both vendors', () => {
     expect(rank('Intel(R) Pentium(R) Dual  CPU  E2160  @ 1.80GHz', null)).toBe(null);
   });
 });
+
+describe('deriveCpu — AMD parts that are not a plain Ryzen', () => {
+  const cpu = (model, ram = 'DDR4') => deriveCpu([model], ram);
+
+  it('reads a Threadripper, which carries no tier digit', () => {
+    expect(cpu('AMD Ryzen Threadripper 3970X 32-Core Processor').cpuGenerationRank).toBe(10);
+    expect(cpu('AMD Ryzen Threadripper PRO 5995WX 64-Cores').cpuGenerationRank).toBe(11);
+  });
+
+  it('places the Zen-based Athlons rather than giving up on them', () => {
+    expect(cpu('AMD Athlon Gold 3150U with Radeon Graphics').cpuArchitecture).toBe('Zen');
+    expect(cpu('AMD Athlon Silver 3050U with Radeon Graphics').cpuAgeBand).toBe('Aging');
+    expect(cpu('AMD Athlon 3000G with Radeon Vega 3 Graphics').cpuGenerationRank).toBe(7);
+  });
+
+  it('calls everything AMD built before Zen Obsolete, DDR4 board or not', () => {
+    // Without this they fall through to the RAM-type fallback, and a DDR4
+    // board alone would call a 2014 APU Aging.
+    expect(cpu('AMD A8-7410 APU with AMD Radeon R5 Graphics').cpuAgeBand).toBe('Obsolete');
+    expect(cpu('AMD A10-9600P RADEON R5').cpuAgeBand).toBe('Obsolete');
+    expect(cpu('AMD FX(tm)-8350 Eight-Core Processor').cpuAgeBand).toBe('Obsolete');
+    expect(cpu('AMD E1-6010 APU with AMD Radeon R2 Graphics').cpuAgeBand).toBe('Obsolete');
+    expect(cpu('AMD Athlon(tm) II X2 240 Processor').cpuAgeBand).toBe('Obsolete');
+    expect(cpu('AMD Athlon II X4 640 Processor').cpuAgeBand).toBe('Obsolete');
+    expect(cpu('AMD Phenom(tm) II X4 955 Processor').cpuAgeBand).toBe('Obsolete');
+    expect(cpu('AMD Sempron(tm) 145 Processor').cpuAgeBand).toBe('Obsolete');
+    expect(cpu('AMD Turion(tm) II P540 Dual-Core Processor').cpuAgeBand).toBe('Obsolete');
+  });
+
+  it('does not read a pre-Zen Athlon as one of the Zen ones', () => {
+    expect(cpu('AMD Athlon II X4 640 Processor').cpuGenerationRank).toBe(null);
+    expect(cpu('AMD Athlon 64 X2 Dual Core 5600+').cpuAgeBand).toBe('Obsolete');
+  });
+
+  it('reads the vendor off the family name when the string omits "AMD"', () => {
+    expect(cpu('Athlon(tm) II X2 240 Processor').cpuVendor).toBe('AMD');
+    expect(cpu('FX(tm)-8350 Eight-Core Processor').cpuVendor).toBe('AMD');
+    expect(cpu('Ryzen 5 7530U with Radeon Graphics').cpuVendor).toBe('AMD');
+    expect(cpu('Intel(R) Core(TM) i5-8250U').cpuVendor).toBe('Intel');
+  });
+});

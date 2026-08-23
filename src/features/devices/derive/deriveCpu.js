@@ -1,6 +1,22 @@
 import { cleanValue } from '../parse/placeholders.js';
 
-const OBSOLETE_FAMILIES = /pentium|celeron|atom/i;
+/**
+ * Families with no generation to read and no future to argue about -- the
+ * bottom of both vendors' ranges, plus everything AMD built before Zen.
+ * `A8-7410`, `FX-8350` and an `Athlon II` are all pre-2017 parts whose model
+ * numbers follow no scheme worth decoding; without this they fall through to
+ * the RAM-type fallback and a DDR4 board alone would call them Aging.
+ */
+const OBSOLETE_FAMILIES =
+  /pentium|celeron|atom|phenom|sempron|turion|athlon\s*(?:\(tm\)\s*)?(?:ii|x[24]|64)\b|\bfx[-(]|\ba\d{1,2}-\d{4}|\be[12]-\d/i;
+
+/**
+ * Not every AMD part says "AMD" first. A scan that reports the processor as
+ * `Athlon(tm) II X2 240` or `FX(tm)-8350` is still an AMD machine, and reading
+ * it as `Other` hides it from the vendor breakdown on the fleet dashboard.
+ */
+const AMD_FAMILIES =
+  /\bamd\b|ryzen|athlon|radeon|epyc|threadripper|phenom|sempron|turion|\bfx[-(]/i;
 
 /**
  * Intel 4-digit SKUs are ambiguous: i7-3667U is 3rd generation (first digit)
@@ -96,8 +112,11 @@ function readGeneration(model) {
     return { kind: 'amd', value: null, arch: ZEN.zen5, series: null };
   }
 
-  // `PRO` sits between the tier and the model number on business parts.
-  const ryzen = /Ryzen\s+\d+\s+(?:PRO\s+)?(\d{4})([A-Z+]*)/i.exec(model);
+  // What sits between "Ryzen" and the model number varies: a tier digit on a
+  // laptop part, `Threadripper` on a workstation one, `PRO` on business
+  // versions of either. The model number is the only part always present.
+  const ryzen = /Ryzen\s+(?:Threadripper\s+)?(?:PRO\s+)?(?:\d\s+)?(?:PRO\s+)?(\d{4})([A-Z+]*)/i
+    .exec(model);
   if (ryzen) {
     const [, sku, suffix = ''] = ryzen;
     return {
@@ -107,6 +126,12 @@ function readGeneration(model) {
       arch: ryzenArchitecture(sku, suffix),
     };
   }
+
+  // Athlon did not stop at the pre-Zen parts above: the 3000G, the 3050U and
+  // the Gold/Silver laptop chips are cut-down Zen, and belong on the scale
+  // with the rest of them rather than in the "cannot tell" bucket.
+  const athlon = /Athlon\s+(?:(?:Gold|Silver|PRO)\s+)*(\d{3,4})/i.exec(model);
+  if (athlon) return { kind: 'amd', value: null, series: null, arch: ZEN.zen1 };
 
   return { kind: 'none', value: null };
 }
@@ -154,7 +179,7 @@ export function deriveCpu(processorLines, ramType) {
 
   let cpuVendor = 'Other';
   if (/intel/i.test(cpuModel)) cpuVendor = 'Intel';
-  else if (/amd|ryzen/i.test(cpuModel)) cpuVendor = 'AMD';
+  else if (AMD_FAMILIES.test(cpuModel)) cpuVendor = 'AMD';
 
   const generation = readGeneration(cpuModel);
   const cpuGenerationRank = generationRank(generation);
@@ -163,7 +188,9 @@ export function deriveCpu(processorLines, ramType) {
   if (generation.kind === 'intel' && generation.value) cpuGeneration = String(generation.value);
   else if (generation.kind === 'ultra') cpuGeneration = `Ultra ${generation.value}`;
   else if (generation.kind === 'amd') {
-    const series = generation.series ? `Ryzen ${generation.series}` : 'Ryzen AI';
+    const series = generation.series
+      ? `Ryzen ${generation.series}`
+      : (/Athlon/i.test(cpuModel) ? 'Athlon' : 'Ryzen AI');
     cpuGeneration = generation.arch ? `${series} (${generation.arch.label})` : series;
   }
 

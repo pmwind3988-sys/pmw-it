@@ -7,6 +7,7 @@ import { ASSET_LIST_NAME, CHANGE_LIST_NAME, toListItem } from './assetSchema.js'
 import { diffAsset } from './planSave.js';
 import { assetKey, assetTitle } from '../identity.js';
 import { diffUnits, withUnitsSplitOut } from '../units.js';
+import { provisionAssets } from './provisionAssets.js';
 
 /**
  * Editing and removing one asset.
@@ -99,30 +100,80 @@ async function logChanges(siteUrl, token, digest, key, changes, changedBy) {
   }
 }
 
+/**
+ * SharePoint's way of saying "that column was never created here".
+ *
+ * The list is created once and then outlives every release, so a column added
+ * to the app's schema afterwards — `Units` was — exists in the code and not in
+ * the tenant. Every save of a row that touches it fails with this, and the
+ * message it fails with ("The property 'Units' does not exist on type
+ * 'SP.Data.IT_x0020_Asset_x0020_RegisterListItem'") tells the person holding
+ * the phone nothing they can act on.
+ */
+export function isMissingColumn(status, body) {
+  return status === 400 && /property '[^']+' does not exist on type/i.test(String(body ?? ''));
+}
+
+/**
+ * The row write, and the one repair worth attempting automatically.
+ *
+ * Editing a row does not provision, on purpose: checking fifty columns before
+ * every save would add a minute to each one. So the missing column is found
+ * the only way that costs nothing on the ordinary path — by the save failing —
+ * and provisioning runs then, once, before the same write is tried again.
+ *
+ * `repaired` is left false when nothing was wrong, so a caller can say "the
+ * register was brought up to date" only when it actually was.
+ */
+async function writeRow(siteUrl, token, digest, id, body) {
+  const send = () => withRetry(() => spFetch(siteUrl, `${listPath(ASSET_LIST_NAME)}/items(${id})`, {
+    token,
+    digest,
+    method: 'POST',
+    accept: ITEM_ACCEPT,
+    body,
+    headers: { 'X-HTTP-Method': 'MERGE', 'IF-MATCH': '*' },
+  }));
+
+  const first = await send();
+  if (first.ok) return { response: first, repaired: false };
+
+  const failure = await first.text();
+  if (!isMissingColumn(first.status, failure)) {
+    throw new Error(`Could not save the change (${first.status}): ${failure}`);
+  }
+
+  await provisionAssets(siteUrl, token);
+
+  const second = await send();
+  if (!second.ok) {
+    throw new Error(
+      `Could not save the change (${second.status}): ${await second.text()}`,
+    );
+  }
+
+  return { response: second, repaired: true };
+}
+
 export async function updateAsset({ siteUrl, token, existing, edits, changedBy }) {
   if (!existing?.id) throw new Error('That row has no id, so it cannot be updated');
 
   const { changes, record } = planEdit(existing, edits);
-  if (!changes.length) return { changes: [] };
+  // The unit records are compared separately from the change log, because a
+  // photograph taken of item 3 changes the row and produces no log line — the
+  // log deliberately ignores photos, and without this the save would decide
+  // nothing had happened and quietly drop the picture.
+  const unitsMoved = String(record.units ?? '') !== String(existing.units ?? '');
+  if (!changes.length && !unitsMoved) return { changes: [] };
 
   const digest = await getFormDigest(siteUrl, token);
 
-  const response = await withRetry(() =>
-    spFetch(siteUrl, `${listPath(ASSET_LIST_NAME)}/items(${existing.id})`, {
-      token,
-      digest,
-      method: 'POST',
-      accept: ITEM_ACCEPT,
-      body: toListItem(record),
-      headers: { 'X-HTTP-Method': 'MERGE', 'IF-MATCH': '*' },
-    }));
-
-  if (!response.ok) {
-    throw new Error(`Could not save the change (${response.status}): ${await response.text()}`);
-  }
+  const { repaired } = await writeRow(
+    siteUrl, token, digest, existing.id, toListItem(record),
+  );
 
   await logChanges(siteUrl, token, digest, record.assetKey, changes, changedBy);
-  return { changes, record };
+  return { changes, record, repaired };
 }
 
 export async function deleteAsset({ siteUrl, token, asset, changedBy }) {

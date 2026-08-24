@@ -4,6 +4,7 @@ import { shrinkFile } from '../scan/capturePhoto';
 import { savePhoto, deletePhoto } from '../store/assetDb';
 import { newId } from '../draft/draftAsset';
 import { usePhotoUrl } from './usePhotoUrl';
+import PhotoLightbox from './PhotoLightbox';
 
 /**
  * One photograph, on a draft or on the delivery.
@@ -18,6 +19,7 @@ export default function PhotoInput({ photoId, onChange, label = 'Photo', compact
   const url = usePhotoUrl(photoId);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [open, setOpen] = useState(false);
 
   const pick = async (event) => {
     const file = event.target.files?.[0];
@@ -59,10 +61,22 @@ export default function PhotoInput({ photoId, onChange, label = 'Photo', compact
 
       {url ? (
         <div className="as-photo-shot">
-          <img src={url} alt={label} />
+          {/* Tapping it opens it whole. A thumbnail this size shows that a
+              photo was taken and nothing of what is written on the box. */}
+          <button
+            type="button"
+            className="as-photo-open as-photo-open-thumb"
+            onClick={() => setOpen(true)}
+            title="See the whole photograph"
+          >
+            <img src={url} alt={label} />
+          </button>
           <button type="button" className="as-photo-clear" onClick={clear} aria-label="Remove photo">
             <X size={13} />
           </button>
+          {open && (
+            <PhotoLightbox src={url} alt={label} onClose={() => setOpen(false)} />
+          )}
         </div>
       ) : (
         <button

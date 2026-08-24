@@ -60,13 +60,35 @@ export const PER_UNIT_ONLY = [
  */
 export const PER_UNIT_CODES = ['serialNumber', 'partNumber', 'macAddress', 'assetTag'];
 
-const KEYS = UNIT_FIELDS.map((field) => field.key);
+/**
+ * The photograph of ONE item, and a photo not yet uploaded.
+ *
+ * `photoUrl` is where the picture ended up in SharePoint. `photoId` is a
+ * just-taken photo still in the phone's own storage, waiting for the next Save
+ * to upload it — carried on the unit record so that closing the page does not
+ * lose the picture, and replaced by `photoUrl` once the upload succeeds.
+ */
+export const UNIT_PHOTO_FIELDS = ['photoUrl', 'photoId'];
 
-const asText = (value) => (value === null || value === undefined ? '' : String(value).trim());
+const KEYS = [...UNIT_FIELDS.map((field) => field.key), ...UNIT_PHOTO_FIELDS];
+
+/**
+ * NOT trimmed, and that is the whole point of it.
+ *
+ * Every keystroke in the pager leaves through `serialiseUnits` and comes back
+ * through `parseUnits`, so anything trimmed here is trimmed WHILE SOMEBODY IS
+ * TYPING. A space is only ever typed at the end of what is there so far, so a
+ * trim on that round trip makes the space bar do nothing at all, in every
+ * field on the card. Trimming happens once, on the way to SharePoint, in
+ * `trimUnits`.
+ */
+const asText = (value) => (value === null || value === undefined ? '' : String(value));
+
+const isBlankValue = (value) => asText(value).trim() === '';
 
 /** A unit nobody has written anything on is not worth storing. */
 export function isBlankUnit(unit) {
-  return KEYS.every((key) => asText(unit?.[key]) === '');
+  return KEYS.every((key) => isBlankValue(unit?.[key]));
 }
 
 function cleanUnit(raw, index) {
@@ -176,6 +198,12 @@ export function withUnitsSplitOut(record, moved = PER_UNIT_ONLY) {
     if (legacy) next.units = serialiseUnits([legacy]);
   }
 
+  // The one place the stray spaces come off. Everything upstream of here is
+  // somebody typing, and a value trimmed mid-word is a space bar that does
+  // nothing; everything downstream is storage, where " HA2KJDSW " and
+  // "HA2KJDSW" must not be two different serial numbers.
+  next.units = trimUnits(next.units);
+
   // Cleared in full whatever was moved: a field left on the row would go on
   // describing the whole line, which is the thing this exists to stop.
   for (const field of PER_UNIT_ONLY) next[field] = '';
@@ -207,11 +235,26 @@ export function serialiseUnits(units) {
     .sort((a, b) => a.index - b.index)
     .map((unit) => {
       const compact = { index: unit.index };
-      for (const key of KEYS) if (unit[key]) compact[key] = unit[key];
+      for (const key of KEYS) if (!isBlankValue(unit[key])) compact[key] = unit[key];
       return compact;
     });
 
   return kept.length ? JSON.stringify(kept) : '';
+}
+
+/**
+ * The same records with every value trimmed: what actually gets stored.
+ *
+ * Kept apart from `serialiseUnits` deliberately. Serialising happens on every
+ * keystroke in the pager, and trimming there is what stopped the space bar
+ * working; this runs once, when a save is on its way to SharePoint.
+ */
+export function trimUnits(stored) {
+  return serialiseUnits(parseUnits(stored).map((unit) => {
+    const trimmed = { index: unit.index };
+    for (const key of KEYS) trimmed[key] = asText(unit[key]).trim();
+    return trimmed;
+  }));
 }
 
 /**
@@ -263,6 +306,8 @@ export function mergeUnits(stored, incoming, offset = 0) {
   return serialiseUnits([...base, ...added]);
 }
 
+const LOGGED_KEYS = UNIT_FIELDS.map((field) => field.key);
+
 const labelFor = (key) => UNIT_FIELDS.find((field) => field.key === key)?.label ?? key;
 
 /**
@@ -280,7 +325,10 @@ export function diffUnits(before, after) {
 
   const changes = [];
   for (const index of indexes) {
-    for (const key of KEYS) {
+    // The photo fields are deliberately absent: a re-photographed item would
+    // otherwise file a change-log line holding two library paths, burying the
+    // changes somebody actually reads the log for.
+    for (const key of LOGGED_KEYS) {
       const oldValue = asText(was.get(index)?.[key]);
       const newValue = asText(now.get(index)?.[key]);
       if (oldValue === newValue) continue;

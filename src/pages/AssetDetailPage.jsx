@@ -5,7 +5,7 @@ import AppShell from '../components/AppShell';
 import Button from '../components/ui/Button';
 import { Card, ErrorBanner, EmptyState } from '../components/ui/Surfaces';
 import {
-  ArrowLeft, Save, Trash2, Tag, Barcode, Check, Users, Clock,
+  ArrowLeft, Save, Trash2, Tag, Barcode, Check, Users, Clock, AlertTriangle,
 } from '../components/ui/Icons';
 import { useAssets, SHAREPOINT_SITE_URL } from '../features/assets/useAssets';
 import { useSharePointToken } from '../hooks/useRequests';
@@ -19,7 +19,7 @@ import {
   holdersOf, outstanding, isOpen, isOverdue, available, owned,
 } from '../features/assets/handover/availability';
 import {
-  unitsOf, serialiseUnits, filledCount, PER_UNIT_ONLY,
+  unitsOf, serialiseUnits, filledCount, parseUnits, PER_UNIT_ONLY,
 } from '../features/assets/units';
 import UnitPager from '../features/assets/ui/UnitPager';
 import ScanField from '../features/assets/ui/ScanField';
@@ -28,6 +28,8 @@ import { labelFor } from '../features/assets/scan/fieldLabels';
 import { applyScannedFields, SCAN_FIELDS } from '../features/assets/scan/textScan';
 import AssetPhoto from '../features/assets/ui/AssetPhoto';
 import { absoluteFileUrl } from '../features/assets/sharepoint/fileUrl';
+import { uploadUnitPhotos } from '../features/assets/sharepoint/uploadUnitPhotos';
+import { loadPhoto, deletePhoto } from '../features/assets/store/assetDb';
 
 /**
  * One item, in full, and editable.
@@ -55,6 +57,11 @@ const FIELDS = [
   { key: 'specSummary', label: 'Specification', multiline: true },
   { key: 'remarks', label: 'Remarks', multiline: true },
 ];
+
+/** Photos taken here and not yet uploaded, so the phone's copies can be cleared. */
+function pendingPhotoIds(stored) {
+  return parseUnits(stored).map((unit) => unit.photoId).filter(Boolean);
+}
 
 /**
  * The camera button, on the fields a printed label can actually fill.
@@ -101,6 +108,10 @@ export default function AssetDetailPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
+  const [photoWarning, setPhotoWarning] = useState('');
+  // Whether the save had to add a missing column to the SharePoint list first.
+  // Worth saying once: it explains why that one save took a minute.
+  const [repaired, setRepaired] = useState(false);
 
   // Cleared when the row itself changes, so opening a second item does not
   // arrive carrying the first one's unsaved edits.
@@ -168,17 +179,57 @@ export default function AssetDetailPage() {
   const save = async () => {
     setSaving(true);
     setError('');
+    setPhotoWarning('');
     try {
       const tokenRes = await getToken();
       const account = instance.getActiveAccount();
-      await updateAsset({
+      const token = tokenRes.accessToken;
+
+      // Photographs first, because a unit record must reach SharePoint holding
+      // a library path and not a reference to a blob on this phone — which is
+      // meaningless to everyone else who opens the row.
+      let next = edits;
+      let stranded = 0;
+      if ('units' in edits) {
+        const photos = await uploadUnitPhotos({
+          siteUrl: SHAREPOINT_SITE_URL,
+          token,
+          stored: edits.units,
+          seed: asset.assetKey || asset.title,
+          photoFor: loadPhoto,
+        });
+        next = { ...edits, units: photos.units };
+        stranded = photos.failures.length;
+
+        if (stranded) {
+          setPhotoWarning(
+            `${stranded} photo${stranded === 1 ? '' : 's'} could not be uploaded. `
+            + 'Everything typed in was saved, and the photo is still on this phone — '
+            + 'press Save changes again to try it once more.',
+          );
+        }
+      }
+
+      const result = await updateAsset({
         siteUrl: SHAREPOINT_SITE_URL,
-        token: tokenRes.accessToken,
+        token,
         existing: asset,
-        edits,
+        edits: next,
         changedBy: account?.username ?? account?.name ?? '',
       });
-      setEdits({});
+
+      // The phone's copies are only worth keeping until they are somewhere
+      // everybody can see them.
+      const stillWaiting = pendingPhotoIds(next.units);
+      for (const id of pendingPhotoIds(edits.units)) {
+        if (!stillWaiting.includes(id)) await deletePhoto(id).catch(() => {});
+      }
+
+      setRepaired(Boolean(result?.repaired));
+      // A photo that would not upload keeps its edit, or "press Save again"
+      // would be an instruction to press a button that is now greyed out with
+      // nothing behind it. Everything else is saved and is cleared.
+      setEdits(stranded ? { units: next.units } : {});
       setSaved(true);
       reload();
     } catch (failure) {
@@ -243,7 +294,18 @@ export default function AssetDetailPage() {
       {saved && !dirty && (
         <Card className="as-notice as-notice-ok">
           <Check size={16} />
-          <span>Saved. The change is recorded in the asset change log.</span>
+          <span>
+            Saved. The change is recorded in the asset change log.
+            {repaired && ' The register was missing a column for the item records, '
+              + 'so it was added first — later saves will be quick.'}
+          </span>
+        </Card>
+      )}
+
+      {photoWarning && (
+        <Card className="as-notice as-notice-warn">
+          <AlertTriangle size={16} />
+          <span>{photoWarning}</span>
         </Card>
       )}
 
@@ -348,6 +410,9 @@ export default function AssetDetailPage() {
               <UnitPager
                 units={units}
                 onChange={(next) => setEdits({ ...edits, units: serialiseUnits(next) })}
+                siteUrl={SHAREPOINT_SITE_URL}
+                rowPhoto={asset.photoUrl}
+                poPhoto={asset.poPhotoUrl}
               />
             </Card>
           )}
@@ -355,12 +420,27 @@ export default function AssetDetailPage() {
 
         <div className="as-detail-side">
           <Card className="as-panel">
-            <h2 className="as-h2">Photo</h2>
-            <AssetPhoto
-              siteUrl={SHAREPOINT_SITE_URL}
-              stored={asset.photoUrl}
-              alt={asset.title}
-            />
+            <h2 className="as-h2">Photographs</h2>
+            <div className="as-shots">
+              <AssetPhoto
+                siteUrl={SHAREPOINT_SITE_URL}
+                stored={asset.photoUrl}
+                alt={asset.title}
+                caption={perUnit ? 'The whole line' : 'The item'}
+              />
+              {/* The delivery order as a PICTURE, not a link. It is the paper
+                  that says what was supposed to arrive, and checking a count
+                  against it should not mean leaving the page and signing into
+                  SharePoint. The link to the original is still one tap away,
+                  inside the enlarged view. */}
+              <AssetPhoto
+                siteUrl={SHAREPOINT_SITE_URL}
+                stored={asset.poPhotoUrl}
+                alt="Delivery order"
+                caption="Delivery order / PO"
+                empty="No delivery order was scanned for this one."
+              />
+            </div>
           </Card>
 
           <Card className="as-panel">
@@ -433,20 +513,28 @@ export default function AssetDetailPage() {
               <dd>{asset.addedOnMYT || '—'}</dd>
               <dt>Added by</dt>
               <dd>{asset.addedBy || '—'}</dd>
+              {asset.poNumber && (
+                <>
+                  <dt>PO number</dt>
+                  <dd>{asset.poNumber}</dd>
+                </>
+              )}
               {asset.poPhotoUrl && (
                 <>
                   <dt>PO scan</dt>
                   <dd>
-                    {/* Absolute, for the same reason the photograph is: the
-                        stored path belongs to SharePoint, and a relative link
-                        asks the portal for a file it has never had. */}
+                    {/* The scan itself is up with the photographs now. This
+                        stays for anyone who wants the file rather than the
+                        picture — absolute, because the stored path belongs to
+                        SharePoint and a relative link asks the portal for a
+                        file it has never had. */}
                     <a
                       href={absoluteFileUrl(SHAREPOINT_SITE_URL, asset.poPhotoUrl)}
                       target="_blank"
                       rel="noreferrer"
                       className="as-link"
                     >
-                      Open
+                      Open in SharePoint
                     </a>
                   </dd>
                 </>

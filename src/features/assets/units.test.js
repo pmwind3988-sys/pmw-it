@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   parseUnits, unitsOf, setUnitField, serialiseUnits, diffUnits, filledCount, isBlankUnit,
-  withUnitsSplitOut, mergeUnits, appendUnit, perItem, countPerItem, PER_UNIT_CODES,
+  withUnitsSplitOut, mergeUnits, appendUnit, perItem, countPerItem, trimUnits, PER_UNIT_CODES,
 } from './units.js';
 
 const bulk = (quantity, units) => ({ quantity, trackingMode: 'Bulk', units });
@@ -275,5 +275,72 @@ describe('perItem', () => {
   it('reads a tracked row off the row', () => {
     const row = { trackingMode: 'Tracked', quantity: 1, condition: 'Faulty' };
     expect(countPerItem(row, 'condition', 'Faulty')).toBe(1);
+  });
+});
+
+/**
+ * The pager writes every keystroke out through `serialiseUnits` and reads it
+ * straight back through `unitsOf`. A trim anywhere on that path is a trim
+ * applied WHILE SOMEBODY IS TYPING — and since a space is only ever typed at
+ * the end of what is there so far, it made the space bar do nothing at all.
+ */
+describe('typing a space', () => {
+  const typed = (value) => unitsOf(bulk(1), serialiseUnits([{ index: 0, location: value }]))[0];
+
+  it('survives the round trip the pager makes on every keystroke', () => {
+    expect(typed('Store ').location).toBe('Store ');
+    expect(typed('Store room').location).toBe('Store room');
+  });
+
+  it('survives it however many times it is made', () => {
+    let units = unitsOf(bulk(1));
+    for (const value of ['S', 'St', 'Store', 'Store ', 'Store r', 'Store room']) {
+      units = unitsOf(bulk(1), serialiseUnits(setUnitField(units, 0, 'location', value)));
+    }
+    expect(units[0].location).toBe('Store room');
+  });
+
+  /** A field holding only spaces is still nothing, and must not be stored. */
+  it('does not turn a field of spaces into a filled-in item', () => {
+    expect(isBlankUnit(typed('   '))).toBe(true);
+    expect(serialiseUnits([{ index: 0, serialNumber: '  ' }])).toBe('');
+  });
+});
+
+describe('trimUnits', () => {
+  it('takes the stray spaces off on the way to storage', () => {
+    const stored = serialiseUnits([{ index: 0, serialNumber: ' HA2KJDSW ' }]);
+    expect(parseUnits(trimUnits(stored))[0].serialNumber).toBe('HA2KJDSW');
+  });
+
+  it('is what a save runs, so nothing half-typed reaches SharePoint', () => {
+    const record = withUnitsSplitOut({
+      trackingMode: 'Bulk',
+      quantity: 1,
+      units: serialiseUnits([{ index: 0, serialNumber: 'SN-A ', location: ' Store ' }]),
+    });
+
+    const [unit] = parseUnits(record.units);
+    expect(unit.serialNumber).toBe('SN-A');
+    expect(unit.location).toBe('Store');
+  });
+});
+
+describe('a photograph of one item', () => {
+  it('is kept on the unit, through the round trip', () => {
+    const stored = serialiseUnits([{ index: 1, photoUrl: '/sites/it/photos/tab-2.jpg' }]);
+    expect(parseUnits(stored)[0].photoUrl).toBe('/sites/it/photos/tab-2.jpg');
+  });
+
+  it('makes the item count as recorded, so the dots show it', () => {
+    const units = unitsOf(bulk(2, serialiseUnits([{ index: 0, photoId: 'local-1' }])));
+    expect(filledCount(units)).toBe(1);
+  });
+
+  /** The change log ignores photos, the same as it does for the row's own. */
+  it('produces no change-log line of its own', () => {
+    const before = serialiseUnits([{ index: 0, serialNumber: 'SN-A' }]);
+    const after = serialiseUnits([{ index: 0, serialNumber: 'SN-A', photoUrl: '/p/a.jpg' }]);
+    expect(diffUnits(before, after)).toEqual([]);
   });
 });

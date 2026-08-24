@@ -1,5 +1,6 @@
 import { spFetch, listPath } from '../../sharepoint/spClient.js';
 import { DEVICE_LIST_NAME, fromListItem } from './deviceSchema.js';
+import { refixStored } from '../derive/refixStored.js';
 
 const PAGE_SIZE = 500;
 
@@ -27,5 +28,8 @@ export async function readAllDevices(siteUrl, token) {
     url = data.d?.__next ?? null;
   }
 
-  return rows.map(fromListItem);
+  // Each row is brought in line with today's exclusion rules as it is read, so
+  // a machine scanned before its IT extraction disk was known stops reporting
+  // that disk as its own storage without waiting to be scanned again.
+  return rows.map(fromListItem).map(refixStored);
 }

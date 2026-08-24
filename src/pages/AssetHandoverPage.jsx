@@ -12,15 +12,15 @@ import { useSharePointToken } from '../hooks/useRequests';
 import { useScanner, CAMERA_STATE } from '../features/assets/scan/useScanner';
 import { signalAccepted, signalDuplicate } from '../features/assets/scan/feedback';
 import {
-  newBasket, newLine, addLine, removeLine, setQuantity, replaceLine, hasAsset, unitCount,
+  newBasket, newLine, newUnitLine, addLine, removeLine, setQuantity, replaceLine,
+  hasAsset, hasUnit, isUnitLine, unitCount,
 } from '../features/assets/handover/basket';
 import { lineRefusal } from '../features/assets/handover/planHandover';
+import { findScanTarget } from '../features/assets/handover/scanMatch';
 import { available, owned, HANDOVER_KIND } from '../features/assets/handover/availability';
 import { commitHandover } from '../features/assets/sharepoint/writeHandover';
 import { matchesQuery } from '../features/assets/assetFilters';
-import { normaliseCode } from '../features/assets/identity';
 import { TRACKED } from '../features/assets/assetKinds';
-import { parseUnits } from '../features/assets/units';
 import PersonPicker from '../features/assets/ui/PersonPicker';
 
 /**
@@ -69,6 +69,7 @@ export default function AssetHandoverPage() {
       .slice(0, 8);
   }, [assets, query]);
 
+  /** A whole-row line — a tracked item, or a bulk box added by search. */
   const add = useCallback((asset) => {
     setBasket((current) => {
       if (hasAsset(current, asset.id)) return current;
@@ -77,45 +78,51 @@ export default function AssetHandoverPage() {
     setQuery('');
   }, []);
 
+  /** One scanned item off a bulk row, carrying its own serial. */
+  const addUnit = useCallback((asset, unit) => {
+    setBasket((current) => {
+      if (hasUnit(current, asset.id, unit.index)) return current;
+      return addLine(current, newUnitLine(asset, unit));
+    });
+    setQuery('');
+  }, []);
+
   /**
-   * A scanned code is matched against every code on a row, because whoever is
-   * holding the thing does not know which field their barcode ended up in.
+   * A scanned code is resolved to the exact thing in the scanner's hand: one
+   * unit off a bulk row where the code names one, or the whole row otherwise.
+   * Two tabs scanned off a box become two lines with two serials, not one line
+   * of two — the register records which one went out.
    */
   const onCodes = useCallback((codes) => {
     for (const code of codes) {
-      const wanted = normaliseCode(code.rawValue);
-      const found = assets.find((asset) => (
-        normaliseCode(asset.serialNumber) === wanted
-        || normaliseCode(asset.assetTag) === wanted
-        || normaliseCode(asset.partNumber) === wanted
-        || (asset.additionalCodes ?? []).some((entry) => normaliseCode(entry) === wanted)
-        // A bulk line keeps its codes on its individual items, so scanning the
-        // tab in your hand has to reach them or the register answers "nothing
-        // matches" for something it certainly owns.
-        || parseUnits(asset.units).some((unit) => (
-          normaliseCode(unit.serialNumber) === wanted
-          || normaliseCode(unit.assetTag) === wanted
-          || normaliseCode(unit.partNumber) === wanted
-        ))
-      ));
+      const target = findScanTarget(assets, code.rawValue);
 
-      if (!found) {
+      if (!target) {
         signalDuplicate();
         setFlash({ kind: 'dup', text: `Nothing in the register matches ${code.rawValue}` });
         continue;
       }
 
-      if (available(found) < 1) {
+      const { asset, unit } = target;
+
+      if (available(asset) < 1) {
         signalDuplicate();
-        setFlash({ kind: 'dup', text: `${found.title} is already out` });
+        setFlash({ kind: 'dup', text: `${asset.title} is already out` });
         continue;
       }
 
-      signalAccepted();
-      setFlash({ kind: 'ok', text: found.title });
-      add(found);
+      if (unit) {
+        const serial = unit.serialNumber || `#${unit.index + 1}`;
+        signalAccepted();
+        setFlash({ kind: 'ok', text: `${asset.title} · ${serial}` });
+        addUnit(asset, unit);
+      } else {
+        signalAccepted();
+        setFlash({ kind: 'ok', text: asset.title });
+        add(asset);
+      }
     }
-  }, [assets, add]);
+  }, [assets, add, addUnit]);
 
   const { videoRef, state } = useScanner({ active: scanning, onCodes });
 
@@ -330,11 +337,15 @@ export default function AssetHandoverPage() {
                     <li key={line.lineId} className={refusal ? 'as-basketline bad' : 'as-basketline'}>
                       <span className="as-person-text">
                         <strong>{line.itemTitle}</strong>
-                        <span className="as-sub">{line.category}</span>
+                        <span className="as-sub">
+                          {line.category}
+                          {isUnitLine(line)
+                            && ` · ${line.serialNumber || `Item #${line.unitIndex + 1}`}`}
+                        </span>
                         {refusal && <span className="as-field-issue">{refusal}</span>}
                       </span>
 
-                      {line.trackingMode !== TRACKED && (
+                      {line.trackingMode !== TRACKED && !isUnitLine(line) && (
                         <label className="as-qtybox">
                           <span className="as-sub">Qty</span>
                           <input

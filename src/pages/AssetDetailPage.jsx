@@ -460,6 +460,7 @@ export default function AssetDetailPage() {
                       <Users size={13} /> {row.personName || row.personEmail}
                     </Link>
                     <span className="as-sub">
+                      {row.serialNumber ? `${row.serialNumber} · ` : ''}
                       {outstanding(row)} · {row.kind}
                       {row.dueOnMYT ? ` · due ${row.dueOnMYT}` : ''}
                     </span>

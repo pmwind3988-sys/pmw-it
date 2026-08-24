@@ -1,5 +1,5 @@
 import { TRACKED } from '../assetKinds.js';
-import { resolveLines } from './basket.js';
+import { resolveLines, isUnitLine } from './basket.js';
 import {
   available, owned, out, HANDOVER_KIND, HANDOVER_STATUS,
 } from './availability.js';
@@ -23,8 +23,18 @@ import {
  */
 export function coalesceLines(lines) {
   const byAsset = new Map();
+  // A unit line names one physical item and its own serial. Two of them must
+  // never be folded into "one line of two", or the two serials collapse into
+  // one record wearing one of them — the exact thing per-item handover exists
+  // to stop. They pass through untouched, one row each.
+  const units = [];
 
   for (const line of lines) {
+    if (isUnitLine(line)) {
+      units.push({ ...line });
+      continue;
+    }
+
     const existing = byAsset.get(line.assetId);
     if (!existing) {
       byAsset.set(line.assetId, { ...line });
@@ -40,7 +50,7 @@ export function coalesceLines(lines) {
     existing.remarks = [existing.remarks, line.remarks].filter(Boolean).join(' — ');
   }
 
-  return [...byAsset.values()];
+  return [...byAsset.values(), ...units];
 }
 
 /**
@@ -55,8 +65,14 @@ export function planHandover(basket, register, { issuedOn = Date.now(), issuedBy
   const byId = new Map(register.map((asset) => [asset.id, asset]));
 
   const handovers = [];
-  const assetUpdates = [];
   const blocked = [];
+
+  // How much of each row this plan has already spoken for. A row can now carry
+  // several lines at once — one count line and any number of scanned units —
+  // and each has to be checked against what the ones before it already took, or
+  // three unit lines each pass against a stock of two and hand out three.
+  const claimed = new Map();
+  const claimedOf = (id) => claimed.get(id) ?? 0;
 
   const person = basket.person ?? {};
 
@@ -83,7 +99,7 @@ export function planHandover(basket, register, { issuedOn = Date.now(), issuedBy
     }
 
     const wanted = asset.trackingMode === TRACKED ? 1 : (line.quantity ?? 0);
-    const free = available(asset);
+    const free = available(asset) - claimedOf(asset.id);
 
     if (wanted > free) {
       blocked.push({
@@ -93,11 +109,21 @@ export function planHandover(basket, register, { issuedOn = Date.now(), issuedBy
       continue;
     }
 
+    claimed.set(asset.id, claimedOf(asset.id) + wanted);
+
+    const serialNumber = line.serialNumber ?? '';
+    const itemTitle = asset.title ?? line.itemTitle;
+
     handovers.push({
       handoverId: basket.id,
       assetKey: asset.assetKey,
       assetId: asset.id,
-      itemTitle: asset.title ?? line.itemTitle,
+      itemTitle,
+      // Which one of the box went out. Empty for a plain count line, and for a
+      // scanned unit whose serial nobody has filled in yet — the register's
+      // count still moves; the row just cannot name the item.
+      serialNumber,
+      unitIndex: isUnitLine(line) ? line.unitIndex : null,
       category: asset.category ?? '',
       personName: person.name ?? '',
       personEmail: person.email ?? '',
@@ -113,24 +139,37 @@ export function planHandover(basket, register, { issuedOn = Date.now(), issuedBy
       issuedBy,
       returnedBy: '',
       remarks: line.remarks ?? '',
-      title: `${person.name || person.email || 'Someone'} — ${asset.title ?? ''}`,
+      title: `${person.name || person.email || 'Someone'} — ${itemTitle}${serialNumber ? ` (${serialNumber})` : ''}`,
     });
+  }
+
+  // One register update per row, summing everything this plan took from it. A
+  // separate update per line would each read the same starting `QuantityOut`
+  // and the last write would win, silently undoing every unit before it.
+  const assetUpdates = [];
+  for (const [assetId, total] of claimed) {
+    const asset = byId.get(assetId);
+    const tracked = asset.trackingMode === TRACKED;
+    // A tracked row is one line, so its kind is unambiguous; read it back off
+    // the handover this plan just wrote for it.
+    const own = handovers.find((row) => row.assetId === assetId);
+    const kind = own?.kind;
 
     assetUpdates.push({
       id: asset.id,
       assetKey: asset.assetKey,
       body: {
-        quantityOut: out(asset) + wanted,
+        quantityOut: out(asset) + total,
         // Only a tracked row can name one holder. A box of cables can be with
         // five people at once and there is no honest single value, so those
         // fields stay empty and `QuantityOut` carries the answer (§4.2).
-        ...(asset.trackingMode === TRACKED ? {
-          status: line.kind === HANDOVER_KIND.BORROWED ? 'Borrowed' : 'Assigned',
-          handoverKind: line.kind,
+        ...(tracked ? {
+          status: kind === HANDOVER_KIND.BORROWED ? 'Borrowed' : 'Assigned',
+          handoverKind: kind,
           assignedTo: person.name ?? '',
           assignedToEmail: person.email ?? '',
           assignedOn: issuedOn,
-          dueOn: line.kind === HANDOVER_KIND.BORROWED ? (line.dueOn ?? null) : null,
+          dueOn: kind === HANDOVER_KIND.BORROWED ? (own?.dueOn ?? null) : null,
         } : {}),
       },
     });

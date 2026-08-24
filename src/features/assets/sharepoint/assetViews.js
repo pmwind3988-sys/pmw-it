@@ -86,7 +86,7 @@ export const ASSET_VIEWS = [
     isDefault: true,
     title: 'All Items',
     fields: [
-      NAME, 'ItemTitle', 'Category', 'PersonName', 'PersonEmail', 'Quantity',
+      NAME, 'ItemTitle', 'SerialNumber', 'Category', 'PersonName', 'PersonEmail', 'Quantity',
       'ReturnedQuantity', 'Kind', 'HandoverStatus', 'IssuedOnMYT', 'DueOnMYT',
       'ReturnedOnMYT', 'ReturnCondition', 'IssuedBy', 'Remarks',
     ],

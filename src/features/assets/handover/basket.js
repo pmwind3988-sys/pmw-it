@@ -1,5 +1,6 @@
 import { newId } from '../draft/draftAsset.js';
 import { TRACKED } from '../assetKinds.js';
+import { unitTitle } from '../units.js';
 import { HANDOVER_KIND, available } from './availability.js';
 
 /**
@@ -36,9 +37,38 @@ export function newLine(asset, overrides = {}) {
     category: asset.category ?? '',
     trackingMode: asset.trackingMode,
     quantity: asset.trackingMode === TRACKED ? 1 : Math.min(1, available(asset)) || 1,
+    // A line with no `unitIndex` is a plain count — "two of that box". A unit
+    // line pins one physical item on the row, named by its own serial, so two
+    // tabs handed over become two lines and two records, not one line of two.
+    unitIndex: null,
+    serialNumber: '',
     kind: undefined,
     dueOn: undefined,
     remarks: '',
+    ...overrides,
+  };
+}
+
+/** True for a line that is one specific item on a bulk row, not a count. */
+export function isUnitLine(line) {
+  return Number.isInteger(line?.unitIndex);
+}
+
+/**
+ * One physical item off a bulk row, the thing that was actually scanned.
+ *
+ * Quantity is one and stays one however the line is later touched: it is a
+ * single object with a single serial, and "two of this exact tab" is a
+ * contradiction. The serial is carried so the handover row can name which one
+ * of the twenty went out, which is the whole point of scanning it rather than
+ * typing a number.
+ */
+export function newUnitLine(asset, unit, overrides = {}) {
+  return {
+    ...newLine(asset, { quantity: 1 }),
+    unitIndex: unit.index,
+    serialNumber: unit.serialNumber || '',
+    unitLabel: unitTitle(unit, asset),
     ...overrides,
   };
 }
@@ -83,14 +113,27 @@ export function setQuantity(basket, lineId, value) {
   return {
     ...basket,
     lines: basket.lines.map((line) => (line.lineId === lineId
-      ? { ...line, quantity: line.trackingMode === TRACKED ? 1 : quantity }
+      // A unit line is one item and is pinned to one the same way a tracked
+      // line is: its count is not the user's to raise.
+      ? { ...line, quantity: line.trackingMode === TRACKED || isUnitLine(line) ? 1 : quantity }
       : line)),
   };
 }
 
-/** Already in the basket, so the same laptop cannot be added to it twice. */
+/**
+ * Already in the basket as a whole-row line, so the same laptop — or the same
+ * box, added by search — cannot be added to it twice. Unit lines are exempt:
+ * a bulk row can legitimately have several, one per scanned item.
+ */
 export function hasAsset(basket, assetId) {
-  return basket.lines.some((line) => line.assetId === assetId);
+  return basket.lines.some((line) => line.assetId === assetId && !isUnitLine(line));
+}
+
+/** This exact item off this row is already in the basket. */
+export function hasUnit(basket, assetId, unitIndex) {
+  return basket.lines.some(
+    (line) => line.assetId === assetId && line.unitIndex === unitIndex,
+  );
 }
 
 export function unitCount(basket) {

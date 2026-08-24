@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { planHandover, coalesceLines, lineRefusal } from './planHandover.js';
 import {
-  newBasket, newLine, addLine, resolveLines, setQuantity, hasAsset, unitCount,
+  newBasket, newLine, newUnitLine, addLine, resolveLines, setQuantity, hasAsset, unitCount,
 } from './basket.js';
 import { HANDOVER_KIND, HANDOVER_STATUS } from './availability.js';
 
@@ -228,5 +228,72 @@ describe('lineRefusal', () => {
     const basket = basketFor([held]);
 
     expect(lineRefusal(basket.lines[0], held, basket)).toContain('Evonne');
+  });
+});
+
+describe('per-unit handover', () => {
+  const tabs = (overrides = {}) => ({
+    id: 3,
+    assetKey: 'bulk:LENOVO||TAB',
+    title: 'Lenovo Tab',
+    category: 'Tablet',
+    trackingMode: 'Bulk',
+    quantity: 2,
+    quantityOut: 0,
+    ...overrides,
+  });
+
+  const unitLine = (asset, unit, overrides = {}) => ({
+    ...newUnitLine(asset, unit),
+    ...overrides,
+  });
+
+  it('writes one handover row per scanned unit, each with its own serial', () => {
+    const asset = tabs();
+    let basket = newBasket(person);
+    basket = addLine(basket, unitLine(asset, { index: 0, serialNumber: 'TAB-AAA' }));
+    basket = addLine(basket, unitLine(asset, { index: 1, serialNumber: 'TAB-BBB' }));
+
+    const { handovers } = planHandover(basket, [asset]);
+
+    expect(handovers).toHaveLength(2);
+    expect(handovers.map((row) => row.serialNumber).sort()).toEqual(['TAB-AAA', 'TAB-BBB']);
+    expect(handovers.every((row) => row.quantity === 1)).toBe(true);
+    expect(handovers.map((row) => row.unitIndex).sort()).toEqual([0, 1]);
+  });
+
+  it('moves the register by the number of units, in a single row update', () => {
+    const asset = tabs({ quantity: 5, quantityOut: 1 });
+    let basket = newBasket(person);
+    basket = addLine(basket, unitLine(asset, { index: 0, serialNumber: 'TAB-AAA' }));
+    basket = addLine(basket, unitLine(asset, { index: 1, serialNumber: 'TAB-BBB' }));
+
+    const { assetUpdates } = planHandover(basket, [asset]);
+
+    expect(assetUpdates).toHaveLength(1);
+    expect(assetUpdates[0].body.quantityOut).toBe(3);
+  });
+
+  it('refuses the unit that would overdraw the row, and keeps the ones that fit', () => {
+    const asset = tabs({ quantity: 2, quantityOut: 1 });
+    let basket = newBasket(person);
+    basket = addLine(basket, unitLine(asset, { index: 0, serialNumber: 'TAB-AAA' }));
+    basket = addLine(basket, unitLine(asset, { index: 1, serialNumber: 'TAB-BBB' }));
+
+    const { handovers, blocked } = planHandover(basket, [asset]);
+
+    expect(handovers).toHaveLength(1);
+    expect(blocked).toHaveLength(1);
+    expect(blocked[0].reason).toContain('Only 0 of 2 available');
+  });
+
+  it('does not name a holder on the bulk row when units go out', () => {
+    const asset = tabs();
+    let basket = newBasket(person);
+    basket = addLine(basket, unitLine(asset, { index: 0, serialNumber: 'TAB-AAA' }));
+
+    const { assetUpdates } = planHandover(basket, [asset]);
+
+    expect(assetUpdates[0].body.assignedTo).toBeUndefined();
   });
 });

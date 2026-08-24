@@ -165,7 +165,10 @@ export default function AssetPersonPage() {
                 <tr key={row.id} className={isOverdue(row) ? 'as-row-overdue' : undefined}>
                   <td>
                     <Link to={`/assets/${row.assetId}`} className="as-link">{row.itemTitle}</Link>
-                    <span className="as-sub">{row.category}</span>
+                    <span className="as-sub">
+                      {row.category}
+                      {row.serialNumber && ` · ${row.serialNumber}`}
+                    </span>
                   </td>
                   <td className="as-qty">{outstanding(row)}</td>
                   <td>{row.kind}</td>

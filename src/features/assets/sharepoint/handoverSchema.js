@@ -24,6 +24,12 @@ export const HANDOVER_COLUMNS = [
   text('ItemTitle', 'Item'),
   choice('Category', 'Category', CATEGORIES),
 
+  // Which one of a bulk row went out. A serial makes the row name the exact
+  // item; the index keeps two blank-serial units apart on the same row so a
+  // return can still tell them from each other.
+  text('SerialNumber', 'Serial Number'),
+  num('UnitIndex', 'Unit'),
+
   text('PersonName', 'Person'),
   // The identity. "What does Amir have" keys on this, never on the display
   // name, which two people will spell two ways.

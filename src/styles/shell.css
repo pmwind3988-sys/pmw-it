@@ -35,7 +35,23 @@
 
   /* Ink used *on* the brand surface: the nav column and the sign-in poster. */
   --it-on-brand: #ffffff;
-  --it-on-brand-dim: #bcd9f4;
+  /* White at 88% rather than a pale blue. #bcd9f4 measured 2.6:1 on the column,
+     and these labels are 13.5px, which needs 4.5. */
+  --it-on-brand-dim: rgba(255, 255, 255, 0.88);
+
+  /* The nav column's own gradient, darker than --it-brand.
+
+     The column writes 13.5px labels on a saturated fill, and white — the
+     lightest ink there is — only reaches 4.53:1 on #0078d4 at full strength.
+     Dimmed inactive rows and the sheen wash over them put it under 4. Nothing
+     about the ink can fix that, so the ground moves instead: these two stops
+     are the point at which every row state (inactive at 88%, hover on a 6%
+     scrim, active on a 10% scrim, each under the sheen) clears 4.5:1.
+
+     --it-brand itself is deliberately unchanged. It is the fill of buttons and
+     focus rings on a white page, where it was never the problem. */
+  --it-nav-top: #005a9f;
+  --it-nav-bottom: #004e86;
 
   --it-card-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.05);
   --it-radius: 12px;
@@ -74,7 +90,9 @@
   --it-danger-wash: #2a1414;
 
   --it-on-brand: #f8fafc;
-  --it-on-brand-dim: #93b4cf;
+  --it-on-brand-dim: rgba(248, 250, 252, 0.88);
+  --it-nav-top: #1b5a89;
+  --it-nav-bottom: #071b2c;
 
   --it-card-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 18px rgba(0, 0, 0, 0.35);
 
@@ -97,7 +115,7 @@
 .it-brand-surface {
   position: relative;
   isolation: isolate;
-  background: linear-gradient(160deg, var(--it-brand) 0%, var(--it-brand-deep) 100%);
+  background: linear-gradient(160deg, var(--it-nav-top) 0%, var(--it-nav-bottom) 100%);
 }
 
 .it-brand-surface::before {
@@ -107,8 +125,8 @@
   z-index: -1;
   pointer-events: none;
   background-image:
-    radial-gradient(38% 30% at 18% 12%, rgba(245, 158, 11, 0.2), transparent 70%),
-    radial-gradient(44% 34% at 84% 84%, rgba(147, 197, 253, 0.24), transparent 72%);
+    radial-gradient(38% 30% at 18% 12%, rgba(245, 158, 11, 0.12), transparent 70%),
+    radial-gradient(44% 34% at 84% 84%, rgba(147, 197, 253, 0.16), transparent 72%);
   background-repeat: no-repeat;
   background-size: 170% 170%, 180% 180%;
   animation: itSheenDrift 22s ease-in-out infinite;
@@ -277,13 +295,31 @@
 }
 
 .shell-navitem:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
   color: var(--it-on-brand);
 }
 
+/* The active row's wash is only 10%, because a wash strong enough to read as
+   "selected" unaided forces the whole column several shades darker to keep its
+   labels legible. The rail does that job instead: an accent bar down the left
+   edge at full strength, plus the heavier weight — which survives a monochrome
+   display, where colour alone would not. */
 .shell-navitem.active {
-  background: rgba(255, 255, 255, 0.22);
+  position: relative;
+  background: rgba(255, 255, 255, 0.1);
   color: var(--it-on-brand);
+  font-weight: 800;
+}
+
+.shell-navitem.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--it-accent);
 }
 
 .shell-navitem svg {

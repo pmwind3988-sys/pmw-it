@@ -1,7 +1,9 @@
 import {
   describe, it, expect, afterEach, vi,
 } from 'vitest';
-import { planEdit, updateDevice, deleteDevice, EDITABLE_FIELDS } from './updateDevice.js';
+import {
+  planEdit, updateDevice, deleteDevice, deleteDevices, EDITABLE_FIELDS,
+} from './updateDevice.js';
 
 const SITE = 'https://contoso.sharepoint.com/sites/it';
 
@@ -193,5 +195,113 @@ describe('deleteDevice', () => {
     await expect(deleteDevice({ siteUrl: SITE, token: 't', device: row() }))
       .rejects.toThrow(/Could not remove/);
     expect(writes(sp.calls).some((c) => c.url.includes('Changes'))).toBe(false);
+  });
+});
+
+describe('deleteDevices', () => {
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  const three = [
+    row({ id: 7, computerName: 'PC1' }),
+    row({ id: 8, computerName: 'PC2' }),
+    row({ id: 9, computerName: 'PC3' }),
+  ];
+
+  it('removes every row it was given and reports them by name', async () => {
+    const sp = fakeSharePoint();
+    vi.stubGlobal('fetch', sp.fetch);
+
+    const result = await deleteDevices({
+      siteUrl: SITE, token: 't', devices: three, changedBy: 'me@pmw-group.com',
+    });
+
+    expect(result.removed.sort()).toEqual(['PC1', 'PC2', 'PC3']);
+    expect(result.failures).toEqual([]);
+
+    const deletes = writes(sp.calls).filter((c) => c.headers['X-HTTP-Method'] === 'DELETE');
+    expect(deletes.map((c) => c.url.match(/items\((\d+)\)/)[1]).sort()).toEqual(['7', '8', '9']);
+  });
+
+  it('asks for the form digest once, not once per machine', async () => {
+    const sp = fakeSharePoint();
+    vi.stubGlobal('fetch', sp.fetch);
+
+    await deleteDevices({ siteUrl: SITE, token: 't', devices: three });
+
+    expect(sp.calls.filter((c) => c.url.endsWith('/contextinfo'))).toHaveLength(1);
+  });
+
+  it('records a removal for each machine, because none of them leaves silently', async () => {
+    const sp = fakeSharePoint();
+    vi.stubGlobal('fetch', sp.fetch);
+
+    await deleteDevices({
+      siteUrl: SITE, token: 't', devices: three, changedBy: 'me@pmw-group.com',
+    });
+
+    const logged = writes(sp.calls).filter((c) => c.url.includes('Changes'));
+    expect(logged.map((c) => c.body.Title).sort()).toEqual(['PC1', 'PC2', 'PC3']);
+    expect(logged.every((c) => c.body.ChangeType === 'Removed')).toBe(true);
+    expect(logged.every((c) => c.body.ChangedBy === 'me@pmw-group.com')).toBe(true);
+  });
+
+  it('removes the rest when one machine fails, and names the one that did not', async () => {
+    const sp = fakeSharePoint({ failOn: 'items(8)' });
+    vi.stubGlobal('fetch', sp.fetch);
+
+    const result = await deleteDevices({ siteUrl: SITE, token: 't', devices: three });
+
+    expect(result.removed.sort()).toEqual(['PC1', 'PC3']);
+    expect(result.failures).toHaveLength(1);
+    expect(result.failures[0].computerName).toBe('PC2');
+    expect(result.failures[0].error).toMatch(/Could not remove/);
+  });
+
+  it('does not log a removal for the machine whose delete failed', async () => {
+    const sp = fakeSharePoint({ failOn: 'items(8)' });
+    vi.stubGlobal('fetch', sp.fetch);
+
+    await deleteDevices({ siteUrl: SITE, token: 't', devices: three });
+
+    const logged = writes(sp.calls).filter((c) => c.url.includes('Changes'));
+    expect(logged.map((c) => c.body.Title).sort()).toEqual(['PC1', 'PC3']);
+  });
+
+  it('reports a row with no id as a failure rather than abandoning the batch', async () => {
+    const sp = fakeSharePoint();
+    vi.stubGlobal('fetch', sp.fetch);
+
+    const result = await deleteDevices({
+      siteUrl: SITE,
+      token: 't',
+      devices: [row({ id: null, computerName: 'PCX' }), row({ id: 7, computerName: 'PC1' })],
+    });
+
+    expect(result.removed).toEqual(['PC1']);
+    expect(result.failures[0]).toMatchObject({ computerName: 'PCX' });
+    expect(result.failures[0].error).toMatch(/no id/);
+  });
+
+  it('does not touch SharePoint when the selection is empty', async () => {
+    const sp = fakeSharePoint();
+    vi.stubGlobal('fetch', sp.fetch);
+
+    const result = await deleteDevices({ siteUrl: SITE, token: 't', devices: [] });
+
+    expect(result).toEqual({ removed: [], failures: [] });
+    expect(sp.calls).toHaveLength(0);
+  });
+
+  it('counts progress up to the size of the selection', async () => {
+    const sp = fakeSharePoint();
+    vi.stubGlobal('fetch', sp.fetch);
+    const seen = [];
+
+    await deleteDevices({
+      siteUrl: SITE, token: 't', devices: three, onProgress: (done, total) => seen.push([done, total]),
+    });
+
+    expect(seen).toHaveLength(3);
+    expect(seen.at(-1)).toEqual([3, 3]);
   });
 });

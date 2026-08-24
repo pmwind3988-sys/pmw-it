@@ -524,8 +524,101 @@
   background: var(--it-brand-wash);
 }
 
+.dt-selected {
+  background: var(--it-brand-wash);
+}
+
 .dt-actions {
   white-space: nowrap;
+}
+
+/* ---- The two columns that do not scroll away ----------------------------
+   The register is forty-odd columns wide on purpose. Frozen at the left edge
+   is WHICH machine a row is and its tick box; frozen at the right is what can
+   be done to it. Without both, scrolling to the far end of a row leaves you
+   pressing Remove on a machine you can no longer name.
+
+   Every frozen cell needs an opaque background of its own: a sticky cell is
+   painted in place while the rest of the row slides underneath it, and a
+   transparent one would show both at once. That is also why the row states
+   below repeat their colour -- a frozen cell keeps `--it-panel` otherwise, and
+   the highlight would break at each frozen edge. */
+.dt-frozen .dt-identity {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--it-panel);
+  box-shadow: inset -1px 0 0 var(--it-line);
+}
+
+.dt-frozen .dt-actions {
+  position: sticky;
+  right: 0;
+  z-index: 1;
+  background: var(--it-panel);
+  box-shadow: inset 1px 0 0 var(--it-line);
+}
+
+/* The header row already sticks to the top, so it has to outrank the body's
+   frozen cells; the two corners, sticking in both directions at once, outrank
+   the header. */
+.dt-frozen th {
+  z-index: 2;
+}
+
+.dt-frozen th.dt-identity,
+.dt-frozen th.dt-actions {
+  z-index: 3;
+}
+
+.dt-editing .dt-identity,
+.dt-editing .dt-actions,
+.dt-selected .dt-identity,
+.dt-selected .dt-actions {
+  background: var(--it-brand-wash);
+}
+
+.dt-identity {
+  display: table-cell;
+  white-space: nowrap;
+}
+
+/* The tick box and the name are one cell, so they need spacing between them
+   that a column gap would otherwise have provided. */
+.dt-tick {
+  margin-right: 8px;
+  vertical-align: middle;
+  cursor: pointer;
+}
+
+.dt-tick:disabled {
+  cursor: default;
+}
+
+/* ---- What is ticked, and the one irreversible button --------------------
+   The bar appears only once something is ticked, and it is the only place the
+   register removes more than one machine, so the confirm step lives here
+   rather than in a dialogue nobody can read the table behind. */
+.dt-bulk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--it-brand-line);
+  border-radius: var(--it-radius);
+  background: var(--it-brand-wash);
+  font-size: 0.82rem;
+}
+
+.dt-bulk-count {
+  font-weight: 600;
+  color: var(--it-ink);
+}
+
+.dt-bulk-warn {
+  color: var(--it-danger);
 }
 
 .dt-icon {

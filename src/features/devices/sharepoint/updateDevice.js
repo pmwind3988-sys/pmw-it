@@ -2,7 +2,7 @@ import {
   spFetch, listPath, ITEM_ACCEPT, getFormDigest,
 } from '../../sharepoint/spClient.js';
 import { DEVICE_LIST_NAME, CHANGE_LIST_NAME } from './deviceSchema.js';
-import { withRetry } from '../../sharepoint/writePool.js';
+import { runPool, withRetry } from '../../sharepoint/writePool.js';
 import { formatMYT } from '../../datastudio/time/malaysiaTime.js';
 
 /**
@@ -118,12 +118,18 @@ export async function updateDevice({
   return { changes };
 }
 
-export async function deleteDevice({
-  siteUrl, token, device, changedBy,
+/**
+ * One machine off the register: the delete, then the row recording it. Shared
+ * by the single Remove button and by removing a selection, so the two cannot
+ * drift -- a removal logged by one route and not the other would leave the
+ * change list lying about what the register holds.
+ */
+async function removeOne({
+  siteUrl, token, digest, device, changedBy,
 }) {
-  if (!device?.id) throw new Error('That row has no id, so it cannot be removed');
-
-  const digest = await getFormDigest(siteUrl, token);
+  if (device?.id === null || device?.id === undefined) {
+    throw new Error('That row has no id, so it cannot be removed');
+  }
 
   const response = await withRetry(() =>
     spFetch(siteUrl, `${listPath(DEVICE_LIST_NAME)}/items(${device.id})`, {
@@ -146,5 +152,61 @@ export async function deleteDevice({
     changeType: 'Removed',
   }], changedBy);
 
-  return { removed: device.computerName };
+  return device.computerName;
+}
+
+export async function deleteDevice({
+  siteUrl, token, device, changedBy,
+}) {
+  if (device?.id === null || device?.id === undefined) {
+    throw new Error('That row has no id, so it cannot be removed');
+  }
+
+  const digest = await getFormDigest(siteUrl, token);
+  const removed = await removeOne({
+    siteUrl, token, digest, device, changedBy,
+  });
+  return { removed };
+}
+
+/**
+ * Several machines off the register in one go, four at a time and behind one
+ * form digest.
+ *
+ * A machine that will not delete does NOT abandon the rest: somebody who ticked
+ * twelve rows wants the eleven that can go to go, and to be told which one did
+ * not. That is why this reports `{ removed, failures }` instead of throwing --
+ * the only thing it throws for is a digest it could not get, which would fail
+ * every row for the same reason.
+ */
+export async function deleteDevices({
+  siteUrl, token, devices, changedBy, onProgress,
+}) {
+  if (!devices?.length) return { removed: [], failures: [] };
+
+  const digest = await getFormDigest(siteUrl, token);
+
+  const results = await runPool(
+    devices,
+    (device) => removeOne({
+      siteUrl, token, digest, device, changedBy,
+    }),
+    { concurrency: 4, onProgress },
+  );
+
+  const removed = [];
+  const failures = [];
+
+  for (const result of results) {
+    if (result.error) {
+      failures.push({
+        computerName: result.item?.computerName ?? '',
+        error: result.error.message,
+      });
+    } else {
+      removed.push(result.value);
+    }
+  }
+
+  return { removed, failures };
 }

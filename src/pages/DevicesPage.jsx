@@ -20,7 +20,7 @@ import { useDevices } from '../features/devices/useDevices';
 import { fleetSummary } from '../features/devices/stats/deviceStats';
 import { labelOf } from '../features/devices/deviceFilters';
 import { syncDevices } from '../features/devices/sharepoint/syncDevices';
-import { updateDevice, deleteDevice } from '../features/devices/sharepoint/updateDevice';
+import { updateDevice, deleteDevice, deleteDevices } from '../features/devices/sharepoint/updateDevice';
 import { provisionLists } from '../features/devices/sharepoint/provisionLists';
 
 const SHAREPOINT_SITE_URL =
@@ -198,8 +198,14 @@ export default function DevicesPage() {
         columnsChecked.current = true;
       }
 
-      await action(tokenRes);
-      reload();
+      try {
+        await action(tokenRes);
+      } finally {
+        // The register re-reads whatever the action managed to do, failure or
+        // not: removing twelve machines and getting eleven has still changed
+        // SharePoint, and a table left showing all twelve would be lying.
+        reload();
+      }
     } catch (failure) {
       setRowError(failure.message);
     } finally {
@@ -221,6 +227,31 @@ export default function DevicesPage() {
     device,
     changedBy: tokenRes.account?.username ?? '',
   }));
+
+  /**
+   * A ticked selection removed in one go. `deleteDevices` reports rather than
+   * throws, so a machine that would not go has to be named here — the rest of
+   * the selection has already gone, and a silent partial removal would leave
+   * somebody believing the register is emptier than it is.
+   */
+  const handleRowDeleteMany = (chosen, onProgress) =>
+    runRowAction(async (tokenRes) => {
+      const outcome = await deleteDevices({
+        siteUrl: SHAREPOINT_SITE_URL,
+        token: tokenRes.accessToken,
+        devices: chosen,
+        changedBy: tokenRes.account?.username ?? '',
+        onProgress,
+      });
+
+      if (outcome.failures.length) {
+        const names = outcome.failures.map((failure) => failure.computerName).join(', ');
+        throw new Error(
+          `Removed ${outcome.removed.length} of ${chosen.length}. `
+          + `Could not remove ${names}: ${outcome.failures[0].error}`,
+        );
+      }
+    });
 
   const rejectedList = rejected.length > 0 && (
     <ul className="dz-rejected">
@@ -361,6 +392,7 @@ export default function DevicesPage() {
             onFilterChange={setParam}
             onSave={handleRowSave}
             onDelete={handleRowDelete}
+            onDeleteMany={handleRowDeleteMany}
             busy={rowBusy}
           />
         </>

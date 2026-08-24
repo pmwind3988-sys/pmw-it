@@ -2,13 +2,19 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, EmptyState } from '../../../components/ui/Surfaces';
 import Button from '../../../components/ui/Button';
-import { Download, Search, X, Pencil, Check, AlertTriangle } from '../../../components/ui/Icons';
+import {
+  Download, Search, X, Pencil, Check, AlertTriangle, Trash2,
+} from '../../../components/ui/Icons';
 import { formatMYT } from '../../datastudio/time/malaysiaTime';
 import { formatScalar } from '../formatValue';
 import ValueCell from './ValueCell';
 import { applyFilters, toCsv } from '../deviceFilters';
 import { EDITABLE_FIELDS } from '../sharepoint/updateDevice';
 import { DEVICE_COLUMNS } from '../sharepoint/deviceSchema';
+import {
+  describeSelection, headerState, isSelectable, selectedDevices,
+  toggleAll, toggleId, visibleSelection,
+} from '../selection';
 
 /**
  * The columns worth seeing first, in this order. Everything else the scan
@@ -53,6 +59,21 @@ const rank = (key) => {
 // A stable sort, so the columns outside LEAD_KEYS keep their schema order.
 const COLUMNS = [...SCHEMA_COLUMNS].sort((a, b) => rank(a.key) - rank(b.key));
 
+const NAME_KEY = 'computerName';
+const NAME_COLUMN = COLUMNS.find((column) => column.key === NAME_KEY);
+
+/**
+ * The tick box and the computer name share ONE frozen cell rather than two
+ * pinned side by side. Two would need the second one's `left` offset to be the
+ * exact rendered width of the first, which a table decides for itself and no
+ * hard-coded pixel figure can promise. One cell needs no arithmetic, so the
+ * pinned edge cannot drift.
+ *
+ * The scrolling columns therefore skip the name -- the frozen cell has already
+ * drawn it. The CSV still exports every column, name included.
+ */
+const BODY_COLUMNS = COLUMNS.filter((column) => column.key !== NAME_KEY);
+
 /**
  * How many entries of a multi-value field a row shows before collapsing the
  * rest into "+N more". Two is what fits beside the columns either side of it;
@@ -89,12 +110,15 @@ function download(name, text) {
 const TYPE_OPTIONS = ['Laptop', 'Desktop', 'Unknown'];
 
 export default function DeviceTable({
-  devices, filters, onFilterChange, onSave, onDelete, busy,
+  devices, filters, onFilterChange, onSave, onDelete, onDeleteMany, busy,
 }) {
   const [sort, setSort] = useState({ key: 'riskScore', dir: 'desc' });
   const [editingId, setEditingId] = useState(null);
   const [draft, setDraft] = useState({});
   const [confirming, setConfirming] = useState(null);
+  const [selected, setSelected] = useState(() => new Set());
+  const [confirmingMany, setConfirmingMany] = useState(false);
+  const [removing, setRemoving] = useState(null);
 
   const startEdit = (device) => {
     setConfirming(null);
@@ -128,6 +152,41 @@ export default function DeviceTable({
     });
   }, [devices, filters, sort]);
 
+  /**
+   * A tick can never reach off screen. Both readings below are scoped to the
+   * rows the filters are showing, and every write is pruned to them as well, so
+   * "Remove 3" cannot possibly mean a machine nobody can see — whatever else
+   * the stored set happens to be carrying.
+   *
+   * Scoping on the way in and out beats reconciling the set in an effect: an
+   * effect would set state during a render it just caused, and would still have
+   * to be right about the same thing.
+   *
+   * Changing what is ticked also cancels a pending confirm, since it has just
+   * changed which machines that confirm was about.
+   */
+  const updateSelection = (next) => {
+    setConfirmingMany(false);
+    setSelected((current) => visibleSelection(next(current), rows));
+  };
+
+  const chosen = useMemo(() => selectedDevices(selected, rows), [selected, rows]);
+  const headBox = headerState(selected, rows);
+
+  const removeChosen = async () => {
+    setRemoving({ done: 0, total: chosen.length });
+    try {
+      await onDeleteMany(chosen, (done, total) => setRemoving({ done, total }));
+    } finally {
+      // Whatever happened, the ticks go: the rows that went are gone, and the
+      // banner names the ones that would not. Leaving them ticked would invite
+      // a second attempt at machines that no longer exist.
+      setRemoving(null);
+      setConfirmingMany(false);
+      setSelected(new Set());
+    }
+  };
+
   const activeFilters = Object.entries(filters).filter(([, value]) => value);
 
   const toggleSort = (key) =>
@@ -135,6 +194,59 @@ export default function DeviceTable({
       (current.key === key
         ? { key, dir: current.dir === 'asc' ? 'desc' : 'asc' }
         : { key, dir: 'desc' }));
+
+  const sortArrow = (key) =>
+    (sort.key === key
+      ? <span aria-hidden="true">{sort.dir === 'asc' ? ' ▲' : ' ▼'}</span>
+      : null);
+
+  let selectionBar;
+  if (removing) {
+    selectionBar = (
+      <span className="dt-bulk-count">
+        Removing {removing.done} of {removing.total}…
+      </span>
+    );
+  } else if (confirmingMany) {
+    selectionBar = (
+      <>
+        <AlertTriangle size={14} />
+        <span className="dt-bulk-warn">
+          Remove {chosen.length === 1 ? 'this device' : `these ${chosen.length} devices`}
+          {' '}from the register? {describeSelection(chosen)}
+        </span>
+        <button
+          type="button"
+          className="dt-icon dt-icon-bad"
+          disabled={busy}
+          onClick={removeChosen}
+        >
+          Yes, remove {chosen.length}
+        </button>
+        <button type="button" className="dt-icon" onClick={() => setConfirmingMany(false)}>
+          Keep them
+        </button>
+      </>
+    );
+  } else {
+    selectionBar = (
+      <>
+        <span className="dt-bulk-count">{chosen.length} selected</span>
+        <button
+          type="button"
+          className="dt-icon dt-icon-bad"
+          disabled={busy}
+          onClick={() => { cancelEdit(); setConfirmingMany(true); }}
+        >
+          <Trash2 size={14} />
+          Remove {chosen.length}
+        </button>
+        <button type="button" className="dt-icon" onClick={() => updateSelection(() => new Set())}>
+          Clear
+        </button>
+      </>
+    );
+  }
 
   return (
     <Card className="rg-card">
@@ -181,14 +293,41 @@ export default function DeviceTable({
         </div>
       )}
 
+      {chosen.length > 0 && <div className="dt-bulk">{selectionBar}</div>}
+
       {rows.length === 0 ? (
         <EmptyState>No devices match these filters.</EmptyState>
       ) : (
         <div className="rg-scroll">
-          <table className="rg">
+          <table className="rg dt-frozen">
             <thead>
               <tr>
-                {COLUMNS.map((column) => (
+                <th className="dt-identity">
+                  <input
+                    type="checkbox"
+                    className="dt-tick"
+                    checked={headBox === 'all'}
+                    disabled={busy}
+                    ref={(box) => {
+                      // Half-ticked is a DOM property, not an attribute, so it
+                      // cannot be expressed as a prop.
+                      if (box) box.indeterminate = headBox === 'some';
+                    }}
+                    onChange={() => updateSelection((current) => toggleAll(current, rows))}
+                    aria-label="Select every device shown"
+                  />
+                  <button
+                    type="button"
+                    className="dt-sort"
+                    onClick={() => toggleSort(NAME_KEY)}
+                    aria-label={`Sort by ${NAME_COLUMN.label}`}
+                  >
+                    {NAME_COLUMN.label}
+                    {sortArrow(NAME_KEY)}
+                  </button>
+                </th>
+
+                {BODY_COLUMNS.map((column) => (
                   <th key={column.key}>
                     <button
                       type="button"
@@ -197,24 +336,48 @@ export default function DeviceTable({
                       aria-label={`Sort by ${column.label}`}
                     >
                       {column.label}
-                      {sort.key === column.key && (
-                        <span aria-hidden="true">{sort.dir === 'asc' ? ' ▲' : ' ▼'}</span>
-                      )}
+                      {sortArrow(column.key)}
                     </button>
                   </th>
                 ))}
                 <th>Scanned</th>
-                <th><span className="sr-only">Actions</span></th>
+                <th className="dt-actions"><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>
               {rows.map((device) => {
                 const editing = editingId === device.id;
+                const ticked = isSelectable(device) && selected.has(device.id);
                 const manual = new Set(device.manualFields ?? []);
 
+                const rowClass = [
+                  editing ? 'dt-editing' : '',
+                  ticked ? 'dt-selected' : '',
+                ].filter(Boolean).join(' ');
+
                 return (
-                  <tr key={device.id ?? device.computerName} className={editing ? 'dt-editing' : undefined}>
-                    {COLUMNS.map((column) => {
+                  <tr key={device.id ?? device.computerName} className={rowClass || undefined}>
+                    <td className="dt-identity">
+                      <input
+                        type="checkbox"
+                        className="dt-tick"
+                        checked={ticked}
+                        // A row with no id cannot be removed, so offering to
+                        // tick it would only lead to an error.
+                        disabled={!isSelectable(device) || busy}
+                        onChange={() => updateSelection((current) => toggleId(current, device.id))}
+                        aria-label={`Select ${device.computerName}`}
+                      />
+                      {device.id != null ? (
+                        <Link className="dt-link" to={`/devices/${device.id}`}>
+                          {formatScalar(device.computerName, 'text')}
+                        </Link>
+                      ) : (
+                        formatScalar(device.computerName, 'text')
+                      )}
+                    </td>
+
+                    {BODY_COLUMNS.map((column) => {
                       const editable = EDITABLE_FIELDS.includes(column.key);
 
                       if (editing && editable) {
@@ -249,18 +412,12 @@ export default function DeviceTable({
                             ? `rg-risk rg-risk-${String(device.riskLevel).toLowerCase()}`
                             : undefined}
                         >
-                          {column.key === 'computerName' && device.id != null ? (
-                            <Link className="dt-link" to={`/devices/${device.id}`}>
-                              {formatScalar(device.computerName, 'text')}
-                            </Link>
-                          ) : (
-                            <ValueCell
-                              value={device[column.key]}
-                              fieldKey={column.key}
-                              kind={column.kind}
-                              limit={CELL_ENTRIES}
-                            />
-                          )}
+                          <ValueCell
+                            value={device[column.key]}
+                            fieldKey={column.key}
+                            kind={column.kind}
+                            limit={CELL_ENTRIES}
+                          />
                           {manual.has(column.key) && (
                             <span className="dt-manual" title="Set by hand — imports leave this alone">
                               edited

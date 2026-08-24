@@ -127,6 +127,8 @@ pmw-it/
 | Device SharePoint schema | `src/features/devices/sharepoint/deviceSchema.js` |
 | Device SharePoint list views | `src/features/devices/sharepoint/deviceViews.js` |
 | Editing or removing one device row | `src/features/devices/sharepoint/updateDevice.js` |
+| Removing several device rows at once | `deleteDevices` in `src/features/devices/sharepoint/updateDevice.js` |
+| What the register has ticked | `src/features/devices/selection.js` |
 | Device fleet statistics | `src/features/devices/stats/deviceStats.js` |
 | Bar and column charts | `src/components/ui/Charts.jsx` (shared by both dashboards) |
 | SharePoint writes | `src/services/sharePointService.js` |
@@ -271,6 +273,26 @@ holds those back on re-import — from the diff AND from the body, or updating
 anything else would overwrite them as a side effect. Clearing a field is how
 somebody hands it back to the scan file; without that it would stay frozen
 against every future import for good.
+
+**A tick in the register cannot reach off screen.** The register removes several
+machines at once, and `selection.js` holds the one rule that makes that safe:
+everything read out of the ticked set is scoped to the rows the filters are
+SHOWING, and every write back is pruned to them too. Without it, ticking three
+machines and then narrowing the search would leave "Remove 3" pointing at rows
+nobody could see. It is deliberately not an effect — an effect would set state
+during the render that caused it, and would still have to be right about the
+same thing. A row with no `id` cannot be ticked at all, because it cannot be
+removed either.
+
+**The register freezes two columns, and one of them is a single cell.** Forty-odd
+scan columns wide, scrolling to the end of a row would otherwise leave somebody
+pressing Remove on a machine they can no longer name. The tick box and the
+computer name share ONE `.dt-identity` cell rather than two pinned side by side:
+two would need the second one's `left` offset to equal the exact rendered width
+of the first, which a table decides for itself. Every frozen cell also carries
+its own opaque background, and each row state repeats its colour on those cells
+-- a sticky cell is painted while the row slides underneath it, so a transparent
+one shows both at once and a highlight breaks at the frozen edge.
 
 **`Total RAM` in a scan report is usable RAM, not installed RAM.** Windows subtracts
 the integrated GPU's reserved share, so a 16 GB laptop reports 15 GB and an 8 GB one

@@ -22,6 +22,10 @@ import {
   unitsOf, serialiseUnits, filledCount, PER_UNIT_ONLY,
 } from '../features/assets/units';
 import UnitPager from '../features/assets/ui/UnitPager';
+import ScanField from '../features/assets/ui/ScanField';
+import TextScanSheet from '../features/assets/ui/TextScanSheet';
+import { labelFor } from '../features/assets/scan/fieldLabels';
+import { applyScannedFields, SCAN_FIELDS } from '../features/assets/scan/textScan';
 import AssetPhoto from '../features/assets/ui/AssetPhoto';
 import { absoluteFileUrl } from '../features/assets/sharepoint/fileUrl';
 
@@ -52,6 +56,15 @@ const FIELDS = [
   { key: 'remarks', label: 'Remarks', multiline: true },
 ];
 
+/**
+ * The camera button, on the fields a printed label can actually fill.
+ * A quantity, a status or somebody's remark is not on the box.
+ */
+function Scannable({ field, onScan, children }) {
+  if (!SCAN_FIELDS.includes(field.key)) return children;
+  return <ScanField label={field.label} onScan={onScan}>{children}</ScanField>;
+}
+
 export default function AssetDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -81,6 +94,10 @@ export default function AssetDetailPage() {
   );
 
   const [edits, setEdits] = useState({});
+  // Which field's camera button is open, and what a scan read but would
+  // not write over a value that was set by hand.
+  const [scanning, setScanning] = useState(null);
+  const [heldBack, setHeldBack] = useState([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
@@ -99,6 +116,30 @@ export default function AssetDetailPage() {
   }
 
   const valueOf = (key) => (key in edits ? edits[key] : (asset?.[key] ?? ''));
+
+  /**
+   * A scan on a saved row goes into the unsaved edits, not into
+   * SharePoint. Nothing here is written until Save, which is what makes
+   * pointing the camera at the wrong box harmless.
+   */
+  const useScan = (values, guessedFields, additional) => {
+    const shown = Object.fromEntries(SCAN_FIELDS.map((key) => [key, valueOf(key)]));
+    const result = applyScannedFields(
+      { ...shown, guessed: asset?.guessed ?? [], manualFields: asset?.manualFields ?? [] },
+      values,
+      guessedFields,
+      additional,
+    );
+
+    const next = { ...edits };
+    for (const key of SCAN_FIELDS) {
+      if (result.record[key] !== shown[key]) next[key] = result.record[key];
+    }
+
+    setEdits(next);
+    setHeldBack(result.heldBack);
+    setScanning(null);
+  };
 
   // The individual things inside a bulk line. Built from the quantity being
   // SHOWN rather than the one that was saved, so typing 3 into the quantity box
@@ -236,22 +277,61 @@ export default function AssetDetailPage() {
                       ))}
                     </select>
                   ) : field.multiline ? (
-                    <textarea
-                      rows={3}
-                      value={valueOf(field.key)}
-                      onChange={(e) => setEdits({ ...edits, [field.key]: e.target.value })}
-                    />
+                    // Remarks are somebody's sentence about the thing, so
+                    // there is nothing on a label to read into them.
+                    <Scannable field={field} onScan={() => setScanning(field.key)}>
+                      <textarea
+                        rows={3}
+                        value={valueOf(field.key)}
+                        onChange={(e) => setEdits({ ...edits, [field.key]: e.target.value })}
+                      />
+                    </Scannable>
                   ) : (
-                    <input
-                      type={field.type ?? 'text'}
-                      value={valueOf(field.key)}
-                      onChange={(e) => setEdits({ ...edits, [field.key]: e.target.value })}
-                    />
+                    <Scannable field={field} onScan={() => setScanning(field.key)}>
+                      <input
+                        type={field.type ?? 'text'}
+                        value={valueOf(field.key)}
+                        onChange={(e) => setEdits({ ...edits, [field.key]: e.target.value })}
+                      />
+                    </Scannable>
                   )}
                 </label>
               ))}
             </div>
+
+            {/* Read off the label but not written, because the value in
+                the box was set by hand. Offered rather than dropped. */}
+            {heldBack.length > 0 && (
+              <ul className="as-heldback">
+                {heldBack.map((entry) => (
+                  <li key={entry.field}>
+                    <span className="as-heldback-label">
+                      {labelFor(entry.field)}
+                    </span>
+                    <span className="as-heldback-value">{entry.value}</span>
+                    <button
+                      type="button"
+                      className="as-heldback-take"
+                      onClick={() => {
+                        setEdits({ ...edits, [entry.field]: entry.value });
+                        setHeldBack(heldBack.filter((held) => held.field !== entry.field));
+                      }}
+                    >
+                      Use this instead
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </Card>
+
+          {scanning && (
+            <TextScanSheet
+              title={`Scan the label — ${labelFor(scanning)}`}
+              onCancel={() => setScanning(null)}
+              onUse={useScan}
+            />
+          )}
 
           {/* A bulk line is a count of identical things, which is the right
               answer to "what did we buy" and the wrong one to "which of the two

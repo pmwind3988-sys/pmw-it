@@ -1,7 +1,12 @@
+import { useState } from 'react';
 import { CATEGORIES, CONDITIONS, TRACKED, BULK } from '../assetKinds';
 import { setDraftField, swapSerialAndPart } from '../draft/draftAsset';
+import { applyScannedFields } from '../scan/textScan';
 import { Trash2, Barcode, AlertTriangle, RefreshCw } from '../../../components/ui/Icons';
 import PhotoInput from './PhotoInput';
+import ScanField from './ScanField';
+import TextScanSheet from './TextScanSheet';
+import { labelFor } from '../scan/fieldLabels';
 
 /**
  * One row of a delivery, open for correction.
@@ -14,26 +19,51 @@ import PhotoInput from './PhotoInput';
  * a heuristic that reads barcodes by shape (§4.5) safe to ship at all.
  */
 
-function Field({ label, children, guessed, issue }) {
+function Field({ label, children, guessed, issue, onScan }) {
   return (
     <label className={`as-field${issue ? ' as-field-bad' : ''}`}>
       <span className="as-field-label">
         {label}
-        {guessed && <span className="as-guess" title="Worked out from the barcode">guessed</span>}
+        {guessed && (
+          <span className="as-guess" title="Worked out from the barcode or the label">guessed</span>
+        )}
       </span>
-      {children}
+      {onScan ? <ScanField label={label} onScan={onScan}>{children}</ScanField> : children}
       {issue && <span className="as-field-issue">{issue}</span>}
     </label>
   );
 }
 
 export default function DraftCard({ draft, issues = [], onChange, onRemove, index }) {
+  // Which field's button opened the camera. It titles the sheet and
+  // nothing more: a label carries several values, and the scan fills
+  // whichever of them it recognises rather than only the one pressed.
+  const [scanning, setScanning] = useState(null);
+  // What the scan read but would not write over something typed by hand.
+  const [heldBack, setHeldBack] = useState([]);
+
   const set = (field) => (event) => onChange(setDraftField(draft, field, event.target.value));
   const guessed = (field) => draft.guessed?.includes(field);
   const issueFor = (field) => issues.find((issue) => issue.field === field)?.message;
+  const scan = (field) => () => setScanning(field);
 
   const blocking = issues.some((issue) => issue.blocking);
   const codes = draft.additionalCodes ?? [];
+
+  const useScan = (values, guessedFields, additional) => {
+    const result = applyScannedFields(draft, values, guessedFields, additional);
+    onChange(result.record);
+    setHeldBack(result.heldBack);
+    setScanning(null);
+  };
+
+  // Taking a held-back value is a correction made deliberately, so it
+  // counts as typing it in: the field is marked by hand and outranks the
+  // next scan, exactly as the swap button below does.
+  const takeHeldBack = (field, value) => {
+    onChange(setDraftField(draft, field, value));
+    setHeldBack(heldBack.filter((entry) => entry.field !== field));
+  };
 
   return (
     <article className={`as-draft${blocking ? ' as-draft-blocked' : ''}`}>
@@ -86,11 +116,16 @@ export default function DraftCard({ draft, issues = [], onChange, onRemove, inde
             </select>
           </Field>
 
-          <Field label="Make">
+          <Field label="Make" guessed={guessed('manufacturer')} onScan={scan('manufacturer')}>
             <input value={draft.manufacturer} onChange={set('manufacturer')} placeholder="Dell" />
           </Field>
 
-          <Field label="Model" issue={issueFor('model')}>
+          <Field
+            label="Model"
+            guessed={guessed('model')}
+            issue={issueFor('model')}
+            onScan={scan('model')}
+          >
             <input value={draft.model} onChange={set('model')} placeholder="Latitude 5540" />
           </Field>
 
@@ -110,11 +145,16 @@ export default function DraftCard({ draft, issues = [], onChange, onRemove, inde
             label="Serial number"
             guessed={guessed('serialNumber')}
             issue={issueFor('serialNumber')}
+            onScan={scan('serialNumber')}
           >
             <input value={draft.serialNumber} onChange={set('serialNumber')} />
           </Field>
 
-          <Field label="Part number" guessed={guessed('partNumber')}>
+          <Field
+            label="Part number"
+            guessed={guessed('partNumber')}
+            onScan={scan('partNumber')}
+          >
             <input value={draft.partNumber} onChange={set('partNumber')} />
           </Field>
 
@@ -132,7 +172,12 @@ export default function DraftCard({ draft, issues = [], onChange, onRemove, inde
             </button>
           )}
 
-          <Field label="Asset label" issue={issueFor('assetTag')}>
+          <Field
+            label="Asset label"
+            guessed={guessed('assetTag')}
+            issue={issueFor('assetTag')}
+            onScan={scan('assetTag')}
+          >
             <input value={draft.assetTag} onChange={set('assetTag')} placeholder="PMW-0142" />
           </Field>
 
@@ -166,7 +211,11 @@ export default function DraftCard({ draft, issues = [], onChange, onRemove, inde
             <input value={draft.location} onChange={set('location')} placeholder="Store room" />
           </Field>
 
-          <Field label="Specification">
+          <Field
+            label="Specification"
+            guessed={guessed('specSummary')}
+            onScan={scan('specSummary')}
+          >
             <textarea
               rows={2}
               value={draft.specSummary}
@@ -180,6 +229,37 @@ export default function DraftCard({ draft, issues = [], onChange, onRemove, inde
           </Field>
         </div>
       </div>
+
+      {/* Read off the label, but not written: something typed by hand was
+          already in the box. Offered rather than dropped, because the
+          person who typed it is the only one who can say which is right. */}
+      {heldBack.length > 0 && (
+        <ul className="as-heldback">
+          {heldBack.map((entry) => (
+            <li key={entry.field}>
+              <span className="as-heldback-label">
+                {labelFor(entry.field)}
+              </span>
+              <span className="as-heldback-value">{entry.value}</span>
+              <button
+                type="button"
+                className="as-heldback-take"
+                onClick={() => takeHeldBack(entry.field, entry.value)}
+              >
+                Use this instead
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {scanning && (
+        <TextScanSheet
+          title={`Scan the label — ${labelFor(scanning)}`}
+          onCancel={() => setScanning(null)}
+          onUse={useScan}
+        />
+      )}
 
       {codes.length > 0 && (
         <footer className="as-draft-codes">

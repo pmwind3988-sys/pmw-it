@@ -29,3 +29,6 @@ server/.env
 
 # Fetched at build time by scripts/fetch-model.mjs.
 public/models/
+
+# Fetched and copied at build time by scripts/fetch-ocr.mjs.
+public/ocr/

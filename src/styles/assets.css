@@ -939,3 +939,193 @@
 
 .as-holders li:last-child { border-bottom: none; padding-bottom: 0; }
 .as-holders .as-link { display: inline-flex; align-items: center; gap: 6px; }
+
+/* ---- Reading a label with the camera ---------------------------------- */
+
+/* The button sits INSIDE the field's line rather than under its label, so
+   the thumb holding the phone reaches it without covering the value it is
+   about to fill. */
+.as-scanfield {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  min-width: 0;
+}
+
+.as-scanfield > :first-child { flex: 1 1 auto; min-width: 0; }
+
+.as-scanfield-btn {
+  flex: 0 0 auto;
+  /* 40px square: the smallest target a thumb hits reliably on a phone held
+     in one hand over a box. */
+  width: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.as-scanfield-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
+
+.as-scanfield-btn:focus-visible {
+  outline: 2px solid var(--text-primary);
+  outline-offset: 1px;
+}
+
+/* Over everything: the camera is the only thing happening while it is open,
+   and a viewfinder in a column beside a form is too small to aim. */
+.as-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 12px;
+}
+
+@media (min-width: 640px) {
+  .as-sheet { align-items: center; }
+}
+
+.as-sheet-inner {
+  width: 100%;
+  max-width: 460px;
+  max-height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.as-sheet-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.as-sheet-head strong { flex: 1 1 auto; font-weight: 600; }
+
+.as-sheet-view {
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #000;
+}
+
+.as-sheet-video {
+  display: block;
+  width: 100%;
+  /* Taller than it is wide: a label is read close up, and a landscape
+     viewfinder on a phone leaves the box half out of frame. */
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+/* Where to put the label. Not a crop — the whole frame is read — but a
+   camera with nothing drawn on it gets aimed at the whole box. */
+.as-sheet-frame {
+  position: absolute;
+  inset: 18% 10%;
+  border: 2px solid rgba(255, 255, 255, 0.75);
+  border-radius: 8px;
+}
+
+.as-sheet-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.as-sheet-note-bad { color: var(--error, #EF4444); }
+
+.as-sheet-found {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.as-sheet-found li {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.as-sheet-found-label { flex: 0 0 auto; color: var(--text-secondary); font-size: 12px; }
+
+.as-sheet-found-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--text-primary);
+}
+
+.as-sheet-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.as-heldback {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 0;
+  display: grid;
+  gap: 6px;
+  font-size: 12.5px;
+}
+
+.as-heldback li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-left: 3px solid #F59E0B;
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.as-heldback-label { color: var(--text-secondary); }
+
+.as-heldback-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--text-primary);
+}
+
+.as-heldback-take {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--text-primary);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}

@@ -112,6 +112,10 @@ pmw-it/
 | Why a code held in frame is not counted twice | `src/features/assets/scan/scanSession.js` |
 | The camera, its permissions and the decode loop | `src/features/assets/scan/useScanner.js` |
 | Native vs ponyfill barcode decoding | `src/features/assets/scan/detector.js` |
+| Reading the printed words off a label | `src/features/assets/scan/textReader.js`, `useTextScanner.js` |
+| Which line of a label is which field | `src/features/assets/scan/classifyText.js` |
+| Why a read value must agree twice, and what a scan may overwrite | `src/features/assets/scan/textScan.js` |
+| Where the recognition engine is served from | `scripts/fetch-ocr.mjs`, `public/ocr/` |
 | What makes two rows the same asset | `src/features/assets/identity.js` |
 | Tracked-vs-bulk, and the category list | `src/features/assets/assetKinds.js` |
 | The individual items inside a bulk line | `src/features/assets/units.js`, `ui/UnitPager.jsx` |
@@ -622,7 +626,8 @@ No icon package is installed — add a glyph there rather than a dependency.
   the bundle for `ort-wasm` if it changes; guessing costs an afternoon.
 - Don't point runtime code at a path under `public/` that only exists because
   somebody copied it there. `public/models` is gitignored and recreated by
-  `scripts/fetch-model.mjs`; anything else gitignored is not recreated by
+  `scripts/fetch-model.mjs` (and `public/ocr` by `scripts/fetch-ocr.mjs`);
+  anything else gitignored is not recreated by
   anything. A missing file does not 404 — the SPA rewrite answers with
   `index.html`, so the browser reports
   "expected magic word 00 61 73 6d, found 3c 21 64 6f", which is `<!do`.

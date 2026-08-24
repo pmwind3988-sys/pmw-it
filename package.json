@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "fetch:model": "node scripts/fetch-model.mjs",
-    "prebuild": "node scripts/fetch-model.mjs"
+    "prebuild": "node scripts/fetch-model.mjs && node scripts/fetch-ocr.mjs",
+    "fetch:ocr": "node scripts/fetch-ocr.mjs"
   },
   "dependencies": {
     "@azure/msal-browser": "^5.8.0",
@@ -25,6 +26,7 @@
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-router-dom": "^7.14.2",
+    "tesseract.js": "^7.0.0",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {

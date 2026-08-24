@@ -31,6 +31,11 @@ export const ASSET_COLUMNS = [
 
   text('AssetTag', 'Asset Label'),
   num('Quantity', 'Quantity'),
+  // The individual things inside a bulk line — one JSON entry per physical
+  // unit, holding its own serial, label, condition and note (`units.js`). Only
+  // the units somebody has actually written on are stored, so a box of twenty
+  // cables costs nothing here until the day one of them is written on.
+  note('Units', 'Unit Records'),
   // What is with people. `Quantity` stays what the company OWNS and never moves
   // when something is handed out, so a handover nobody recorded cannot silently
   // change how much the company believes it bought (handovers spec §4.1).

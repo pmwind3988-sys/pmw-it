@@ -19,6 +19,11 @@ export const SCAN_MODES = { ONE: 'one', MANY: 'many' };
 export const OUTCOMES = {
   ACCEPTED: 'accepted',
   POOLED: 'pooled',
+  // ONE mode: a code that was already read off an EARLIER box, arriving while
+  // a new box is being pooled. Kept rather than refused, because that is the
+  // part number of two identical things and it is the surest way to tell one
+  // from the serial (see below).
+  SHARED: 'shared',
   DUPLICATE: 'duplicate',
   EMPTY: 'empty',
 };
@@ -51,8 +56,30 @@ export function seeCode(session, code) {
   const raw = String(code?.rawValue ?? '').trim();
   if (!raw) return { session, outcome: OUTCOMES.EMPTY, code: raw };
 
-  if (session.seen.includes(raw)) {
-    return { session, outcome: OUTCOMES.DUPLICATE, code: raw };
+  const known = session.seen.includes(raw);
+  const pooled = session.pool.some((entry) => entry.rawValue === raw);
+
+  /**
+   * A code already read off an earlier box, arriving while a new box is being
+   * pooled, is the part number those two boxes SHARE — two tabs bought
+   * together carry the same one and never the same serial. Refusing it, as
+   * this used to, threw away the one piece of evidence that settles which code
+   * is which, and left the second tab's serial to be guessed by shape.
+   *
+   * The pool having something in it already is what makes this safe. A repeat
+   * arriving on an EMPTY pool is the box just confirmed being carried back
+   * into frame, and that must still be refused, or it becomes a second item.
+   */
+  if (known) {
+    const sharing = session.mode === SCAN_MODES.ONE && !pooled && session.pool.length > 0;
+    if (!sharing) return { session, outcome: OUTCOMES.DUPLICATE, code: raw };
+
+    const entry = { rawValue: raw, format: String(code?.format ?? ''), repeat: true };
+    return {
+      session: { ...session, pool: [...session.pool, entry] },
+      outcome: OUTCOMES.SHARED,
+      code: raw,
+    };
   }
 
   const entry = { rawValue: raw, format: String(code?.format ?? '') };

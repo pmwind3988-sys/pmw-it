@@ -27,6 +27,7 @@ export const CATEGORIES = [
   'Printer',
   'Docking Station',
   'Phone',
+  'Tab',
   'Network',
   'PC Part',
   'Keyboard',
@@ -42,6 +43,13 @@ export const CATEGORIES = [
  * stick of RAM or a spare SSD carries a serial and is worth following into the
  * machine it ends up in; `Accessory` is not, because it is the catch-all for
  * bags and stands.
+ *
+ * `Tab` is deliberately absent. Tablets arrive as a box of identical units and
+ * are bought that way — two tabs are one row reading 2, not two rows. Their
+ * individual serials are not lost by that: a bulk row carries a unit record
+ * per physical item (`units.js`), which is where one tab's own serial, label
+ * and condition live. A purchase that wants a row each still says so on the
+ * row, the same as any other category.
  */
 const TRACKED_CATEGORIES = new Set([
   'Laptop',

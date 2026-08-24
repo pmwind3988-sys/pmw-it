@@ -102,6 +102,37 @@ describe('one-item mode', () => {
     expect(again.session.drafts).toHaveLength(1);
   });
 
+  /**
+   * Two of the same thing, one after the other. The code both boxes carry is
+   * the part number — a serial appears on one box and one box only — and
+   * keeping it is what lets the second tab hold on to its own serial.
+   */
+  it('keeps a code shared with an earlier box, and files it as the part number', () => {
+    const first = scan(createSession(SCAN_MODES.ONE), [
+      code('TAB10FE2024'), code('R52TC0AAAAA'),
+    ]);
+    const { session: afterFirst } = commitPool(first.session);
+
+    const serial = seeCode(afterFirst, code('R52TC0BBBBB'));
+    const shared = seeCode(serial.session, code('TAB10FE2024'));
+
+    expect(shared.outcome).toBe(OUTCOMES.SHARED);
+    expect(shared.session.pool).toHaveLength(2);
+
+    const { draft } = commitPool(shared.session);
+    expect(draft.serialNumber).toBe('R52TC0BBBBB');
+    expect(draft.partNumber).toBe('TAB10FE2024');
+  });
+
+  /** A code held in frame is still decoded thirty times a second. */
+  it('refuses the same code twice inside one box', () => {
+    const { session } = scan(createSession(SCAN_MODES.ONE), [
+      code('AAA111'), code('BBB222'), code('AAA111'),
+    ]);
+
+    expect(session.pool).toHaveLength(2);
+  });
+
   it('commits nothing when the pool is empty', () => {
     const session = createSession(SCAN_MODES.ONE);
     expect(commitPool(session).draft).toBeNull();

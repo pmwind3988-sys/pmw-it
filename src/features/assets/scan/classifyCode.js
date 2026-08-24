@@ -18,8 +18,13 @@
 const SEP = '(?:\\s*[:=#]\\s*|\\s+)';
 
 const PREFIXES = [
-  { field: 'serialNumber', re: new RegExp(`^(?:S/?N|SER(?:IAL)?(?:\\s*(?:NO|NUM(?:BER)?))?)${SEP}(\\S.*)$`, 'i') },
-  { field: 'partNumber', re: new RegExp(`^(?:P/?N|PART(?:\\s*(?:NO|NUM(?:BER)?))?|MPN|SKU)${SEP}(\\S.*)$`, 'i') },
+  // `SVC TAG` and `IMEI` name ONE unit, the same as a serial does — a Dell
+  // service tag is the serial as far as the register is concerned, and two
+  // tablets never share an IMEI.
+  { field: 'serialNumber', re: new RegExp(`^(?:S/?N|SER(?:IAL)?(?:\\s*(?:NO|NUM(?:BER)?))?|(?:SVC|SERVICE)\\s*TAG|IMEI(?:\\s*\\d)?)${SEP}(\\S.*)$`, 'i') },
+  // `MODEL`, `TYPE` and `EAN` name a MODEL, which is what a part number is
+  // for. Every identical tab in the box carries the same one.
+  { field: 'partNumber', re: new RegExp(`^(?:P/?N|P/?NO|PART(?:\\s*(?:NO|NUM(?:BER)?))?|(?:MFR\\s*)?MPN|SKU|MODEL|MDL|TYPE|EAN|UPC|ITEM(?:\\s*(?:NO|CODE))?)${SEP}(\\S.*)$`, 'i') },
   { field: 'macAddress', re: new RegExp(`^MAC(?:\\s*ADDR(?:ESS)?)?${SEP}(\\S.*)$`, 'i') },
   { field: 'assetTag', re: new RegExp(`^(?:ASSET(?:\\s*TAG)?|TAG)${SEP}(\\S.*)$`, 'i') },
 ];
@@ -37,6 +42,13 @@ const RETAIL_FORMATS = new Set(['ean_13', 'ean_8', 'upc_a', 'upc_e']);
 function isRetail(code) {
   return RETAIL_FORMATS.has(code.format) || /^\d{12,14}$/.test(code.value);
 }
+
+/**
+ * An IMEI names one handset or one tablet, never a model — and at fifteen
+ * digits it is one character clear of the retail-barcode rule above it, which
+ * would otherwise file the only per-unit code on a phone box as a part number.
+ */
+const IMEI = /^\d{15}$/;
 
 /**
  * How much this looks like something that identifies one unit rather than a
@@ -57,6 +69,36 @@ export function serialScore(value) {
   return score;
 }
 
+/**
+ * How much this looks like the MODEL rather than the unit.
+ *
+ * Scored separately from `serialScore` rather than as its opposite, because
+ * the two read different evidence. The punctuation is the strongest of it: a
+ * vendor part number carries `#` (HP's `5UF44AA#ABU` locale suffix) or `/`
+ * (Apple's `MK2K3LL/A`), and a serial number carries neither — no
+ * manufacturer prints a slash in the code that has to be unique per unit.
+ *
+ * Shortness is evidence too, but weak evidence: plenty of serials are short.
+ * It only decides anything when nothing else does.
+ */
+export function partScore(value) {
+  let score = 0;
+
+  if (/[#/]/.test(value)) score += 6;
+  // `LC-24B` — a short letter group, a separator, then the variant.
+  if (/^[A-Z]{1,5}[-.][A-Z0-9][A-Z0-9.-]*$/i.test(value)) score += 2;
+  // Letters with no digits at all is a model name, and no serial scheme in use
+  // anywhere would produce it.
+  if (!/\d/.test(value)) score += 2;
+
+  if (value.length <= 7) score += 2;
+  else if (value.length <= 10) score += 1;
+  // Long enough to be unique per unit is long enough not to be a part number.
+  if (value.length >= 14) score -= 2;
+
+  return score;
+}
+
 function readPrefix(raw) {
   for (const { field, re } of PREFIXES) {
     const match = raw.match(re);
@@ -66,7 +108,13 @@ function readPrefix(raw) {
 }
 
 /**
- * `codes` is `[{ rawValue, format }]` as the detector hands them over.
+ * `codes` is `[{ rawValue, format, repeat }]` as the detector and the scanning
+ * session hand them over. `repeat` means this exact code was already read off
+ * a DIFFERENT box in the same session, which is the strongest evidence there
+ * is: a serial number appears on one box and one box only, so a code on two of
+ * them names the model. That is what separates two tabs bought together — the
+ * shared part number is recognised as shared, and each tab keeps its own
+ * serial instead of the second one's serial being filed as a part number.
  *
  * Returns the fields it could fill, the codes it could not place, and the
  * names of the fields whose value was inferred rather than read.
@@ -104,37 +152,74 @@ export function classifyCodes(codes) {
       continue;
     }
 
-    unclaimed.push({ value: prefixed ? prefixed.value : raw, format });
+    unclaimed.push({
+      value: prefixed ? prefixed.value : raw,
+      format,
+      repeat: entry?.repeat === true,
+    });
   }
 
-  const retail = unclaimed.filter(isRetail);
-  const rest = unclaimed.filter((code) => !isRetail(code));
+  // A code seen on an earlier box is the model's, not this unit's. It is taken
+  // out before anything is scored, so it can neither become the serial nor
+  // lose the part-number slot to a shape heuristic.
+  const shared = unclaimed.filter((code) => code.repeat);
+  const fresh = unclaimed.filter((code) => !code.repeat);
+
+  if (shared.length && !result.partNumber) {
+    result.partNumber = shared.shift().value;
+    result.guessed.push('partNumber');
+  }
+
+  // Held out of the scoring in both directions: an IMEI must never be filed as
+  // a part number, and it must not outrank a serial printed beside it. It
+  // takes the serial slot only if nothing else has.
+  const imei = fresh.filter((code) => IMEI.test(code.value));
+  const shaped = fresh.filter((code) => !IMEI.test(code.value));
+
+  const retail = shaped.filter(isRetail);
+  const rest = shaped.filter((code) => !isRetail(code));
 
   if (retail.length && !result.partNumber) {
     result.partNumber = retail.shift().value;
     result.guessed.push('partNumber');
   }
 
-  // Best first: score, then length as the tie-break, because between two codes
-  // that score alike the longer one carries more to be unique with.
-  rest.sort((a, b) => (
-    serialScore(b.value) - serialScore(a.value) || b.value.length - a.value.length
-  ));
+  // Best first by how much more it looks like a unit than like a model, then
+  // length as the tie-break, because between two codes that score alike the
+  // longer one carries more to be unique with.
+  const lead = (code) => serialScore(code.value) - partScore(code.value);
+  rest.sort((a, b) => lead(b) - lead(a) || b.value.length - a.value.length);
 
   for (const code of rest) {
-    if (!result.serialNumber) {
+    // The one code on the box that looks more like a model than a unit is a
+    // part number, even with the serial slot standing empty. A box with only
+    // `5UF44AA#ABU` printed on it has no serial to read, and inventing one
+    // from the part number gives twenty identical items twenty identities.
+    const modelShaped = !result.partNumber && lead(code) < 0;
+
+    if (!result.serialNumber && !modelShaped) {
       result.serialNumber = code.value;
       result.guessed.push('serialNumber');
     } else if (!result.partNumber) {
       result.partNumber = code.value;
       result.guessed.push('partNumber');
+    } else if (!result.serialNumber) {
+      result.serialNumber = code.value;
+      result.guessed.push('serialNumber');
     } else {
       result.additional.push(code.value);
     }
   }
 
+  if (imei.length && !result.serialNumber) {
+    result.serialNumber = imei.shift().value;
+    result.guessed.push('serialNumber');
+  }
+
   // Anything left over is kept verbatim rather than dropped. A code nobody can
   // place today is still the only copy of what was on the box.
+  for (const code of imei) result.additional.push(code.value);
+  for (const code of shared) result.additional.push(code.value);
   for (const code of retail) result.additional.push(code.value);
 
   return result;

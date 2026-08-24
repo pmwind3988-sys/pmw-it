@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { classifyCodes, serialScore } from './classifyCode.js';
+import { classifyCodes, serialScore, partScore } from './classifyCode.js';
 
 const code = (rawValue, format = 'code_128') => ({ rawValue, format });
+const again = (rawValue, format = 'code_128') => ({ rawValue, format, repeat: true });
 
 describe('classifyCodes — explicit prefixes', () => {
   it('reads a prefixed serial and does not call it a guess', () => {
@@ -139,6 +140,93 @@ describe('classifyCodes — guessing from shape', () => {
 
   it('is safe on undefined', () => {
     expect(classifyCodes(undefined).serialNumber).toBe('');
+  });
+});
+
+describe('classifyCodes — part number versus serial number', () => {
+  /**
+   * The two-tabs case. The code that was already on the first box cannot be a
+   * serial, whatever shape it happens to have, so the second tab keeps its own
+   * serial instead of losing it to a coin toss between two look-alike codes.
+   */
+  it('files a code seen on an earlier box as the part number', () => {
+    const result = classifyCodes([again('TAB10FE2024'), code('R52TC0ABCDE')]);
+
+    expect(result.partNumber).toBe('TAB10FE2024');
+    expect(result.serialNumber).toBe('R52TC0ABCDE');
+  });
+
+  it('does not let a repeated code take the serial even when it is alone', () => {
+    const result = classifyCodes([again('TAB10FE2024')]);
+
+    expect(result.partNumber).toBe('TAB10FE2024');
+    expect(result.serialNumber).toBe('');
+  });
+
+  /** An explicit `S/N:` outranks the fact that the code has been seen before. */
+  it('lets a prefix beat the repeat', () => {
+    expect(classifyCodes([again('S/N: CN0ABC123')]).serialNumber).toBe('CN0ABC123');
+  });
+
+  /**
+   * `#ABU` is HP's locale suffix and `/A` is Apple's. No serial scheme prints
+   * either, so a box carrying only one of these has no serial to read — and
+   * inventing one gives twenty identical items twenty identities.
+   */
+  it.each([
+    ['5UF44AA#ABU'],
+    ['MK2K3LL/A'],
+  ])('leaves the serial empty for %s, which is a part number', (raw) => {
+    const result = classifyCodes([code(raw)]);
+
+    expect(result.partNumber).toBe(raw);
+    expect(result.serialNumber).toBe('');
+  });
+
+  it('still reads the serial beside a vendor part number', () => {
+    const result = classifyCodes([code('5UF44AA#ABU'), code('5CG1234ABC')]);
+
+    expect(result.partNumber).toBe('5UF44AA#ABU');
+    expect(result.serialNumber).toBe('5CG1234ABC');
+  });
+
+  it('reads a service tag as the serial, because that is what it is', () => {
+    expect(classifyCodes([code('SVC TAG: 7XKL2Q3')]).serialNumber).toBe('7XKL2Q3');
+  });
+
+  it('reads MODEL as a part number, since every unit in the box shares it', () => {
+    expect(classifyCodes([code('MODEL: SM-X210')]).partNumber).toBe('SM-X210');
+  });
+
+  /** Fifteen digits is one clear of the retail rule, and names one handset. */
+  it('files an IMEI as the serial, not as a retail part number', () => {
+    const result = classifyCodes([code('356938035643809')]);
+
+    expect(result.serialNumber).toBe('356938035643809');
+    expect(result.partNumber).toBe('');
+  });
+
+  it('keeps an IMEI verbatim when a serial was already read', () => {
+    const result = classifyCodes([code('S/N: R52TC0ABCDE'), code('356938035643809')]);
+
+    expect(result.serialNumber).toBe('R52TC0ABCDE');
+    expect(result.partNumber).toBe('');
+    expect(result.additional).toContain('356938035643809');
+  });
+});
+
+describe('partScore', () => {
+  it('reads vendor punctuation as the part number it is', () => {
+    expect(partScore('5UF44AA#ABU')).toBeGreaterThan(serialScore('5UF44AA#ABU'));
+    expect(partScore('MK2K3LL/A')).toBeGreaterThan(serialScore('MK2K3LL/A'));
+  });
+
+  it('does not out-argue an ordinary serial', () => {
+    expect(partScore('CN0ABC123456')).toBeLessThan(serialScore('CN0ABC123456'));
+  });
+
+  it('treats letters with no digits as a model name', () => {
+    expect(partScore('THINKPAD')).toBeGreaterThan(partScore('5CG1234ABC'));
   });
 });
 

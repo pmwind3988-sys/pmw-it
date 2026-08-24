@@ -64,6 +64,26 @@ describe('planSave — things already in the register', () => {
     expect(plan.updates[0].body.quantity).toBe(15);
   });
 
+  /**
+   * A save writes every column, and a draft has no unit records — nothing in a
+   * barcode says which of the two tabs is which. Without carrying them across,
+   * a second box of the same thing would erase every serial anybody had
+   * recorded against the individual units on that row.
+   */
+  it('carries the unit records of a bulk row through a re-scan', () => {
+    const units = JSON.stringify([{ index: 0, serialNumber: 'R52TC0AAAAA' }]);
+    const register = [{
+      id: 3, assetKey: 'bulk:TAB|SAMSUNG|SM-X210', trackingMode: BULK,
+      category: 'Tab', manufacturer: 'Samsung', model: 'SM-X210', quantity: 2, units,
+    }];
+    const plan = planSave([newDraft({
+      category: 'Tab', manufacturer: 'Samsung', model: 'SM-X210', quantity: 1,
+    })], register);
+
+    expect(plan.updates[0].body.quantity).toBe(3);
+    expect(plan.updates[0].body.units).toBe(units);
+  });
+
   it('leaves a tracked row at one however it was scanned', () => {
     const register = [{
       id: 7, assetKey: 'serial:DELL|CN0ABC123', trackingMode: TRACKED, quantity: 1,

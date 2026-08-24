@@ -10,12 +10,18 @@ import {
 import { useAssets, SHAREPOINT_SITE_URL } from '../features/assets/useAssets';
 import { useSharePointToken } from '../hooks/useRequests';
 import { updateAsset, deleteAsset, EDITABLE_FIELDS } from '../features/assets/sharepoint/updateAsset';
-import { CATEGORIES, CONDITIONS, STATUSES, TRACKED, BULK } from '../features/assets/assetKinds';
+import {
+  CATEGORIES, CONDITIONS, STATUSES, TRACKED, BULK, isTracked,
+} from '../features/assets/assetKinds';
 import { formatMYT } from '../features/datastudio/time/malaysiaTime';
 import { useHandovers } from '../features/assets/useHandovers';
 import {
   holdersOf, outstanding, isOpen, isOverdue, available, owned,
 } from '../features/assets/handover/availability';
+import { unitsOf, serialiseUnits, filledCount } from '../features/assets/units';
+import UnitPager from '../features/assets/ui/UnitPager';
+import AssetPhoto from '../features/assets/ui/AssetPhoto';
+import { absoluteFileUrl } from '../features/assets/sharepoint/fileUrl';
 
 /**
  * One item, in full, and editable.
@@ -91,6 +97,17 @@ export default function AssetDetailPage() {
   }
 
   const valueOf = (key) => (key in edits ? edits[key] : (asset?.[key] ?? ''));
+
+  // The individual things inside a bulk line. Built from the quantity being
+  // SHOWN rather than the one that was saved, so typing 3 into the quantity box
+  // grows the pager to three cards before anybody presses Save.
+  const units = useMemo(
+    () => unitsOf({ ...asset, quantity: Number(valueOf('quantity')) || asset?.quantity },
+      'units' in edits ? edits.units : asset?.units),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [asset, edits.units, edits.quantity],
+  );
+  const perUnit = Boolean(asset) && !isTracked(asset.trackingMode) && units.length > 1;
   const dirty = EDITABLE_FIELDS.some(
     (key) => key in edits && String(edits[key]) !== String(asset?.[key] ?? ''),
   );
@@ -178,55 +195,82 @@ export default function AssetDetailPage() {
       )}
 
       <div className="as-detail">
-        <Card className="as-panel">
-          <h2 className="as-h2">Details</h2>
-          <div className="as-form">
-            {FIELDS.map((field) => (
-              <label className="as-field" key={field.key}>
-                <span className="as-field-label">
-                  {field.label}
-                  {asset.manualFields?.includes(field.key) && (
-                    <span className="as-guess" title="Set by hand, so a re-scan will not change it">
-                      hand-set
-                    </span>
+        {/* Two columns on a desktop: the record itself down the left, and the
+            things around it — photo, who has it, where it came from — down the
+            right. The unit pager belongs with the record, not beside it. */}
+        <div className="as-detail-main">
+          <Card className="as-panel">
+            <h2 className="as-h2">Details</h2>
+            <div className="as-form">
+              {FIELDS.map((field) => (
+                <label className="as-field" key={field.key}>
+                  <span className="as-field-label">
+                    {field.label}
+                    {asset.manualFields?.includes(field.key) && (
+                      <span className="as-guess" title="Set by hand, so a re-scan will not change it">
+                        hand-set
+                      </span>
+                    )}
+                  </span>
+
+                  {field.options ? (
+                    <select
+                      value={valueOf(field.key)}
+                      onChange={(e) => setEdits({ ...edits, [field.key]: e.target.value })}
+                    >
+                      <option value="">—</option>
+                      {field.options.map((option) => (
+                        <option key={option} value={option}>{option}</option>
+                      ))}
+                    </select>
+                  ) : field.multiline ? (
+                    <textarea
+                      rows={3}
+                      value={valueOf(field.key)}
+                      onChange={(e) => setEdits({ ...edits, [field.key]: e.target.value })}
+                    />
+                  ) : (
+                    <input
+                      type={field.type ?? 'text'}
+                      value={valueOf(field.key)}
+                      onChange={(e) => setEdits({ ...edits, [field.key]: e.target.value })}
+                    />
                   )}
+                </label>
+              ))}
+            </div>
+          </Card>
+
+          {/* A bulk line is a count of identical things, which is the right
+              answer to "what did we buy" and the wrong one to "which of the two
+              tabs has the cracked screen". This is where each physical item gets
+              its own serial, label and condition. */}
+          {perUnit && (
+            <Card className="as-panel as-units-panel">
+              <h2 className="as-h2">
+                Each one, individually
+                <span className="as-sub">
+                  {filledCount(units)} of {units.length} recorded
                 </span>
-
-                {field.options ? (
-                  <select
-                    value={valueOf(field.key)}
-                    onChange={(e) => setEdits({ ...edits, [field.key]: e.target.value })}
-                  >
-                    <option value="">—</option>
-                    {field.options.map((option) => (
-                      <option key={option} value={option}>{option}</option>
-                    ))}
-                  </select>
-                ) : field.multiline ? (
-                  <textarea
-                    rows={3}
-                    value={valueOf(field.key)}
-                    onChange={(e) => setEdits({ ...edits, [field.key]: e.target.value })}
-                  />
-                ) : (
-                  <input
-                    type={field.type ?? 'text'}
-                    value={valueOf(field.key)}
-                    onChange={(e) => setEdits({ ...edits, [field.key]: e.target.value })}
-                  />
-                )}
-              </label>
-            ))}
-          </div>
-        </Card>
-
-        <div className="as-detail-side">
-          {asset.photoUrl && (
-            <Card className="as-panel">
-              <h2 className="as-h2">Photo</h2>
-              <img src={asset.photoUrl} alt={asset.title} className="as-detail-photo" />
+              </h2>
+              <UnitPager
+                asset={asset}
+                units={units}
+                onChange={(next) => setEdits({ ...edits, units: serialiseUnits(next) })}
+              />
             </Card>
           )}
+        </div>
+
+        <div className="as-detail-side">
+          <Card className="as-panel">
+            <h2 className="as-h2">Photo</h2>
+            <AssetPhoto
+              siteUrl={SHAREPOINT_SITE_URL}
+              stored={asset.photoUrl}
+              alt={asset.title}
+            />
+          </Card>
 
           <Card className="as-panel">
             <h2 className="as-h2">Who has it</h2>
@@ -301,7 +345,19 @@ export default function AssetDetailPage() {
               {asset.poPhotoUrl && (
                 <>
                   <dt>PO scan</dt>
-                  <dd><a href={asset.poPhotoUrl} className="as-link">Open</a></dd>
+                  <dd>
+                    {/* Absolute, for the same reason the photograph is: the
+                        stored path belongs to SharePoint, and a relative link
+                        asks the portal for a file it has never had. */}
+                    <a
+                      href={absoluteFileUrl(SHAREPOINT_SITE_URL, asset.poPhotoUrl)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="as-link"
+                    >
+                      Open
+                    </a>
+                  </dd>
                 </>
               )}
             </dl>

@@ -70,6 +70,12 @@ export default function AssetScanPage() {
         if (step2.outcome === OUTCOMES.DUPLICATE) {
           signalDuplicate();
           show('dup', `Already scanned — ${step2.code}`);
+        } else if (step2.outcome === OUTCOMES.SHARED) {
+          // Said out loud, because it looks like the scanner accepting a
+          // duplicate. It is the opposite: the code both boxes carry is the
+          // one thing that proves it is not the serial.
+          signalAccepted();
+          show('ok', `Same as an earlier box — part number ${step2.code}`);
         } else if (step2.outcome !== OUTCOMES.EMPTY) {
           signalAccepted();
           show('ok', step2.code);

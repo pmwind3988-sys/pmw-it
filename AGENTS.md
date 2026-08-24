@@ -114,6 +114,8 @@ pmw-it/
 | Native vs ponyfill barcode decoding | `src/features/assets/scan/detector.js` |
 | What makes two rows the same asset | `src/features/assets/identity.js` |
 | Tracked-vs-bulk, and the category list | `src/features/assets/assetKinds.js` |
+| The individual items inside a bulk line | `src/features/assets/units.js`, `ui/UnitPager.jsx` |
+| Why a saved photo needs the API and not the library | `src/features/assets/sharepoint/fileUrl.js`, `ui/useSharePointImage.js` |
 | A delivery held offline | `src/features/assets/draft/batch.js`, `store/assetDb.js` |
 | What a save writes, updates or refuses | `src/features/assets/sharepoint/planSave.js` |
 | Owned vs out vs available | `src/features/assets/handover/availability.js` |
@@ -319,6 +321,19 @@ tracked-or-bulk so the question is never answered twice or differently by two
 people. Tracked rows are pinned to a quantity of 1 wherever they are touched —
 twenty units cannot share one serial number.
 
+**A bulk line still knows its individual items.** "2 tabs" is the right answer
+to what was bought and the wrong answer to which one has the cracked screen, so
+a bulk row carries a UNIT RECORD per physical item — its own serial, label,
+condition, location and note (`units.js`, paged one at a time by
+`ui/UnitPager.jsx` on `/assets/:id`). They live as one JSON string in the
+`Units` column, SPARSE: only the units somebody has written on are stored, so a
+box of twenty cables costs nothing until the day one of them is written on. The
+count follows the row's quantity and lowering it only HIDES units — a quantity
+typed wrong and corrected back must not take a serial number with it. The
+change log gets a line per unit and field ("Unit 2 · Serial number"), never the
+JSON. `planSave` carries the column across a re-scan by hand, because a draft
+has none and the save writes every column.
+
 **Which barcode is the serial is a guess, and is labelled as one.** A printed
 label does not say. `scan/classifyCode.js` takes an explicit `S/N:` prefix as
 fact, a colon-separated MAC as fact, a retail EAN/UPC as a PART number (every
@@ -326,6 +341,17 @@ identical monitor on the pallet carries the same one), and scores the rest by
 shape. Everything it infers lands in `guessed` and renders as `guessed` in the
 review grid — same contract as the device import's derived values, and the
 reason a shape heuristic is safe to ship.
+
+**A code seen on TWO boxes is the part number.** The surest evidence there is,
+because a serial appears on one box and one box only. In ONE-item mode a repeat
+arriving while a new box is being pooled is kept (`OUTCOMES.SHARED`) instead of
+refused, and `classifyCodes` files it as the part number before anything is
+scored — which is what lets the second of two identical tabs keep its own
+serial. A repeat arriving on an EMPTY pool is still refused: that is the box
+just confirmed being carried back into frame. Shape is the fallback, and
+`partScore` reads what `serialScore` cannot — `#ABU` and `/A` are vendor part
+suffixes no serial scheme prints. Where it still gets it backwards, the review
+grid swaps both fields in one press (`swapSerialAndPart`).
 
 **SharePoint plumbing is shared, not per-section.** `features/sharepoint/`
 holds `spClient.js`, `writePool.js` and `provision.js`. `provisionSchema` takes
@@ -650,6 +676,17 @@ No icon package is installed — add a glyph there rather than a dependency.
   `RootFolder/ServerRelativeUrl` once per save instead of 404ing on every upload.
 - Don't send a Blob through `spFetch` — it JSON-stringifies the body and uploads
   the string "[object Blob]". Binary goes through `spUpload`.
+- Don't put a stored photo path straight into an `<img src>`. What is saved is
+  SERVER-RELATIVE (`/sites/IThelpdesk/IT Asset Photos/x.jpg`), so it resolves
+  against the PORTAL's origin and asks Vercel for a file only SharePoint has —
+  which is why no photograph in the register was visible until 2026-08-24. Nor
+  is prefixing the host enough: the library path sends no CORS headers, so a
+  cross-origin fetch fails before there is a status code, and it takes cookies
+  rather than the app's token. Read the bytes through
+  `/_api/web/GetFileByServerRelativeUrl('…')/$value` (`fileApiPath`), which
+  does both, and keep `absoluteFileUrl` for the human-facing "open in
+  SharePoint" link. Verified against the tenant on 2026-08-24: the library path
+  answers `Failed to fetch`, the API path answers 401 for a bad token.
 
 - Don't add a nav item without importing its icon. `NAV_ITEMS` in `AppShell.jsx`
   references the glyph by identifier, so a missing import is a ReferenceError

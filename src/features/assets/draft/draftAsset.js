@@ -109,6 +109,27 @@ export function setDraftField(draft, field, value) {
 }
 
 /**
+ * The two codes, the other way round.
+ *
+ * Which barcode on a box is the serial is a guess, and the guess is sometimes
+ * wrong. Retyping both by hand off a label held in the other hand is the kind
+ * of correction people skip, so the review grid offers the swap as one press —
+ * and, being a correction, it marks both fields as set by hand, the same as
+ * typing them would.
+ */
+export function swapSerialAndPart(draft) {
+  return {
+    ...draft,
+    serialNumber: draft.partNumber ?? '',
+    partNumber: draft.serialNumber ?? '',
+    guessed: (draft.guessed ?? []).filter(
+      (name) => name !== 'serialNumber' && name !== 'partNumber',
+    ),
+    manualFields: [...new Set([...(draft.manualFields ?? []), 'serialNumber', 'partNumber'])],
+  };
+}
+
+/**
  * What is wrong with this row, in words a person can act on. Returned as a
  * list rather than a boolean so the review grid can show them all at once
  * instead of one per save attempt.

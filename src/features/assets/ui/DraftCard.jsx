@@ -1,6 +1,6 @@
 import { CATEGORIES, CONDITIONS, TRACKED, BULK } from '../assetKinds';
-import { setDraftField } from '../draft/draftAsset';
-import { Trash2, Barcode, AlertTriangle } from '../../../components/ui/Icons';
+import { setDraftField, swapSerialAndPart } from '../draft/draftAsset';
+import { Trash2, Barcode, AlertTriangle, RefreshCw } from '../../../components/ui/Icons';
 import PhotoInput from './PhotoInput';
 
 /**
@@ -105,6 +105,20 @@ export default function DraftCard({ draft, issues = [], onChange, onRemove, inde
           <Field label="Part number" guessed={guessed('partNumber')}>
             <input value={draft.partNumber} onChange={set('partNumber')} />
           </Field>
+
+          {/* Offered whenever both codes are present, because the guess is
+              wrong often enough that retyping two barcodes by hand is a
+              correction people would rather skip than make. */}
+          {draft.serialNumber && draft.partNumber && (
+            <button
+              type="button"
+              className="as-swap"
+              onClick={() => onChange(swapSerialAndPart(draft))}
+            >
+              <RefreshCw size={13} />
+              The other way round — this is the part number, that is the serial
+            </button>
+          )}
 
           <Field label="Asset label" issue={issueFor('assetTag')}>
             <input value={draft.assetTag} onChange={set('assetTag')} placeholder="PMW-0142" />

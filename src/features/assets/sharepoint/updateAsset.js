@@ -6,6 +6,7 @@ import { formatMYT } from '../../datastudio/time/malaysiaTime.js';
 import { ASSET_LIST_NAME, CHANGE_LIST_NAME, toListItem } from './assetSchema.js';
 import { diffAsset } from './planSave.js';
 import { assetKey, assetTitle } from '../identity.js';
+import { diffUnits } from '../units.js';
 
 /**
  * Editing and removing one asset.
@@ -18,7 +19,7 @@ import { assetKey, assetTitle } from '../identity.js';
 export const EDITABLE_FIELDS = [
   'category', 'trackingMode', 'manufacturer', 'model', 'serialNumber', 'partNumber',
   'macAddress', 'assetTag', 'quantity', 'condition', 'status', 'location',
-  'remarks', 'specSummary', 'supplier', 'poNumber', 'arrivedOn',
+  'remarks', 'specSummary', 'supplier', 'poNumber', 'arrivedOn', 'units',
 ];
 
 const asText = (value) => (value === null || value === undefined ? '' : String(value));
@@ -45,6 +46,11 @@ export function planEdit(existing, edits) {
     else manual.delete(field);
   }
 
+  // `units` is a JSON blob, so it is held out of the manual list and out of
+  // the ordinary diff. Both would be nonsense: nothing re-scans a unit record,
+  // and a change log line reading `[{"index":1,...}]` is the same as no
+  // history at all. It is logged below, one line per unit and field.
+  manual.delete('units');
   next.manualFields = [...manual];
   // Both derived, both re-derived: correcting a serial number changes which
   // physical thing this row claims to be, and the key has to follow it or the
@@ -53,6 +59,7 @@ export function planEdit(existing, edits) {
   next.title = assetTitle(next);
 
   changes.push(...diffAsset(existing, next));
+  if ('units' in edits) changes.push(...diffUnits(existing.units, next.units));
 
   return { changes, record: next };
 }

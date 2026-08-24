@@ -148,7 +148,17 @@ export function planSave(drafts, register, { addedOn = Date.now(), addedBy = '' 
     // Diff and write the SAME record, so a field held back from the diff is
     // also held back from the body.
     const resolved = applyManualOverrides(
-      { ...draft, assetKey: key, quantity, status: draft.status ?? existing.status },
+      {
+        ...draft,
+        assetKey: key,
+        quantity,
+        status: draft.status ?? existing.status,
+        // Carried forward explicitly. A draft has no unit records — nothing in
+        // a barcode says which of the twenty cables is which — and the save
+        // writes every column, so without this a second bag of the same mice
+        // would erase every serial anybody had recorded against the row.
+        units: draft.units ?? existing.units ?? '',
+      },
       existing,
     );
 

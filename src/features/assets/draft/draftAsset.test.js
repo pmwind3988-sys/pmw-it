@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  newDraft, draftFromCodes, setDraftField, draftIssues, isBlocked,
+  newDraft, draftFromCodes, setDraftField, swapSerialAndPart, draftIssues, isBlocked,
 } from './draftAsset.js';
 import { TRACKED, BULK } from '../assetKinds.js';
 
@@ -134,5 +134,34 @@ describe('draftIssues', () => {
     const batchTags = new Map([['PMW-0142', draft.localId]]);
 
     expect(isBlocked(draftIssues(draft, { batchTags }))).toBe(false);
+  });
+});
+
+describe('swapSerialAndPart', () => {
+  it('puts each code in the other field', () => {
+    const draft = newDraft({ serialNumber: 'AAA111', partNumber: 'BBB222' });
+    const after = swapSerialAndPart(draft);
+
+    expect(after.serialNumber).toBe('BBB222');
+    expect(after.partNumber).toBe('AAA111');
+  });
+
+  /** A correction outranks a future re-scan, the same as typing one would. */
+  it('marks both as set by hand and neither as a guess', () => {
+    const draft = newDraft({
+      serialNumber: 'AAA111', partNumber: 'BBB222', guessed: ['serialNumber', 'partNumber'],
+    });
+    const after = swapSerialAndPart(draft);
+
+    expect(after.guessed).toEqual([]);
+    expect(after.manualFields).toEqual(expect.arrayContaining(['serialNumber', 'partNumber']));
+  });
+
+  it('does not list a field twice when it was already set by hand', () => {
+    const draft = newDraft({
+      serialNumber: 'AAA111', partNumber: 'BBB222', manualFields: ['serialNumber'],
+    });
+
+    expect(swapSerialAndPart(draft).manualFields.filter((f) => f === 'serialNumber')).toHaveLength(1);
   });
 });

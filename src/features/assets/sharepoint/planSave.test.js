@@ -19,6 +19,18 @@ const mice = (overrides = {}) => newDraft({
   ...overrides,
 });
 
+/** Two tabs already in the register, as a bulk line with a unit record. */
+const tabs = (overrides = {}) => ({
+  id: 3,
+  assetKey: 'bulk:TAB|SAMSUNG|SM-X210',
+  trackingMode: BULK,
+  category: 'Tab',
+  manufacturer: 'Samsung',
+  model: 'SM-X210',
+  quantity: 2,
+  ...overrides,
+});
+
 describe('planSave — new things', () => {
   it('inserts a row nothing in the register matches', () => {
     const plan = planSave([laptop()], []);
@@ -68,20 +80,36 @@ describe('planSave — things already in the register', () => {
    * A save writes every column, and a draft has no unit records — nothing in a
    * barcode says which of the two tabs is which. Without carrying them across,
    * a second box of the same thing would erase every serial anybody had
-   * recorded against the individual units on that row.
+   * recorded against the individual items on that row.
    */
   it('carries the unit records of a bulk row through a re-scan', () => {
     const units = JSON.stringify([{ index: 0, serialNumber: 'R52TC0AAAAA' }]);
-    const register = [{
-      id: 3, assetKey: 'bulk:TAB|SAMSUNG|SM-X210', trackingMode: BULK,
-      category: 'Tab', manufacturer: 'Samsung', model: 'SM-X210', quantity: 2, units,
-    }];
     const plan = planSave([newDraft({
       category: 'Tab', manufacturer: 'Samsung', model: 'SM-X210', quantity: 1,
-    })], register);
+    })], [tabs({ units })]);
 
     expect(plan.updates[0].body.quantity).toBe(3);
     expect(plan.updates[0].body.units).toBe(units);
+  });
+
+  /**
+   * A third tab arriving is a THIRD object. Its serial takes the next position
+   * rather than filling a gap in item 1's record, which would invent an item
+   * wearing one tab's serial and another's label.
+   */
+  it('gives a re-scanned bulk item the next position, not the first', () => {
+    const units = JSON.stringify([{ index: 0, serialNumber: 'R52TC0AAAAA' }]);
+    const plan = planSave([newDraft({
+      category: 'Tab', manufacturer: 'Samsung', model: 'SM-X210', quantity: 1,
+      serialNumber: 'R52TC0CCCCC',
+    })], [tabs({ units })]);
+
+    expect(JSON.parse(plan.updates[0].body.units)).toEqual([
+      expect.objectContaining({ index: 0, serialNumber: 'R52TC0AAAAA' }),
+      expect.objectContaining({ index: 2, serialNumber: 'R52TC0CCCCC' }),
+    ]);
+    // And never on the row: one serial cannot speak for three tabs.
+    expect(plan.updates[0].body.serialNumber).toBe('');
   });
 
   it('leaves a tracked row at one however it was scanned', () => {

@@ -1,4 +1,5 @@
 import { TRACKED } from './assetKinds.js';
+import { parseUnits } from './units.js';
 
 /**
  * What makes two rows the same asset.
@@ -90,6 +91,14 @@ export function indexByTag(assets) {
   for (const asset of assets) {
     const tag = normaliseCode(asset?.assetTag);
     if (tag) index.set(tag, asset);
+
+    // A bulk line keeps its labels on its individual items, and a label that
+    // is only on an item is still a label: leaving them out of this index
+    // would let PMW-0142 be stuck on a second thing without a word.
+    for (const unit of parseUnits(asset?.units)) {
+      const unitTag = normaliseCode(unit.assetTag);
+      if (unitTag && !index.has(unitTag)) index.set(unitTag, asset);
+    }
   }
   return index;
 }

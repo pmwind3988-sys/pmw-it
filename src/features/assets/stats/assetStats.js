@@ -1,5 +1,6 @@
 import { TRACKED } from '../assetKinds.js';
 import { available, out as unitsOut } from '../handover/availability.js';
+import { perItem, countPerItem, unitsOf as itemsOf } from '../units.js';
 
 /**
  * The figures at the top of the register.
@@ -10,6 +11,19 @@ import { available, out as unitsOut } from '../handover/availability.js';
  */
 
 const unitsOf = (asset) => (Number.isFinite(asset?.quantity) ? asset.quantity : 1);
+
+/**
+ * How many items on a bulk line are still waiting for a sticker.
+ *
+ * Only counted on a line where labelling has already STARTED. A bag of twenty
+ * cables was never going to wear twenty stickers, and counting it would bury
+ * the number this card exists for; but two tabs with one labelled is exactly
+ * the case somebody needs reminding about.
+ */
+function awaitingLabel(asset, count) {
+  const tagged = itemsOf(asset).filter((unit) => unit.assetTag).length;
+  return tagged === 0 ? 0 : Math.max(0, count - tagged);
+}
 
 export function assetStats(assets = []) {
   const byCategory = new Map();
@@ -28,16 +42,23 @@ export function assetStats(assets = []) {
     units += count;
 
     add(byCategory, asset.category || 'Uncategorised', count);
-    add(byStatus, asset.status || 'In stock', count);
     if (asset.location) add(byLocation, asset.location, count);
+
+    // Status is per item on a bulk line, so the tally comes from the items
+    // rather than the row. Twenty cables with one retired is nineteen in stock
+    // and one retired, not twenty of whichever the row happened to say.
+    for (const entry of perItem(asset, 'status', 'In stock')) {
+      add(byStatus, entry.value, entry.count);
+    }
 
     if (asset.trackingMode === TRACKED) {
       trackedUnits += count;
-      // Only tracked things wear a sticker; a bag of cables was never going to.
       if (!String(asset.assetTag ?? '').trim()) unlabelled += 1;
+    } else {
+      unlabelled += awaitingLabel(asset, count);
     }
 
-    if (asset.condition === 'Faulty') faulty += count;
+    faulty += countPerItem(asset, 'condition', 'Faulty');
 
     // Units, not rows: a box with three of twenty out contributes three, and
     // seventeen to what is still on the shelf.

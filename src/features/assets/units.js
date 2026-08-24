@@ -1,4 +1,4 @@
-import { CONDITIONS } from './assetKinds.js';
+import { CONDITIONS, STATUSES, TRACKED } from './assetKinds.js';
 
 /**
  * The individual things inside a bulk line.
@@ -6,9 +6,15 @@ import { CONDITIONS } from './assetKinds.js';
  * A bulk row says "2 tabs". That is the right answer to "what did we buy" and
  * the wrong answer to "which one is Aisyah holding, and which one has the
  * cracked screen". A unit record fills that gap: one entry per physical item
- * on the row, each with its own serial, label, condition and note, without
- * splitting the line into two rows and losing the fact that it was one
- * purchase of two identical things.
+ * on the row, without splitting the line into two rows and losing the fact
+ * that it was one purchase of two identical things.
+ *
+ * A serial number, a part number, a MAC address, a sticker label, a condition
+ * and a status all describe ONE physical thing. A bulk row therefore does not
+ * hold them at all — `PER_UNIT_ONLY` is the list, and the row is stripped of
+ * them wherever it is written. A row carrying one serial for twenty items is
+ * not a record of twenty items; it is a record of one, with nineteen hidden
+ * behind it.
  *
  * Everything here is pure and the storage is one JSON string in a single
  * SharePoint column (`Units`). That is deliberate — a second list would need
@@ -22,11 +28,37 @@ import { CONDITIONS } from './assetKinds.js';
 
 export const UNIT_FIELDS = [
   { key: 'serialNumber', label: 'Serial number' },
+  { key: 'partNumber', label: 'Part number' },
+  { key: 'macAddress', label: 'MAC address' },
   { key: 'assetTag', label: 'Asset label' },
   { key: 'condition', label: 'Condition', options: CONDITIONS },
+  { key: 'status', label: 'Status', options: STATUSES },
   { key: 'location', label: 'Where it is' },
   { key: 'remarks', label: 'Remarks', multiline: true },
 ];
+
+/**
+ * What a BULK row must never hold, because each names one physical item.
+ *
+ * `location` and `remarks` are absent from this list on purpose: a line can
+ * honestly live in one place and carry one note, and a unit may override
+ * either. These six cannot be overridden — they are either about one item or
+ * about nothing.
+ */
+export const PER_UNIT_ONLY = [
+  'serialNumber', 'partNumber', 'macAddress', 'assetTag', 'condition', 'status',
+];
+
+/**
+ * The subset a SCAN can honestly claim for one item: the codes it read off the
+ * box in front of it.
+ *
+ * Condition and status are deliberately not here. The condition on a review
+ * grid is a blanket statement about the delivery — "all new" — and writing it
+ * onto item 1 alone would turn "twenty new cables" into "one new cable and
+ * nineteen nobody looked at", which is worse than the honest nothing.
+ */
+export const PER_UNIT_CODES = ['serialNumber', 'partNumber', 'macAddress', 'assetTag'];
 
 const KEYS = UNIT_FIELDS.map((field) => field.key);
 
@@ -76,6 +108,22 @@ export function parseUnits(stored) {
 }
 
 /**
+ * The row's own per-unit values, as the unit record they should have been.
+ *
+ * Rows written before this rule existed carry a serial, a label and a
+ * condition on the row — the Lenovo tabs did. Reading them as item 1 is what
+ * stops the change from looking like the register quietly lost them, and it
+ * happens at READ time: nothing is written until somebody saves.
+ */
+function legacyUnit(asset, fields = PER_UNIT_ONLY) {
+  const source = {};
+  for (const field of fields) source[field] = asset?.[field];
+
+  const unit = cleanUnit(source, 0);
+  return isBlankUnit(unit) ? null : unit;
+}
+
+/**
  * Every unit on the row, in order, blanks included — which is what a pager
  * needs: "unit 2 of 5" has to exist before anybody can type into it.
  *
@@ -86,7 +134,17 @@ export function parseUnits(stored) {
  * dropped on the next save that writes over them.
  */
 export function unitsOf(asset, stored = asset?.units) {
-  const filled = new Map(parseUnits(stored).map((unit) => [unit.index, unit]));
+  const parsed = parseUnits(stored);
+  const filled = new Map(parsed.map((unit) => [unit.index, unit]));
+
+  // Only when there is nothing stored at all. A row that already has unit
+  // records has been saved under the new rule, and its row-level leftovers —
+  // if any survive — are not a first item waiting to be adopted.
+  if (!parsed.length) {
+    const legacy = legacyUnit(asset);
+    if (legacy) filled.set(0, legacy);
+  }
+
   const count = Math.max(1, Math.trunc(Number(asset?.quantity) || 1));
 
   const units = [];
@@ -94,6 +152,34 @@ export function unitsOf(asset, stored = asset?.units) {
     units.push(filled.get(index) ?? cleanUnit(null, index));
   }
   return units;
+}
+
+/**
+ * The row as it should be stored: a bulk line with its per-item fields moved
+ * into the units where they belong, and blanked on the row itself.
+ *
+ * Both halves have to happen together. Blanking without moving loses the data;
+ * moving without blanking leaves the register showing one item's serial as if
+ * it described the whole line, which is the thing being fixed.
+ *
+ * A tracked row is returned untouched — it IS one item, so the row is the
+ * right place for all of it.
+ */
+export function withUnitsSplitOut(record, moved = PER_UNIT_ONLY) {
+  if (record?.trackingMode === TRACKED) return record;
+
+  const next = { ...record };
+  const stored = parseUnits(record?.units);
+
+  if (!stored.length) {
+    const legacy = legacyUnit(record, moved);
+    if (legacy) next.units = serialiseUnits([legacy]);
+  }
+
+  // Cleared in full whatever was moved: a field left on the row would go on
+  // describing the whole line, which is the thing this exists to stop.
+  for (const field of PER_UNIT_ONLY) next[field] = '';
+  return next;
 }
 
 /** How many of them somebody has actually recorded something about. */
@@ -107,14 +193,74 @@ export function setUnitField(units, index, field, value) {
   ));
 }
 
-/** The JSON the column holds. Empty string when there is nothing to keep. */
+/**
+ * The JSON the column holds. Empty string when there is nothing to keep.
+ *
+ * Blank fields are dropped rather than written as `""`. A single note column
+ * holds every unit on the row, and twenty items each carrying eight empty
+ * strings is most of a SharePoint text limit spent on nothing.
+ */
 export function serialiseUnits(units) {
   const kept = (units ?? [])
     .map((unit, position) => cleanUnit(unit, Number.isInteger(unit?.index) ? unit.index : position))
     .filter((unit) => !isBlankUnit(unit))
-    .sort((a, b) => a.index - b.index);
+    .sort((a, b) => a.index - b.index)
+    .map((unit) => {
+      const compact = { index: unit.index };
+      for (const key of KEYS) if (unit[key]) compact[key] = unit[key];
+      return compact;
+    });
 
   return kept.length ? JSON.stringify(kept) : '';
+}
+
+/**
+ * One more physical item on an existing line, taking the next free position.
+ *
+ * This is a second box of something already in the register being scanned in:
+ * the quantity goes up by one and the thing in the scanner's hand becomes the
+ * unit at that new position, rather than overwriting item 1's serial with its
+ * own — which is what a plain field-level update would do.
+ *
+ * `at` is where to put it. A position already taken is stepped over instead of
+ * being written on, because the row it would overwrite describes a real object
+ * somebody has already recorded.
+ */
+export function appendUnit(stored, source, at = 0, fields = PER_UNIT_ONLY) {
+  const units = parseUnits(stored);
+  const candidate = legacyUnit(source, fields);
+  if (!candidate) return serialiseUnits(units);
+
+  const taken = new Set(units.map((unit) => unit.index));
+  let index = Math.max(0, Math.trunc(Number(at) || 0));
+  while (taken.has(index)) index += 1;
+
+  return serialiseUnits([...units, { ...candidate, index }]);
+}
+
+/**
+ * The units of an arriving delivery added to the units already on the row.
+ *
+ * `offset` is where the new ones start — the row's existing quantity, because
+ * everything below that is already spoken for. Positions already taken are
+ * stepped over rather than written on: each entry describes a real object
+ * somebody has recorded, and two of them must never be merged into one item
+ * wearing this tab's serial and that tab's label.
+ */
+export function mergeUnits(stored, incoming, offset = 0) {
+  const base = parseUnits(stored);
+  const taken = new Set(base.map((unit) => unit.index));
+  const added = [];
+
+  let next = Math.max(0, Math.trunc(Number(offset) || 0));
+  for (const unit of parseUnits(incoming)) {
+    while (taken.has(next)) next += 1;
+    taken.add(next);
+    added.push({ ...unit, index: next });
+    next += 1;
+  }
+
+  return serialiseUnits([...base, ...added]);
 }
 
 const labelFor = (key) => UNIT_FIELDS.find((field) => field.key === key)?.label ?? key;
@@ -149,6 +295,51 @@ export function diffUnits(before, after) {
   }
 
   return changes;
+}
+
+/**
+ * A field that is per-item, counted across everything the row owns.
+ *
+ * `[{ value, count }]`, and the arithmetic is the point: a box of twenty with
+ * one unit marked Faulty is one faulty and nineteen unrecorded, not one row
+ * that is faulty and not twenty faulty cables. Items nobody has said anything
+ * about are counted under `unstated` — 'In stock' for a status, because that
+ * is what a thing nobody has handed out is; nothing at all for a condition,
+ * because a condition nobody recorded is not a condition.
+ *
+ * A tracked row is one item and answers with its own value.
+ */
+export function perItem(asset, field, unstated = '') {
+  const owned = Math.max(1, Math.trunc(Number(asset?.quantity) || 1));
+  const tally = new Map();
+  const add = (value, count) => {
+    if (!value || count <= 0) return;
+    tally.set(value, (tally.get(value) ?? 0) + count);
+  };
+
+  if (asset?.trackingMode === TRACKED) {
+    add(asset?.[field] || unstated, 1);
+    return [...tally].map(([value, count]) => ({ value, count }));
+  }
+
+  // Through `unitsOf` rather than `parseUnits`, so a row still carrying its
+  // values on the row counts them as item 1 — the same reading the item detail
+  // gives it. Two places disagreeing about one row is how a register starts
+  // reporting figures nobody can reproduce by opening it.
+  let stated = 0;
+  for (const unit of unitsOf(asset)) {
+    if (!unit[field]) continue;
+    add(unit[field], 1);
+    stated += 1;
+  }
+
+  add(unstated, owned - stated);
+  return [...tally].map(([value, count]) => ({ value, count }));
+}
+
+/** How many of the row's items are in this state. */
+export function countPerItem(asset, field, wanted, unstated = '') {
+  return perItem(asset, field, unstated).find((entry) => entry.value === wanted)?.count ?? 0;
 }
 
 /** A one-line name for the unit, for the pager's own heading. */

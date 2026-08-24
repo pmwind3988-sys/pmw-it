@@ -2,6 +2,7 @@ import { assetKey, assetTitle, normaliseCode, indexByKey, indexByTag } from '../
 import { draftIssues, isBlocked } from '../draft/draftAsset.js';
 import { TRACKED_FIELDS } from './assetSchema.js';
 import { BULK } from '../assetKinds.js';
+import { withUnitsSplitOut, appendUnit, mergeUnits, PER_UNIT_CODES } from '../units.js';
 
 /**
  * What a save is going to do, decided before a single request is sent.
@@ -74,16 +75,28 @@ export function coalesce(drafts) {
     const existing = byKey.get(key);
 
     if (!existing) {
-      byKey.set(key, { ...draft, assetKey: key });
+      // A bulk line's serial, part number, label and condition belong to the
+      // box in front of the scanner, not to the line — so they come off the
+      // row and become its first unit.
+      byKey.set(key, withUnitsSplitOut({ ...draft, assetKey: key }, PER_UNIT_CODES));
       continue;
     }
 
     if (draft.trackingMode === BULK) {
+      // The second of two identical tabs. Its codes take the NEXT position
+      // rather than filling gaps in the first one's record: they describe a
+      // different object, and merging them would invent an item that has one
+      // tab's serial and the other's label.
+      existing.units = appendUnit(existing.units, draft, existing.quantity ?? 0, PER_UNIT_CODES);
       existing.quantity = (existing.quantity ?? 0) + (draft.quantity ?? 0);
     }
 
-    for (const field of ['manufacturer', 'model', 'serialNumber', 'partNumber',
-      'macAddress', 'assetTag', 'location', 'remarks', 'specSummary']) {
+    const shared = draft.trackingMode === BULK
+      ? ['manufacturer', 'model', 'location', 'remarks', 'specSummary']
+      : ['manufacturer', 'model', 'serialNumber', 'partNumber',
+        'macAddress', 'assetTag', 'location', 'remarks', 'specSummary'];
+
+    for (const field of shared) {
       if (!String(existing[field] ?? '').trim()) existing[field] = draft[field];
     }
     existing.photoId = existing.photoId ?? draft.photoId;
@@ -147,20 +160,27 @@ export function planSave(drafts, register, { addedOn = Date.now(), addedBy = '' 
 
     // Diff and write the SAME record, so a field held back from the diff is
     // also held back from the body.
-    const resolved = applyManualOverrides(
+    // Unit records are carried forward explicitly, because the save writes
+    // every column and a second bag of the same mice would otherwise erase
+    // every serial anybody had recorded against the row.
+    //
+    // On a bulk line the box being scanned is a NEW physical item, so it takes
+    // the next position rather than the first — the row already describes
+    // however many arrived before it.
+    const units = draft.trackingMode === BULK
+      ? mergeUnits(existing.units, draft.units, existing.quantity ?? 0)
+      : (draft.units ?? existing.units ?? '');
+
+    const resolved = withUnitsSplitOut(applyManualOverrides(
       {
         ...draft,
         assetKey: key,
         quantity,
         status: draft.status ?? existing.status,
-        // Carried forward explicitly. A draft has no unit records — nothing in
-        // a barcode says which of the twenty cables is which — and the save
-        // writes every column, so without this a second bag of the same mice
-        // would erase every serial anybody had recorded against the row.
-        units: draft.units ?? existing.units ?? '',
+        units,
       },
       existing,
-    );
+    ));
 
     const changes = diffAsset(existing, resolved);
     if (!changes.length) {

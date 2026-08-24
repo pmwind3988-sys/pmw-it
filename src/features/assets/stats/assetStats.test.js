@@ -47,8 +47,48 @@ describe('assetStats', () => {
     expect(assetStats([{ category: 'Cable', quantity: 3 }]).inStock).toBe(3);
   });
 
-  it('counts faulty units', () => {
-    expect(assetStats([bulk({ condition: 'Faulty' })]).faulty).toBe(20);
+  /**
+   * Condition belongs to a thing, and a bulk row is a count of things. Two of
+   * twenty mice being faulty is two faulty mice — the old reading, off the
+   * row, made it twenty.
+   */
+  it('counts the faulty ITEMS on a bulk line, not the whole line', () => {
+    const units = JSON.stringify([
+      { index: 0, condition: 'Faulty' },
+      { index: 1, condition: 'Faulty' },
+      { index: 2, condition: 'Good' },
+    ]);
+
+    expect(assetStats([bulk({ units })]).faulty).toBe(2);
+  });
+
+  it('counts a faulty tracked item once', () => {
+    expect(assetStats([tracked({ condition: 'Faulty' })]).faulty).toBe(1);
+  });
+
+  it('counts nothing faulty on a line where nobody said', () => {
+    expect(assetStats([bulk()]).faulty).toBe(0);
+  });
+
+  /** Items nobody has spoken for are in stock; the ones retired are not. */
+  it('tallies status per item on a bulk line', () => {
+    const units = JSON.stringify([{ index: 0, status: 'Retired' }]);
+    const stats = assetStats([bulk({ units })]);
+
+    expect(stats.inStock).toBe(19);
+    expect(stats.byStatus).toEqual(expect.arrayContaining([{ label: 'Retired', value: 1 }]));
+  });
+
+  /**
+   * A bag of cables was never going to wear twenty stickers, so a line nobody
+   * has started labelling is not twenty items waiting for one. A line where
+   * labelling HAS started is exactly the case worth a reminder.
+   */
+  it('counts the rest of a part-labelled line as waiting for a sticker', () => {
+    const units = JSON.stringify([{ index: 0, assetTag: 'PMWTAB001' }]);
+    const stats = assetStats([{ ...bulk({ units }), quantity: 2 }]);
+
+    expect(stats.unlabelled).toBe(1);
   });
 
   it('is calm about an empty register', () => {

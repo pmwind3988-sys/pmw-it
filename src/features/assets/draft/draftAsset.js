@@ -143,10 +143,18 @@ export function draftIssues(draft, { registerTags = new Map(), batchTags = new M
     issues.push({ field: 'category', message: 'Pick a category.' });
   }
 
-  if (!String(draft.model ?? '').trim() && !String(draft.serialNumber ?? '').trim()) {
+  // A serial identifies a tracked row and nothing else: a bulk line is keyed
+  // on what the thing IS, and its serials belong to the individual items
+  // inside it, so a bulk row with no model has nothing to be called at all.
+  const named = String(draft.model ?? '').trim();
+  const serialised = String(draft.serialNumber ?? '').trim();
+  if (!named && (draft.trackingMode !== TRACKED || !serialised)) {
     issues.push({
       field: 'model',
-      message: 'Give it a model or a serial number — otherwise there is nothing to identify it by.',
+      message: draft.trackingMode === TRACKED
+        ? 'Give it a model or a serial number — otherwise there is nothing to identify it by.'
+        : 'Give it a model. A line counted by quantity is identified by what it is, '
+          + 'and its serials belong to the individual items on it.',
     });
   }
 

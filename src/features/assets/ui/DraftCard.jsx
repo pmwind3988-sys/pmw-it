@@ -94,6 +94,18 @@ export default function DraftCard({ draft, issues = [], onChange, onRemove, inde
             <input value={draft.model} onChange={set('model')} placeholder="Latitude 5540" />
           </Field>
 
+          {/* On a line counted by quantity these four describe the box in
+              front of you, not the line — they are saved against ITEM 1 of it,
+              and the next box of the same thing becomes item 2. Said out loud,
+              because typing a serial into a row that reads "× 20" otherwise
+              looks like claiming it for all twenty. */}
+          {draft.trackingMode === BULK && (
+            <p className="as-draft-note">
+              The serial, part number and label below belong to this one box —
+              they are kept against the individual item, not the whole line.
+            </p>
+          )}
+
           <Field
             label="Serial number"
             guessed={guessed('serialNumber')}
@@ -136,13 +148,19 @@ export default function DraftCard({ draft, issues = [], onChange, onRemove, inde
             </Field>
           )}
 
-          <Field label="Condition">
-            <select value={draft.condition} onChange={set('condition')}>
-              {CONDITIONS.map((condition) => (
-                <option key={condition} value={condition}>{condition}</option>
-              ))}
-            </select>
-          </Field>
+          {/* A condition describes a thing, and a bulk line is a count of
+              things. "All new" typed here would be written against item 1
+              alone — twenty new cables recorded as one new cable and nineteen
+              nobody looked at — so it is asked per item on the row instead. */}
+          {draft.trackingMode !== BULK && (
+            <Field label="Condition">
+              <select value={draft.condition} onChange={set('condition')}>
+                {CONDITIONS.map((condition) => (
+                  <option key={condition} value={condition}>{condition}</option>
+                ))}
+              </select>
+            </Field>
+          )}
 
           <Field label="Where it is">
             <input value={draft.location} onChange={set('location')} placeholder="Store room" />

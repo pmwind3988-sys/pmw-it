@@ -115,6 +115,7 @@ pmw-it/
 | What makes two rows the same asset | `src/features/assets/identity.js` |
 | Tracked-vs-bulk, and the category list | `src/features/assets/assetKinds.js` |
 | The individual items inside a bulk line | `src/features/assets/units.js`, `ui/UnitPager.jsx` |
+| What a bulk row may not hold, and where it goes instead | `units.js` — `PER_UNIT_ONLY`, `withUnitsSplitOut` |
 | Why a saved photo needs the API and not the library | `src/features/assets/sharepoint/fileUrl.js`, `ui/useSharePointImage.js` |
 | A delivery held offline | `src/features/assets/draft/batch.js`, `store/assetDb.js` |
 | What a save writes, updates or refuses | `src/features/assets/sharepoint/planSave.js` |
@@ -321,18 +322,41 @@ tracked-or-bulk so the question is never answered twice or differently by two
 people. Tracked rows are pinned to a quantity of 1 wherever they are touched —
 twenty units cannot share one serial number.
 
-**A bulk line still knows its individual items.** "2 tabs" is the right answer
-to what was bought and the wrong answer to which one has the cracked screen, so
-a bulk row carries a UNIT RECORD per physical item — its own serial, label,
-condition, location and note (`units.js`, paged one at a time by
-`ui/UnitPager.jsx` on `/assets/:id`). They live as one JSON string in the
-`Units` column, SPARSE: only the units somebody has written on are stored, so a
-box of twenty cables costs nothing until the day one of them is written on. The
-count follows the row's quantity and lowering it only HIDES units — a quantity
-typed wrong and corrected back must not take a serial number with it. The
-change log gets a line per unit and field ("Unit 2 · Serial number"), never the
-JSON. `planSave` carries the column across a re-scan by hand, because a draft
-has none and the save writes every column.
+**A serial, a part number, a MAC, a label, a condition and a status describe
+ONE thing, so a bulk row does not hold them.** `PER_UNIT_ONLY` in `units.js` is
+the list, and `withUnitsSplitOut` is the invariant: wherever a bulk row is
+written — the edit screen through `planEdit`, a delivery through `planSave` —
+those six come off the row and onto its items. A row carrying one serial for
+twenty items is not a record of twenty items; it is a record of one, with
+nineteen hidden behind it. A row saved before the rule has them MOVED onto item
+1 rather than deleted, and `unitsOf` reads them there from the moment the rule
+landed, so nothing looks lost in between.
+
+**A bulk line knows its individual items.** One UNIT RECORD per physical thing
+(`units.js`, paged one at a time by `ui/UnitPager.jsx` on `/assets/:id`, swipe
+or arrows). They live as one JSON string in the `Units` column, SPARSE and with
+blank fields dropped: only the units somebody has written on are stored, so a
+box of twenty cables costs nothing until one of them is written on. The count
+follows the row's quantity and lowering it only HIDES units — a quantity typed
+wrong and corrected back must not take a serial number with it. The change log
+gets a line per unit and field ("Unit 2 · Serial number"), never the JSON.
+`planSave` carries the column across a re-scan by hand, because a draft has
+none and the save writes every column; a re-scanned bulk box takes the NEXT
+position (`mergeUnits`), never item 1's, because it is a different object.
+
+**A scan may claim codes for an item, never a condition.** `PER_UNIT_CODES` is
+the narrower list the review grid is allowed to move onto an item. "All new" on
+a review grid is about the delivery, and writing it onto item 1 alone turns
+twenty new cables into one new cable and nineteen nobody looked at — so the
+condition field is not offered on a bulk draft at all.
+
+**Anything that counts a per-item field counts ITEMS.** `perItem` /
+`countPerItem` do the arithmetic once and everything else reads them: a box of
+twenty with one Faulty is one faulty, not twenty and not one row. Items nobody
+has spoken for are 'In stock' for a status and nothing at all for a condition —
+a condition nobody recorded is not a condition. Search
+(`assetFilters.haystack`) and the handover scanner both reach into the units,
+or a tab could not be found by the serial on the tab in your hand.
 
 **Which barcode is the serial is a guess, and is labelled as one.** A printed
 label does not say. `scan/classifyCode.js` takes an explicit `S/N:` prefix as

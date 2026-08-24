@@ -21,7 +21,7 @@ import {
 /** Below this a drag is a scroll, not a swipe. */
 const SWIPE_PX = 45;
 
-export default function UnitPager({ asset, units, onChange }) {
+export default function UnitPager({ units, onChange }) {
   const [at, setAt] = useState(0);
   const touch = useRef(null);
 
@@ -126,9 +126,10 @@ export default function UnitPager({ asset, units, onChange }) {
 
             {field.options ? (
               <select value={unit[field.key]} onChange={set(field.key)}>
-                {/* Empty means "whatever the row says", which is different
-                    from a condition somebody chose for this one item. */}
-                <option value="">Same as the row ({asset.condition || '—'})</option>
+                {/* Empty is "nobody has said", not a value. The row has no
+                    condition of its own to fall back to — it is a count of
+                    things, and only a thing can be faulty. */}
+                <option value="">— not recorded</option>
                 {field.options.map((option) => (
                   <option key={option} value={option}>{option}</option>
                 ))}

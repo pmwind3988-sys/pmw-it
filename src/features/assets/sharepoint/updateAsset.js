@@ -6,7 +6,7 @@ import { formatMYT } from '../../datastudio/time/malaysiaTime.js';
 import { ASSET_LIST_NAME, CHANGE_LIST_NAME, toListItem } from './assetSchema.js';
 import { diffAsset } from './planSave.js';
 import { assetKey, assetTitle } from '../identity.js';
-import { diffUnits } from '../units.js';
+import { diffUnits, withUnitsSplitOut } from '../units.js';
 
 /**
  * Editing and removing one asset.
@@ -35,7 +35,7 @@ const asText = (value) => (value === null || value === undefined ? '' : String(v
 export function planEdit(existing, edits) {
   const changes = [];
   const manual = new Set(existing.manualFields ?? []);
-  const next = { ...existing };
+  let next = { ...existing };
 
   for (const field of EDITABLE_FIELDS) {
     if (!(field in edits)) continue;
@@ -45,6 +45,13 @@ export function planEdit(existing, edits) {
     if (asText(edits[field])) manual.add(field);
     else manual.delete(field);
   }
+
+  // A serial, a part number, a label, a condition and a status each describe
+  // ONE physical item, so a bulk line does not keep them. On a row saved
+  // before that rule they are moved onto item 1 in the same breath as being
+  // cleared — separately would either lose them or leave one item's serial
+  // standing in for twenty.
+  next = withUnitsSplitOut(next);
 
   // `units` is a JSON blob, so it is held out of the manual list and out of
   // the ordinary diff. Both would be nonsense: nothing re-scans a unit record,
@@ -59,7 +66,10 @@ export function planEdit(existing, edits) {
   next.title = assetTitle(next);
 
   changes.push(...diffAsset(existing, next));
-  if ('units' in edits) changes.push(...diffUnits(existing.units, next.units));
+  // Compared unconditionally, because the split above writes units nobody
+  // edited — and a move from the row into item 1 has to show in the history as
+  // the move it is, not as five fields vanishing.
+  changes.push(...diffUnits(existing.units, next.units));
 
   return { changes, record: next };
 }

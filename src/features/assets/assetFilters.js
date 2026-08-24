@@ -1,4 +1,19 @@
 import { normaliseCode } from './identity.js';
+import { TRACKED } from './assetKinds.js';
+import { unitsOf, countPerItem, UNIT_FIELDS } from './units.js';
+
+const UNIT_KEYS = UNIT_FIELDS.map((field) => field.key);
+
+/**
+ * Whether every item on the row wears a sticker. A bulk line's labels are on
+ * its items, so a box of two with one labelled is not a labelled row.
+ */
+function labelled(asset) {
+  if (asset?.trackingMode === TRACKED) return Boolean(String(asset?.assetTag ?? '').trim());
+
+  const items = unitsOf(asset);
+  return items.every((unit) => unit.assetTag);
+}
 
 /**
  * Finding one thing in the register.
@@ -17,6 +32,14 @@ const HAYSTACK_FIELDS = [
 
 export function haystack(asset) {
   const parts = HAYSTACK_FIELDS.map((field) => asset?.[field]).filter(Boolean);
+
+  // A bulk line's serials and labels live on its individual items, so a search
+  // that only read the row would fail to find a box of tabs by the serial of
+  // the tab in somebody's hand — the one search anybody actually runs.
+  for (const unit of unitsOf(asset)) {
+    for (const key of UNIT_KEYS) if (unit[key]) parts.push(unit[key]);
+  }
+
   return [...parts, ...(asset?.additionalCodes ?? [])].join(' ').toLowerCase();
 }
 
@@ -46,11 +69,14 @@ export function matchesQuery(asset, query) {
 export function filterAssets(assets = [], filters = {}) {
   return assets.filter((asset) => {
     if (filters.category && asset.category !== filters.category) return false;
-    if (filters.status && (asset.status || 'In stock') !== filters.status) return false;
-    if (filters.condition && asset.condition !== filters.condition) return false;
+    // Status and condition are per item on a bulk line, so a row is shown when
+    // ANY of the things on it is in that state. Filtering on the row alone
+    // would hide the one faulty tab behind a line that has no condition.
+    if (filters.status && !countPerItem(asset, 'status', filters.status, 'In stock')) return false;
+    if (filters.condition && !countPerItem(asset, 'condition', filters.condition)) return false;
     if (filters.location && asset.location !== filters.location) return false;
     if (filters.trackingMode && asset.trackingMode !== filters.trackingMode) return false;
-    if (filters.unlabelled && String(asset.assetTag ?? '').trim()) return false;
+    if (filters.unlabelled && labelled(asset)) return false;
     return matchesQuery(asset, filters.query);
   });
 }

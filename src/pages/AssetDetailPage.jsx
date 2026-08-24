@@ -18,7 +18,9 @@ import { useHandovers } from '../features/assets/useHandovers';
 import {
   holdersOf, outstanding, isOpen, isOverdue, available, owned,
 } from '../features/assets/handover/availability';
-import { unitsOf, serialiseUnits, filledCount } from '../features/assets/units';
+import {
+  unitsOf, serialiseUnits, filledCount, PER_UNIT_ONLY,
+} from '../features/assets/units';
 import UnitPager from '../features/assets/ui/UnitPager';
 import AssetPhoto from '../features/assets/ui/AssetPhoto';
 import { absoluteFileUrl } from '../features/assets/sharepoint/fileUrl';
@@ -107,7 +109,17 @@ export default function AssetDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [asset, edits.units, edits.quantity],
   );
-  const perUnit = Boolean(asset) && !isTracked(asset.trackingMode) && units.length > 1;
+  // Shown for every bulk line, however few are on it — a line of one still
+  // holds its serial on the item rather than on the row, and hiding the pager
+  // at a quantity of 1 would leave that serial nowhere to go.
+  const perUnit = Boolean(asset) && !isTracked(asset.trackingMode);
+
+  // A serial, a part number, a MAC, a label, a condition and a status each
+  // describe one physical thing, so a bulk line does not offer them on the
+  // row. They are on the items, below.
+  const shownFields = perUnit
+    ? FIELDS.filter((field) => !PER_UNIT_ONLY.includes(field.key))
+    : FIELDS;
   const dirty = EDITABLE_FIELDS.some(
     (key) => key in edits && String(edits[key]) !== String(asset?.[key] ?? ''),
   );
@@ -202,7 +214,7 @@ export default function AssetDetailPage() {
           <Card className="as-panel">
             <h2 className="as-h2">Details</h2>
             <div className="as-form">
-              {FIELDS.map((field) => (
+              {shownFields.map((field) => (
                 <label className="as-field" key={field.key}>
                   <span className="as-field-label">
                     {field.label}
@@ -254,7 +266,6 @@ export default function AssetDetailPage() {
                 </span>
               </h2>
               <UnitPager
-                asset={asset}
                 units={units}
                 onChange={(next) => setEdits({ ...edits, units: serialiseUnits(next) })}
               />

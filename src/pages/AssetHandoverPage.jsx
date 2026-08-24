@@ -20,6 +20,7 @@ import { commitHandover } from '../features/assets/sharepoint/writeHandover';
 import { matchesQuery } from '../features/assets/assetFilters';
 import { normaliseCode } from '../features/assets/identity';
 import { TRACKED } from '../features/assets/assetKinds';
+import { parseUnits } from '../features/assets/units';
 import PersonPicker from '../features/assets/ui/PersonPicker';
 
 /**
@@ -88,6 +89,14 @@ export default function AssetHandoverPage() {
         || normaliseCode(asset.assetTag) === wanted
         || normaliseCode(asset.partNumber) === wanted
         || (asset.additionalCodes ?? []).some((entry) => normaliseCode(entry) === wanted)
+        // A bulk line keeps its codes on its individual items, so scanning the
+        // tab in your hand has to reach them or the register answers "nothing
+        // matches" for something it certainly owns.
+        || parseUnits(asset.units).some((unit) => (
+          normaliseCode(unit.serialNumber) === wanted
+          || normaliseCode(unit.assetTag) === wanted
+          || normaliseCode(unit.partNumber) === wanted
+        ))
       ));
 
       if (!found) {

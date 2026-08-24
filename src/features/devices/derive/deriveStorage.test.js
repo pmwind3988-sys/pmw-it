@@ -68,3 +68,40 @@ describe('deriveStorage — IT extraction disk', () => {
     expect(result.hasHdd).toBe(false);
   });
 });
+
+describe('deriveStorage \u2014 IT flash drive', () => {
+  const IT_STICK = 'USB DISK 2.0 | Unspecified | 15 GB';
+  const IT_DISK = 'WDC WD10 JPVX-60JC3T1 | Unspecified | 932 GB';
+
+  it('leaves the stick out of the size, the count and the disk type', () => {
+    const result = deriveStorage([IT_STICK, 'SAMSUNG MZVLQ512HBLU-00BH1 | SSD | 477 GB']);
+    expect(result.storageTotalGB).toBe(477);
+    expect(result.driveCount).toBe(1);
+    expect(result.hasHdd).toBe(false);
+    expect(result.storageType).toBe('SSD only');
+  });
+
+  it('stops an all-SSD machine reading Mixed just because the stick was in it', () => {
+    const result = deriveStorage([
+      'KBG50ZNV512G KIOXIA | SSD | 477 GB',
+      IT_STICK,
+    ]);
+    expect(result.storageType).toBe('SSD only');
+    expect(result.hasHdd).toBe(false);
+  });
+
+  it('reports what it left out, so the page can say why', () => {
+    const result = deriveStorage([IT_STICK, 'Apacer AS340 240GB | SSD | 224 GB']);
+    expect(result.ignoredDrives).toEqual(['USB DISK 2.0 | 15 GB']);
+  });
+
+  it('leaves out both pieces of IT media at once', () => {
+    const result = deriveStorage([IT_DISK, IT_STICK, 'Apacer AS340 240GB | SSD | 224 GB']);
+    expect(result.driveCount).toBe(1);
+    expect(result.storageTotalGB).toBe(224);
+    expect(result.ignoredDrives).toEqual([
+      'WDC WD10 JPVX-60JC3T1 | 932 GB',
+      'USB DISK 2.0 | 15 GB',
+    ]);
+  });
+});

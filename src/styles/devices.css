@@ -108,6 +108,19 @@
   margin-inline: -16px;
 }
 
+/* The list runs to a hundred rows and more, so a scroll box as tall as its
+   content parks the horizontal bar far below the fold -- to reach the columns
+   on the right you first had to scroll to the very bottom of the page. Capping
+   the box to the height left on screen keeps that bar in view at all times and
+   scrolls the rows within it instead; the sticky header rides along at the top. */
+@media (min-height: 480px) {
+  .rg-scroll {
+    max-height: calc(100vh - 220px);
+    min-height: 260px;
+    overflow-y: auto;
+  }
+}
+
 .rg th:first-child,
 .rg td:first-child {
   padding-left: 16px;

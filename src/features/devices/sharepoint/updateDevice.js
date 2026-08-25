@@ -3,7 +3,7 @@ import {
 } from '../../sharepoint/spClient.js';
 import { DEVICE_LIST_NAME, CHANGE_LIST_NAME } from './deviceSchema.js';
 import { runPool, withRetry } from '../../sharepoint/writePool.js';
-import { formatMYT } from '../../datastudio/time/malaysiaTime.js';
+import { formatMYT } from '../../../utils/malaysiaTime.js';
 
 /**
  * The only fields the register lets somebody retype. They are exactly the ones

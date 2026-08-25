@@ -1,4 +1,4 @@
-import { formatMYT } from '../datastudio/time/malaysiaTime.js';
+import { formatMYT } from '../../utils/malaysiaTime.js';
 
 /**
  * One value, rendered the way its kind reads.

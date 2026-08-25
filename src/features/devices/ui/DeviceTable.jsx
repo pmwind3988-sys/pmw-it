@@ -5,7 +5,7 @@ import Button from '../../../components/ui/Button';
 import {
   Download, Search, X, Pencil, Check, AlertTriangle, Trash2,
 } from '../../../components/ui/Icons';
-import { formatMYT } from '../../datastudio/time/malaysiaTime';
+import { formatMYT } from '../../../utils/malaysiaTime';
 import { formatScalar } from '../formatValue';
 import ValueCell from './ValueCell';
 import { applyFilters, toCsv } from '../deviceFilters';

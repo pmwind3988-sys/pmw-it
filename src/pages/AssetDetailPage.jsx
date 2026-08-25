@@ -13,7 +13,7 @@ import { updateAsset, deleteAsset, EDITABLE_FIELDS } from '../features/assets/sh
 import {
   CATEGORIES, CONDITIONS, STATUSES, TRACKED, BULK, isTracked,
 } from '../features/assets/assetKinds';
-import { formatMYT } from '../features/datastudio/time/malaysiaTime';
+import { formatMYT } from '../utils/malaysiaTime';
 import { useHandovers } from '../features/assets/useHandovers';
 import {
   holdersOf, outstanding, isOpen, isOverdue, available, owned,

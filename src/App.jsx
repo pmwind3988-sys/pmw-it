@@ -16,11 +16,11 @@ import AssetHandoverPage from './pages/AssetHandoverPage';
 import AssetPeoplePage from './pages/AssetPeoplePage';
 import AssetPersonPage from './pages/AssetPersonPage';
 
-// Lazy on purpose, not for tidiness: this page's chunk carries SheetJS and
-// ECharts, which together are larger than the rest of the app. Loading it
-// eagerly would make every other screen pay for a section most visits
-// never open (spec section 6.3).
-const DataStudioPage = lazy(() => import('./pages/DataStudioPage'));
+// Lazy on purpose, not for tidiness: this page's chunk carries SheetJS,
+// ECharts and the sentence model, which together are larger than the
+// rest of the app. Loading it eagerly would make every other screen pay
+// for a section most visits never open.
+const SemanticAnalysisPage = lazy(() => import('./pages/SemanticAnalysisPage'));
 
 /** `/list` was the records screen before it moved; links to it are still around. */
 function LegacyListRedirect() {
@@ -55,13 +55,17 @@ function App() {
         <Route path="/assets/people/:email" element={<AssetPersonPage />} />
         <Route path="/assets/:id" element={<AssetDetailPage />} />
         <Route
-          path="/data-studio"
+          path="/semantic-analysis"
           element={(
-            <Suspense fallback={<div className="ds-route-loading">Loading Data Studio...</div>}>
-              <DataStudioPage />
+            <Suspense fallback={<div className="sa-route-loading">Loading Semantic Analysis...</div>}>
+              <SemanticAnalysisPage />
             </Suspense>
           )}
         />
+        {/* The section used to be a general charting tool. Anyone who
+            bookmarked it wanted their spreadsheet read, which is what
+            is here now. */}
+        <Route path="/data-studio" element={<Navigate to="/semantic-analysis" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </div>

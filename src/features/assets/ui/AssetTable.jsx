@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Tag, Boxes } from '../../../components/ui/Icons';
-import { formatMYT } from '../../datastudio/time/malaysiaTime';
+import { formatMYT } from '../../../utils/malaysiaTime';
 import { isTracked } from '../assetKinds';
 import { available, out } from '../handover/availability';
 import { unitsOf, perItem, isBlankUnit } from '../units';

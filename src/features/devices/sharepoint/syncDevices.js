@@ -4,7 +4,7 @@ import { DEVICE_LIST_NAME, CHANGE_LIST_NAME, toListItem } from './deviceSchema.j
 import { readAllDevices } from './readDevices.js';
 import { diffDevice, indexByName } from './diffDevice.js';
 import { runPool, withRetry } from '../../sharepoint/writePool.js';
-import { formatMYT } from '../../datastudio/time/malaysiaTime.js';
+import { formatMYT } from '../../../utils/malaysiaTime.js';
 
 /**
  * A field somebody corrected by hand outranks what the scan file says about

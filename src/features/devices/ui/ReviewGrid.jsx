@@ -1,4 +1,4 @@
-import { formatMYT } from '../../datastudio/time/malaysiaTime';
+import { formatMYT } from '../../../utils/malaysiaTime';
 import { issuesFor } from '../reviewIssues';
 
 /**

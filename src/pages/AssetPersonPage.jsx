@@ -16,7 +16,7 @@ import {
   heldBy, outstanding, isOverdue, isOpen, HANDOVER_KIND,
 } from '../features/assets/handover/availability';
 import { CONDITIONS } from '../features/assets/assetKinds';
-import { formatMYT } from '../features/datastudio/time/malaysiaTime';
+import { formatMYT } from '../utils/malaysiaTime';
 import { initialsOf } from '../utils/initials';
 
 /**

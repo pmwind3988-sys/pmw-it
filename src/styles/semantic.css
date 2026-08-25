@@ -1,0 +1,1010 @@
+/* Semantic Analysis -- the drop zone, the charts and the responses. Loaded after shell.css. */
+
+/* ---------- series palette ----------
+   Categorical chart colours, as tokens so `echartsTheme.js` reads them
+   the same way it reads every other colour and the dark flip needs no
+   JavaScript.
+
+   The hues are Okabe-Ito, the standard colour-blind-safe qualitative
+   set: adjacent entries stay distinguishable under deuteranopia,
+   protanopia and tritanopia, which a ramp built from a single brand hue
+   does not. Slot 1 is Okabe-Ito's blue (#0072B2), which is within a
+   whisker of --it-brand, so a single-series chart still reads as this
+   app's blue.
+
+   Okabe-Ito's black and yellow are dropped: black vanishes on the dark
+   panel and #F0E442 is illegible on the white one. The dark row is the
+   same hues lifted for a #151b24 ground -- the light values are too
+   dark to read there.
+
+   Slot ORDER is load-bearing and was set by measurement, not taste. The
+   first four slots carry most charts, so they are the ones that have to
+   stay apart under colour-blindness. Okabe-Ito's blue and bluish-green
+   sitting at slots 1 and 3 collapsed under tritanopia (a separation of
+   0.081 where the bar is 0.12), so green moved to slot 5 and the bronze
+   took its place, which measures 0.249. Reordering cost nothing;
+   loosening the bar would have shipped two series a tritanope cannot
+   tell apart.
+
+   Contrast against each theme's --it-panel, and the separation of the
+   first four slots under all three dichromacies, are verified
+   numerically in `echartsTheme.contrast.test.js` -- not assumed. */
+
+:root {
+  --sa-series-1: #0072b2;
+  --sa-series-2: #d55e00;
+  --sa-series-3: #8c6d31;
+  --sa-series-4: #cc79a7;
+  --sa-series-5: #009e73;
+  --sa-series-6: #7b5aa6;
+  --sa-series-7: #3c8ac4;
+  --sa-series-8: #b8860b;
+}
+
+[data-theme='dark'] {
+  --sa-series-1: #56b4e9;
+  --sa-series-2: #f0883c;
+  --sa-series-3: #d4b483;
+  --sa-series-4: #e79fc4;
+  --sa-series-5: #34d399;
+  --sa-series-6: #b79be0;
+  --sa-series-7: #8fd3f4;
+  --sa-series-8: #f0c049;
+}
+
+/* ---------- drop zone ---------- */
+
+.sa-drop-card {
+  padding: 0;
+}
+
+.sa-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 48px 20px;
+  border: 1px dashed var(--it-line);
+  border-radius: var(--it-radius);
+  background: var(--it-panel);
+  text-align: center;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.sa-drop-active {
+  border-color: var(--it-brand);
+  background: var(--it-brand-wash);
+}
+
+.sa-drop-icon {
+  color: var(--it-brand);
+}
+
+.sa-drop-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--it-ink);
+}
+
+.sa-drop-hint {
+  max-width: 46ch;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--it-ink-soft);
+}
+
+.sa-drop-hint code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--it-brand-wash);
+  color: var(--it-brand-deep);
+  font-size: 12px;
+}
+
+.sa-drop-input {
+  display: none;
+}
+
+/* ---------- progress ---------- */
+
+.sa-progress-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sa-progress-file {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--it-ink);
+  overflow-wrap: anywhere;
+}
+
+.sa-progress-track {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--it-brand-wash);
+}
+
+/* Driven by a scale transform rather than by width, so advancing the
+   bar is a compositor job and never triggers layout. The track already
+   clips to a pill via `overflow: hidden`, so the bar needs no radius of
+   its own -- which also avoids scaleX squashing a rounded cap into an
+   ellipse. Callers set `--sa-progress` to a 0..1 fraction. */
+.sa-progress-bar {
+  width: 100%;
+  height: 100%;
+  background: var(--it-brand);
+  transform: scaleX(var(--sa-progress, 0));
+  transform-origin: left center;
+  transition: transform 200ms ease;
+}
+
+.sa-progress-stage {
+  margin: 0;
+  font-size: 13px;
+  color: var(--it-ink-soft);
+}
+
+/* ---------- toolbar ---------- */
+
+.sa-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.sa-toolbar-spacer {
+  flex: 1 1 auto;
+}
+
+.sa-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.sa-field > span {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--it-ink-soft);
+}
+
+.sa-select {
+  max-width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--it-line);
+  border-radius: 8px;
+  background: var(--it-panel);
+  color: var(--it-ink);
+  font: inherit;
+  font-size: 13px;
+}
+
+.sa-select:focus-visible {
+  outline: 2px solid var(--it-brand);
+  outline-offset: 1px;
+}
+
+.sa-summary {
+  font-size: 12px;
+  color: var(--it-ink-soft);
+}
+
+/* ---------- tables ---------- */
+
+
+.sa-table-scroll {
+  overflow-x: auto;
+}
+
+.sa-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.sa-table th,
+.sa-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--it-line);
+  text-align: left;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.sa-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--it-canvas);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--it-ink-soft);
+}
+
+.sa-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.sa-table .sa-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+
+.sa-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+
+
+
+
+/* ---------- wider screens ---------- */
+/* Mobile-first, per the project's `min-width`-only breakpoints: on a
+   phone the toolbar stacks, its buttons share the last row and the
+   summary line gets a row to itself. From 640px the toolbar is one
+   row and everything sits at its natural width. */
+
+.sa-toolbar > .ui-btn {
+  flex: 1 1 auto;
+}
+
+.sa-summary {
+  flex: 1 1 100%;
+}
+
+@media (min-width: 640px) {
+  .sa-toolbar > .ui-btn {
+    flex: 0 0 auto;
+  }
+
+  .sa-summary {
+    flex: 0 1 auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sa-drop,
+  .sa-progress-bar {
+    transition: none;
+  }
+}
+
+/* The lazy route's fallback. Deliberately plain: the chunk arrives in a
+   moment on any normal connection, and a spinner that flashes for 80ms
+   reads as a glitch rather than as progress. */
+.sa-route-loading {
+  padding: 48px 20px;
+  color: var(--it-ink-soft);
+  font-size: 13px;
+  text-align: center;
+}
+
+/* ---------- canvas ---------- */
+
+/* Twelve columns, per spec §10.4. Tile widths come from the
+   `--sa-tile-span` each tile sets from its size preset. Mobile-first:
+   below 640px every tile is full width, because a 3-column KPI on a
+   360px phone is 90px of chart. */
+.sa-canvas {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.sa-tile {
+  display: flex;
+  flex-direction: column;
+  grid-column: span 12;
+  min-width: 0;
+  padding: 12px 14px 14px;
+  border: 1px solid var(--it-line);
+  border-radius: var(--it-radius);
+  background: var(--it-panel);
+  box-shadow: var(--it-card-shadow);
+}
+
+.sa-tile-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.sa-tile-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--it-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sa-tile-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 2px;
+}
+
+.sa-tile-actions button {
+  display: inline-flex;
+  padding: 4px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--it-ink-soft);
+  cursor: pointer;
+}
+
+.sa-tile-actions button:hover:not(:disabled) {
+  background: var(--it-brand-wash);
+  color: var(--it-brand-deep);
+}
+
+.sa-tile-actions button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Keyboard reordering replaces the drag engine, so the focus ring is
+   not decoration -- it is the only way to tell which tile you are
+   about to move. */
+.sa-tile-actions button:focus-visible {
+  outline: 2px solid var(--it-brand);
+  outline-offset: 1px;
+}
+
+.sa-tile-body {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.sa-tile-chart {
+  width: 100%;
+  height: 240px;
+}
+
+.sa-tile-kpi .sa-tile-chart,
+.sa-tile-kpi .sa-tile-body {
+  height: auto;
+}
+
+.sa-tile-table .sa-tile-body {
+  max-height: 360px;
+  overflow: auto;
+}
+
+.sa-tile-table-scroll {
+  overflow: auto;
+}
+
+.sa-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 0 2px;
+}
+
+.sa-kpi-value {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--it-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.sa-kpi-label {
+  font-size: 12px;
+  color: var(--it-ink-soft);
+}
+
+.sa-tile-broken,
+.sa-tile-empty {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  min-height: 120px;
+  font-size: 13px;
+  color: var(--it-ink-soft);
+  text-align: center;
+}
+
+.sa-tile-broken p {
+  margin: 0;
+}
+
+.sa-tile-broken p:first-child {
+  color: var(--it-danger);
+}
+
+.sa-tile-broken-hint {
+  font-size: 12px;
+}
+
+/* ---------- filter bar ---------- */
+
+.sa-filterbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--it-line);
+  border-radius: var(--it-radius);
+  background: var(--it-panel);
+}
+
+.sa-filterbar-icon {
+  color: var(--it-ink-soft);
+}
+
+.sa-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px 3px 10px;
+  border-radius: 999px;
+  background: var(--it-brand-wash);
+  color: var(--it-brand-deep);
+  font-size: 12px;
+}
+
+.sa-chip em {
+  font-style: normal;
+  opacity: 0.75;
+}
+
+/* The cross-filter chip is deliberately a different colour from the
+   global ones: it was created by clicking a chart rather than by
+   setting a filter, and it is the one people forget they applied. */
+.sa-chip-selection {
+  background: color-mix(in srgb, var(--it-accent) 18%, transparent);
+  color: var(--it-ink);
+}
+
+.sa-chip button {
+  display: inline-flex;
+  padding: 3px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.sa-chip button:hover {
+  background: var(--it-panel);
+}
+
+.sa-filterbar-add {
+  display: inline-flex;
+}
+
+.sa-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* --- text analysis ---------------------------------------------------
+   The tab reuses .sa-table, .sa-toolbar, .sa-field and .sa-select
+   wholesale. Only what has no equivalent is defined here. Every colour
+   is a token, so the section follows the theme like everything else. */
+
+.sa-text-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 12px 0;
+  border-bottom: 1px solid var(--it-line);
+}
+
+.sa-text-tab {
+  padding: 8px 14px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--it-ink-soft);
+  font: inherit;
+  cursor: pointer;
+}
+
+.sa-text-tab:hover {
+  color: var(--it-ink);
+}
+
+.sa-text-tab-on,
+.sa-text-tab-on:hover {
+  color: var(--it-brand);
+  border-bottom-color: var(--it-brand);
+}
+
+.sa-text-card,
+.sa-text-notice {
+  margin-bottom: 12px;
+}
+
+.sa-text-notice {
+  border-left: 3px solid var(--it-accent);
+  background: var(--it-accent-wash);
+}
+
+.sa-bucket-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sa-bucket {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--it-line);
+  border-radius: var(--it-radius);
+  background: var(--it-panel);
+}
+
+.sa-bucket-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sa-input {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--it-line);
+  border-radius: 8px;
+  background: var(--it-panel);
+  color: var(--it-ink);
+  font: inherit;
+}
+
+.sa-bucket-name {
+  flex: 1;
+  font-weight: 600;
+}
+
+.sa-bucket-description {
+  resize: vertical;
+}
+
+.sa-theme-list {
+  display: grid;
+  gap: 10px;
+}
+
+.sa-theme-examples {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: var(--it-ink-soft);
+  font-size: 0.9em;
+}
+
+.sa-issue-text {
+  max-width: 44rem;
+}
+
+/* Excluded rows stay on screen rather than vanishing: somebody who
+   mis-clicks needs to see what they removed in order to put it back. */
+.sa-issue-noise {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
+.sa-priority-actions {
+  display: flex;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+/* ---------- the autopilot brief ----------
+   Sits above the filter bar and carries the app's account of what it
+   decided for you. Styled as a quiet panel rather than a banner: it is
+   a summary you read once and mostly stop noticing, not an alert. */
+
+.sa-brief {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 14px;
+  border-left: 3px solid var(--it-brand);
+}
+
+.sa-brief-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.sa-brief-icon {
+  flex: none;
+  margin-top: 3px;
+  color: var(--it-brand);
+}
+
+/* Takes the slack so the two controls stay pinned right, and `min-width:
+   0` so a long file title wraps instead of pushing them off the card. */
+.sa-brief-titles {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.sa-brief-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--it-ink);
+  overflow-wrap: anywhere;
+}
+
+.sa-brief-line {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--it-ink-soft);
+  overflow-wrap: anywhere;
+}
+
+.sa-brief-dismiss {
+  flex: none;
+  display: inline-flex;
+  padding: 5px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--it-ink-soft);
+  cursor: pointer;
+}
+
+.sa-brief-dismiss:hover {
+  background: var(--it-canvas);
+  color: var(--it-ink);
+}
+
+.sa-brief-hidden,
+.sa-brief-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--it-line);
+}
+
+.sa-brief-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--it-brand);
+  cursor: pointer;
+  text-align: left;
+}
+
+.sa-brief-chevron {
+  flex: none;
+  transition: transform 150ms ease;
+}
+
+.sa-brief-chevron-open {
+  transform: rotate(90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sa-brief-chevron {
+    transition: none;
+  }
+}
+
+.sa-brief-list {
+  margin: 0;
+  padding: 0 0 0 19px;
+  list-style: disc;
+  font-size: 13px;
+  color: var(--it-ink-soft);
+}
+
+.sa-brief-list li {
+  margin-bottom: 3px;
+}
+
+.sa-brief-list strong {
+  color: var(--it-ink);
+  font-weight: 600;
+}
+
+/* The progress track is a block element, so the flex column's
+   `align-items: flex-start` would collapse it to nothing. */
+.sa-brief-text > .sa-progress-track {
+  align-self: stretch;
+}
+
+.sa-brief-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.sa-brief-row > .sa-brief-line {
+  flex: 1 1 220px;
+  margin: 0;
+}
+
+/* ---------- the rows behind the charts ----------
+   The drill-down half of the canvas: the records the charts are
+   counting, and one record in full. It is collapsed by default because
+   a dashboard is meant to be read as pictures first -- the table is the
+   answer to "what is that bar made of", which is a question that only
+   arises after the bar has been looked at. */
+
+.sa-records {
+  margin-top: 16px;
+  border-top: 1px solid var(--it-line);
+  padding-top: 12px;
+}
+
+.sa-records-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.sa-records-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--it-ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* The count of what is listed, alongside the count of everything. Two
+   numbers rather than one, because "38" on its own does not say whether
+   a tap on a bar narrowed anything. */
+.sa-records-title em {
+  font-style: normal;
+  font-weight: 500;
+  color: var(--it-ink-soft);
+}
+
+.sa-records-narrowed {
+  margin: 10px 0 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--it-brand-wash);
+  color: var(--it-ink-soft);
+  font-size: 12.5px;
+}
+
+.sa-records-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.sa-records-empty {
+  margin: 14px 0 4px;
+  color: var(--it-ink-soft);
+  font-size: 13px;
+}
+
+.sa-records-scroll {
+  margin-top: 12px;
+  max-height: 420px;
+  overflow: auto;
+}
+
+/* A cell is truncated rather than wrapped: a written-answer column is
+   paragraphs long, and one row of it would push every other row off the
+   screen. The full text is one click away in the record card, and is on
+   the `title` attribute meanwhile. */
+.sa-records-table td {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sa-records-row {
+  cursor: pointer;
+}
+
+.sa-records-row:hover td,
+.sa-records-row:focus-visible td {
+  background: var(--it-brand-wash);
+}
+
+.sa-records-row:focus-visible {
+  outline: 2px solid var(--it-brand);
+  outline-offset: -2px;
+}
+
+.sa-records-blank {
+  color: var(--it-ink-soft);
+}
+
+.sa-records-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+/* ---------- one record, in full ---------- */
+
+.sa-record-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(2, 6, 12, 0.5);
+}
+
+.sa-record {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(680px, 100%);
+  max-height: 84vh;
+  padding: 18px;
+  border: 1px solid var(--it-line);
+  border-radius: 14px;
+  background: var(--it-panel);
+  overflow-y: auto;
+}
+
+.sa-record-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.sa-record-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--it-ink);
+}
+
+.sa-record-sub {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--it-ink-soft);
+}
+
+.sa-record-nav {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.sa-record-nav button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--it-line);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--it-ink-soft);
+  cursor: pointer;
+}
+
+.sa-record-nav button:hover:not(:disabled) {
+  border-color: var(--it-brand);
+  color: var(--it-brand-deep);
+}
+
+.sa-record-nav button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.sa-record-fields {
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+
+.sa-record-field {
+  display: grid;
+  grid-template-columns: minmax(140px, 34%) 1fr;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--it-line);
+}
+
+.sa-record-field:last-child {
+  border-bottom: 0;
+}
+
+.sa-record-field dt {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--it-ink-soft);
+}
+
+.sa-record-field dd {
+  margin: 0;
+  font-size: 13px;
+  color: var(--it-ink);
+  /* Written answers are the reason this card exists, so they wrap
+     rather than truncate here -- the opposite of the table above. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.sa-record-field-empty dd {
+  color: var(--it-ink-soft);
+  font-style: italic;
+}
+
+.sa-badge-parked {
+  background: var(--it-line);
+  color: var(--it-ink-soft);
+}
+
+@media (max-width: 640px) {
+  .sa-record-field {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}
+
+/* The header-row picker, folded away.
+   Detection is right on every Forms export, so this is a hedge against
+   the workbook with a title typed across the top -- and a hedge that
+   takes a row of the toolbar is a hedge that costs everybody. */
+.sa-headerpick > summary {
+  cursor: pointer;
+  color: var(--it-ink-soft);
+  font-size: 12.5px;
+}
+
+.sa-headerpick[open] > summary {
+  margin-bottom: 6px;
+}

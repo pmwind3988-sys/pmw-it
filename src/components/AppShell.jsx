@@ -47,7 +47,7 @@ const NAV_ITEMS = [
   { to: '/devices', label: 'Device list', icon: Laptop },
   { to: '/assets', label: 'Asset inventory', icon: Package },
   { to: '/assets/people', label: 'Who has what', icon: Users },
-  { to: '/data-studio', label: 'Data Studio', icon: BarChart3 },
+  { to: '/semantic-analysis', label: 'Semantic Analysis', icon: BarChart3 },
 ];
 
 export default function AppShell({ title, subtitle, actions, search, children }) {

@@ -1,5 +1,3 @@
-import { StorageFullError } from '../../datastudio/store/db.js';
-
 /**
  * Where a delivery lives between the store room and SharePoint.
  *
@@ -8,9 +6,9 @@ import { StorageFullError } from '../../datastudio/store/db.js';
  * network. A batch that has not been saved yet has no half-written state to
  * reason about — it is simply still on the phone.
  *
- * Its own database rather than a store inside Data Studio's, because the two
- * sections have nothing to say to each other and a shared version number would
- * make a schema change in one an upgrade for both.
+ * Its own database, because it is the only thing this app keeps in the
+ * browser and a shared version number would make a schema change in one
+ * section an upgrade for another.
  */
 
 export const DB_NAME = 'pmw-assets';
@@ -22,7 +20,19 @@ export const STORE_BATCHES = 'batches';
 // photographs to render a banner saying "2 batches waiting".
 export const STORE_PHOTOS = 'photos';
 
-export { StorageFullError };
+/**
+ * Thrown when the browser refuses a write for want of space.
+ *
+ * A distinct type because the UI has to react differently: quota is the one
+ * storage failure the user can actually fix, so the banner that offers that
+ * fix has to be able to tell it apart from every other write failure.
+ */
+export class StorageFullError extends Error {
+  constructor(message = "There is no room left in this browser's storage.") {
+    super(message);
+    this.name = 'StorageFullError';
+  }
+}
 
 let dbPromise = null;
 

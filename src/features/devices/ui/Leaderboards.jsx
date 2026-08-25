@@ -1,5 +1,5 @@
 import { Card, EmptyState } from '../../../components/ui/Surfaces';
-import { formatMYT } from '../../datastudio/time/malaysiaTime';
+import { formatMYT } from '../../../utils/malaysiaTime';
 import { leaderboards } from '../stats/deviceStats';
 
 function Board({ title, blurb, rows, render, emptyText }) {

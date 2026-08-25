@@ -21,7 +21,7 @@ import './App.css';
 import './styles/shell.css';
 import './styles/auth.css';
 import './styles/devices.css';
-import './styles/datastudio.css';
+import './styles/semantic.css';
 import './styles/assets.css';
 import './styles/forms.css';
 

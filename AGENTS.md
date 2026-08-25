@@ -29,8 +29,8 @@ pmw-it/
 │   │   ├── SignatureDialog.jsx
 │   │   └── ui/               # Icons, Button, Surfaces, StatCard, Badges
 │   ├── features/
-│   │   ├── datastudio/       # ingest/ profile/ clean/ engine/ canvas/
-│   │   │                     # intent/ suggest/ store/ text/ time/ worker/
+│   │   ├── semantic/         # ingest/ profile/ clean/ engine/ canvas/
+│   │   │                     # intent/ suggest/ text/ export/ worker/
 │   │   ├── devices/          # parse/ derive/ sharepoint/ stats/ ui/
 │   │   ├── forms/            # the two forms' fields, validation and writes
 │   │   ├── assets/           # scan/ draft/ handover/ people/ store/
@@ -49,7 +49,7 @@ pmw-it/
 │   │   ├── devices.css       # the device list section
 │   │   ├── assets.css        # the asset inventory section
 │   │   ├── forms.css         # the form kit
-│   │   └── datastudio.css    # Data Studio, incl. the chart series palette
+│   │   └── semantic.css      # Semantic Analysis, incl. the chart series palette
 │   ├── context/              # ThemeContext (dark/light), SessionContext (auto
 │   │                         # re-sign-in + its dialog and entrance animation)
 │   ├── services/             # sharePointService.js
@@ -82,7 +82,7 @@ pmw-it/
 | `/assets/handover` | Pick a person, fill a basket by search or camera, hand it over |
 | `/assets/people` | Everyone currently holding something, overdue first |
 | `/assets/people/:email` | One person, everything they hold, and returning it |
-| `/data-studio` | Drop a spreadsheet and land on a dashboard. It reads the file name for the subject, parks the form's bookkeeping columns, charts the rest and reads the written answers. Every chart drills down to the rows behind it and to one record in full. Lazy route. |
+| `/semantic-analysis` | Drop a Microsoft Forms export and land on a finished screen. It reads the file name for the subject, parks the form's bookkeeping columns, charts the rest, reads the written answers with a local model, sorts them into categories (internet, SAP, digitization, paperwork…) and charts those too. Tapping any mark filters the response list below — email, submitted, department, then every answer — and a response opens in full. Nothing is uploaded and nothing is saved: no SharePoint, no IndexedDB. Charts export as PNG, responses as CSV. Lazy route; `/data-studio` redirects here. |
 
 ## WHERE TO LOOK
 | Task | Location |
@@ -143,28 +143,29 @@ pmw-it/
 | Bar and column charts | `src/components/ui/Charts.jsx` (shared by both dashboards) |
 | SharePoint writes | `src/services/sharePointService.js` |
 | Theme | `src/context/ThemeContext.jsx`; toggle lives in the shell's bar |
-| Spreadsheet parsing / header detection | `src/features/datastudio/ingest/` |
-| Column type inference and stats | `src/features/datastudio/profile/` |
-| The cleaning ops, proposals and apply | `src/features/datastudio/clean/` |
-| Columnar store, filter masks, aggregation | `src/features/datastudio/engine/` |
-| Chart tiles, theme, grid, tile editor | `src/features/datastudio/canvas/` |
-| Starter chart suggestions | `src/features/datastudio/suggest/suggestCharts.js` |
-| IndexedDB, exports, the saved library | `src/features/datastudio/store/` |
-| Malaysia time parsing and formatting | `src/features/datastudio/time/malaysiaTime.js` |
-| Data Studio state and worker lifetime | `src/features/datastudio/DataStudioContext.jsx` |
+| Spreadsheet parsing / header detection | `src/features/semantic/ingest/` |
+| Column type inference and stats | `src/features/semantic/profile/` |
+| The cleaning ops, proposals and apply | `src/features/semantic/clean/` |
+| Columnar store, filter masks, aggregation | `src/features/semantic/engine/` |
+| Chart tiles, theme, grid | `src/features/semantic/canvas/` |
+| Starter chart suggestions | `src/features/semantic/suggest/suggestCharts.js` |
+| PNG and CSV export | `src/features/semantic/export/exporters.js` |
+| Malaysia time parsing and formatting | `src/utils/malaysiaTime.js` |
+| Semantic Analysis state and worker lifetime | `src/features/semantic/SemanticContext.jsx` |
 | Multi-select column detection and encoding | `profile/inferType.js` (`detectMultiSeparator`), `engine/dataset.js` (`encodeMulti`) |
-| Splitting a written answer into issues | `src/features/datastudio/text/splitIssues.js` |
-| The analysis categories and their descriptions | `src/features/datastudio/text/buckets.js` |
-| The model, and where it is served from | `src/features/datastudio/text/embed.js`, `scripts/fetch-model.mjs` |
+| Splitting a written answer into issues | `src/features/semantic/text/splitIssues.js` |
+| The analysis categories and their descriptions | `src/features/semantic/text/buckets.js` |
+| The model, and where it is served from | `src/features/semantic/text/embed.js`, `scripts/fetch-model.mjs` |
 | Text analysis pipeline and its worker | `text/analysis.js`, `worker/text.worker.js` |
-| The user's corrections to the analysis | `src/features/datastudio/text/overrides.js` |
-| What the file NAME says the sheet is about | `src/features/datastudio/intent/fileIntent.js` |
-| Which columns are form bookkeeping | `src/features/datastudio/intent/adminColumns.js` |
-| The one decision taken per import | `src/features/datastudio/intent/planAutopilot.js` |
-| The card that discloses that decision | `src/features/datastudio/intent/AutoBrief.jsx` |
-| Decoding one stored cell into readable text | `src/features/datastudio/engine/formatCell.js` |
-| The rows behind the charts, and one record in full | `engine/rows.js`, `canvas/RecordsPanel.jsx` |
-| The dashboard built out of the text analysis | `src/features/datastudio/text/analysisTiles.js` |
+| The user's corrections to the analysis | `src/features/semantic/text/overrides.js` |
+| What the file NAME says the sheet is about | `src/features/semantic/intent/fileIntent.js` |
+| Which columns are form bookkeeping | `src/features/semantic/intent/adminColumns.js` |
+| The one decision taken per import | `src/features/semantic/intent/planAutopilot.js` |
+| The card that discloses that decision | `src/features/semantic/intent/AutoBrief.jsx` |
+| Decoding one stored cell into readable text | `src/features/semantic/engine/formatCell.js` |
+| The responses behind the charts, and one in full | `engine/rows.js`, `canvas/ResponsePanel.jsx` |
+| Who answered vs what they answered | `src/features/semantic/engine/responseFields.js` |
+| The charts built out of the reading | `text/analysisTiles.js`, `text/chartAnalysis.js` |
 
 ## CONVENTIONS
 
@@ -173,7 +174,7 @@ its own body. The bar, the nav, the theme toggle, sign-out and the sign-in gate
 all belong to the shell — do not re-add per-page copies of them.
 
 **Stylesheet order** (`src/main.jsx`): `index.css` → `App.css` → `styles/shell.css`
-→ `styles/auth.css` → `styles/devices.css` → `styles/datastudio.css`.
+→ `styles/auth.css` → `styles/devices.css` → `styles/semantic.css`.
 shell.css re-points the older `--bg` / `--surface` /
 `--border` / `--text-*` tokens at the new palette, so it must load last.
 `--accent` is deliberately left alone: it fills `.ms-button`, whose text colour
@@ -209,19 +210,23 @@ redirect — leaving it would let the guard read a deliberate sign-out as a
 timeout and undo it. Sign out through `useSession().signOut()` for that reason.
 
 **`src/features/<name>/`** is where a section with more than a handful of modules
-lives — `datastudio/` and `devices/` both follow it. Layering inside a feature:
+lives — `semantic/` and `devices/` both follow it. Layering inside a feature:
 `parse/` knows nothing about the domain, `derive/` knows nothing about SharePoint,
 `sharepoint/` imports no React. Each layer is testable without the one above it.
-Data Studio layers the same way — `ingest/` → `profile/` → `clean/` → `engine/`,
+Semantic Analysis layers the same way — `ingest/` → `profile/` → `clean/` → `engine/`,
 each a set of pure functions over plain data, with `canvas/` the only part that
 touches React. That is why `engine/aggregate.js` carries more tests than the
 whole canvas does: it is the part that can be wrong without looking wrong.
 
-**An import decides everything at once, in `intent/planAutopilot.js`.** Dropping
-a sheet no longer parks the user on a profile screen: the file name is read for
-the subject, the form's bookkeeping columns are set to role `ignored`, the
-starter charts are ranked with the title's keywords as a nudge, and a
-pain-point or feedback survey has its written answers read in the background.
+**An import decides everything at once, in `intent/planAutopilot.js`.** There is
+no profile screen and no cleaning checklist to park the user on: the file name is
+read for the subject, the form's bookkeeping columns are set to role `ignored`,
+the starter charts are ranked with the title's keywords as a nudge, and the
+written answers are read in the background — always, since reading them is what
+this section is for. The reading then charts ITSELF, in `text/chartAnalysis.js`:
+five derived columns go onto the grid and the category, theme and severity charts
+go above the rest. A later correction re-scores the analysis but leaves those
+charts alone until the user asks, so nothing is rebuilt under them mid-read.
 The provider carries the plan out and takes no decisions of its own, so the
 whole of the behaviour is testable without React — see `intent/*.test.js`.
 
@@ -505,7 +510,7 @@ No icon package is installed — add a glyph there rather than a dependency.
 
 ## ANTI-PATTERNS (THIS PROJECT)
 - Don't use `navigate()` in useEffect — causes infinite loops
-- Don't patch a Data Studio profile's `columns` without re-running
+- Don't patch a Semantic Analysis profile's `columns` without re-running
   `retopProfile`. `topMeasure` and `primaryTemporal` are derived from the
   roles, and a profile patched by hand goes on naming a column that has since
   been ignored — which is how the starter dashboard opened with
@@ -574,13 +579,13 @@ No icon package is installed — add a glyph there rather than a dependency.
 - Don't import the `echarts` umbrella. It pulls in every chart type and both
   renderers — about a megabyte, most of it for charts this app never draws — and
   it does so silently, because the code still works. Import the default export
-  of `src/features/datastudio/canvas/echartsCore.js`, which registers exactly
+  of `src/features/semantic/canvas/echartsCore.js`, which registers exactly
   the pieces used.
-- Don't shift a date-only column when the UTC toggle is on. Adding eight hours to
-  a value that has no time of day moves it to the wrong day, and nothing on
-  screen shows that it happened. `castType` keys this off `dateOnly`, and the
-  control in the clean review is rendered DISABLED rather than hidden so someone
-  who knows their export is UTC is not left hunting for a setting.
+- Don't shift a date-only column when a `sourceZone` is asked for. Adding eight
+  hours to a value that has no time of day moves it to the wrong day, and nothing
+  on screen shows that it happened. `castType` keys this off `dateOnly` and
+  refuses; the section no longer exposes a zone control, but the op still takes
+  the parameter and still has to be safe when something passes one.
 - Don't replace the grid in state without sending it to the worker. The
   worker KEEPS the parsed grid so a re-clean costs one small plan message
   however large the sheet is -- so a main thread that rebuilds the grid

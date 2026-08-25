@@ -1,4 +1,4 @@
-import { formatMYT } from '../../datastudio/time/malaysiaTime.js';
+import { formatMYT } from '../../../utils/malaysiaTime.js';
 
 export const DEVICE_LIST_NAME = 'IT Device List';
 export const CHANGE_LIST_NAME = 'IT Device Changes';

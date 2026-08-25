@@ -1,5 +1,5 @@
 import { isRequest } from './checklistForm.js';
-import { formatMYT } from '../datastudio/time/malaysiaTime.js';
+import { formatMYT } from '../../utils/malaysiaTime.js';
 
 /**
  * The checklist, as the row SharePoint stores.

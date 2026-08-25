@@ -19,7 +19,7 @@ import { groupsFor, RAW_REPORT_KEY } from '../features/devices/fieldGroups';
 import { formatScalar } from '../features/devices/formatValue';
 import ValueCell from '../features/devices/ui/ValueCell';
 import { toneForField, toneForEntry, hasEntryTones } from '../features/devices/fieldTone';
-import { formatMYT } from '../features/datastudio/time/malaysiaTime';
+import { formatMYT } from '../utils/malaysiaTime';
 
 /** Remembered per browser: somebody who turns the colouring off is not asked
  *  to turn it off again on the next machine they open. */

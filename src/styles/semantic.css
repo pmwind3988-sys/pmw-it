@@ -226,12 +226,13 @@
   position: sticky;
   top: 0;
   z-index: 1;
-  background: var(--it-canvas);
+  background: var(--it-thead);
+  border-bottom: 2px solid var(--it-line);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--it-ink-soft);
+  color: var(--it-ink);
 }
 
 .sa-table tbody tr:last-child td {

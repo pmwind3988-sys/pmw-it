@@ -26,6 +26,15 @@
   --it-ink-soft: #64748b;
   --it-line: #e3e9f0;
 
+  /* The band behind a table's header row. Its own token rather than
+     `--it-canvas` or `--it-brand-wash`: a header sitting on the canvas
+     colour vanishes on any table that is itself on the canvas, and the
+     brand wash is what a SELECTED row is painted with — a header wearing
+     it would read as a row somebody had ticked. Deliberately quiet: it
+     has to survive being sticky over scrolling rows without competing
+     with them for attention. */
+  --it-thead: #dde6f2;
+
   --it-accent: #f59e0b;
   --it-accent-wash: #fffbeb;
   --it-good: #12a150;
@@ -81,6 +90,11 @@
   --it-ink: #f1f5f9;
   --it-ink-soft: #94a3b8;
   --it-line: #242d3a;
+
+  /* Lighter than the panel here, where the light theme's is darker than
+     it. Both directions read as "raised above the rows", which is what
+     the band is saying. */
+  --it-thead: #26303f;
 
   --it-accent: #fbbf24;
   --it-accent-wash: #241d0c;

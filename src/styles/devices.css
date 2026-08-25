@@ -135,9 +135,10 @@
 .rg th {
   position: sticky;
   top: 0;
-  font-weight: 600;
-  color: var(--it-ink-soft);
-  background: var(--it-panel);
+  font-weight: 700;
+  color: var(--it-ink);
+  background: var(--it-thead);
+  border-bottom: 2px solid var(--it-line);
 }
 
 .rg-flagged {
@@ -566,9 +567,13 @@
   z-index: 2;
 }
 
+/* The frozen columns paint their own background, which would otherwise
+   win over the header band and leave the register's two corners a
+   different colour from the row of labels between them. */
 .dt-frozen th.dt-identity,
 .dt-frozen th.dt-actions {
   z-index: 3;
+  background: var(--it-thead);
 }
 
 .dt-editing .dt-identity,

@@ -212,10 +212,11 @@
 }
 
 .list-table th {
-  background: var(--bg);
+  background: var(--it-thead);
+  border-bottom: 2px solid var(--border);
   font-size: 13px;
-  font-weight: 600;
-  color: var(--text-secondary);
+  font-weight: 700;
+  color: var(--it-ink);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }

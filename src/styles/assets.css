@@ -233,12 +233,13 @@
 .as-table th {
   text-align: left;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--text-secondary);
+  color: var(--it-ink);
+  background: var(--it-thead);
   padding: 10px 12px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 2px solid var(--border);
   white-space: nowrap;
 }
 

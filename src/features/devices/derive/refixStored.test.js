@@ -60,12 +60,12 @@ describe('refixStored — storage summary self-correcting on read', () => {
     expect(fixed.driveCount).toBe(2);
   });
 
-  it('leaves a row with no raw drive list untouched', () => {
+  it('leaves the storage figures of a row with no raw drive list alone', () => {
     const stored = { storageType: 'Mixed', driveCount: 2, hasHdd: true };
-    expect(refixStored(stored)).toBe(stored);
+    expect(refixStored(stored)).toMatchObject(stored);
   });
 
-  it('returns the same object when nothing changed, so reads stay cheap', () => {
+  it('keeps the stored storage figures when they already agree with the raw list', () => {
     const stored = {
       storageDrivesRaw: 'Apacer AS340 480GB | SSD | 447 GB',
       storageTotalGB: 447,
@@ -74,6 +74,20 @@ describe('refixStored — storage summary self-correcting on read', () => {
       storageType: 'SSD only',
       scanComplete: true,
     };
-    expect(refixStored(stored)).toBe(stored);
+    expect(refixStored(stored)).toMatchObject(stored);
+  });
+
+  it('lays the persona verdict over every row it reads', () => {
+    const fixed = refixStored({
+      storageDrivesRaw: 'Apacer AS340 480GB | SSD | 447 GB',
+      department: 'SALES',
+      deviceType: 'Laptop',
+      microsoftOffice: ['O365BusinessRetail'],
+      scanComplete: true,
+    });
+
+    expect(fixed.personaLabel).toMatch(/Executive/);
+    expect(fixed.licenseStatus).toBe('Authentic');
+    expect(fixed.suggestedFormFactor).toBe('Laptop');
   });
 });

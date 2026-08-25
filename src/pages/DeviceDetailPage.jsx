@@ -2,6 +2,16 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import AppShell from '../components/AppShell';
 import { Card, EmptyState, ErrorBanner } from '../components/ui/Surfaces';
+
+/**
+ * The verdict shares the risk palette rather than a second one: red is "go and
+ * look", amber "put it on the list", green "leave it alone".
+ */
+const FIT_TONE = {
+  Critical: 'critical',
+  'Needs Attention': 'watch',
+  Optimal: 'ok',
+};
 import Button from '../components/ui/Button';
 import { ArrowLeft, RefreshCw } from '../components/ui/Icons';
 import { useDevices } from '../features/devices/useDevices';
@@ -115,6 +125,54 @@ export default function DeviceDetailPage() {
               Colour the risks red and the healthy values green
             </label>
           </div>
+
+          <Card className="dd-fit">
+            <h2 className="dd-group-title">
+              Fit for the work
+              <span className="dd-group-hint">{device.personaBlurb}</span>
+            </h2>
+
+            <div className="dd-fit-head">
+              <span className={`dd-risk rg-risk-${FIT_TONE[device.fitStatus] ?? 'unknown'}`}>
+                {device.fitStatus ?? 'Unknown'}
+              </span>
+              <span className="dd-fit-persona">{device.personaLabel}</span>
+            </div>
+
+            <ul className="dd-fit-reasons">
+              {(device.fitReasons ?? []).map((reason) => (
+                <li key={reason}>{reason}</li>
+              ))}
+            </ul>
+
+            <dl className="dd-fit-facts">
+              <div>
+                <dt>Action</dt>
+                <dd>{device.actionRequired ?? '—'}</dd>
+              </div>
+              <div>
+                <dt>Suggested form factor</dt>
+                <dd>
+                  {device.suggestedFormFactor ?? '—'}
+                  <span className="dd-fit-note">{device.formFactorNote}</span>
+                </dd>
+              </div>
+              <div>
+                <dt>Office licence</dt>
+                <dd>
+                  {device.licenseStatus ?? '—'}
+                  <span className="dd-fit-note">{device.licenseNote}</span>
+                </dd>
+              </div>
+              <div>
+                <dt>Server link</dt>
+                <dd>
+                  {device.serverDependent ? device.networkRisk : 'Not server-bound'}
+                  <span className="dd-fit-note">{device.networkNote}</span>
+                </dd>
+              </div>
+            </dl>
+          </Card>
 
           <div className="dd-groups">
             {groups.map((group) => (

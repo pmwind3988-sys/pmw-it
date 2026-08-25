@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { fleetSummary, countBy, scansByMonth, leaderboards } from './deviceStats.js';
+import {
+  fleetSummary, countBy, scansByMonth, leaderboards, complianceSummary, fitByDepartment,
+} from './deviceStats.js';
 
 const NOW = Date.UTC(2026, 7, 21);
 const DAY = 86_400_000;
@@ -120,5 +122,59 @@ describe('leaderboards', () => {
     for (const board of ['highestRam', 'lowestRam', 'oldest', 'recent', 'upgradeCandidates']) {
       expect(boards[board].some((d) => d.computerName === 'BROKEN')).toBe(false);
     }
+  });
+});
+
+describe('complianceSummary', () => {
+  const rows = [
+    { fitStatus: 'Critical', licenseStatus: 'Unlicensed', serverDependent: true, networkRisk: 'Severe' },
+    { fitStatus: 'Optimal', licenseStatus: 'Authentic', serverDependent: true, networkRisk: 'Fine' },
+    { fitStatus: 'Moderate', licenseStatus: 'Authentic', serverDependent: false, networkRisk: 'None', formFactorMatches: false },
+    { fitStatus: 'Unknown', licenseStatus: 'Undefined', scanComplete: false },
+  ];
+
+  it('counts the fleet the cards report on, leaving failed scans out', () => {
+    const summary = complianceSummary(rows);
+    expect(summary.total).toBe(3);
+    expect(summary.graded).toBe(3);
+    expect(summary.critical).toBe(1);
+    expect(summary.criticalPct).toBe(33);
+  });
+
+  it('reports licensing as a rate and a count of what to fix', () => {
+    const summary = complianceSummary(rows);
+    expect(summary.complianceRate).toBe(67);
+    expect(summary.unlicensed).toBe(1);
+  });
+
+  it('separates working off the server from being slowed by it', () => {
+    const summary = complianceSummary(rows);
+    expect(summary.serverDependent).toBe(2);
+    expect(summary.networkBottlenecks).toBe(1);
+  });
+
+  it('counts the machines whose form factor does not suit the role', () => {
+    expect(complianceSummary(rows).mismatchedFormFactor).toBe(1);
+  });
+});
+
+describe('fitByDepartment', () => {
+  const rows = [
+    { department: 'ENGINEERING', fitStatus: 'Critical', personaLabel: 'Engineering / Technical / Media' },
+    { department: 'ENGINEERING', fitStatus: 'Optimal', personaLabel: 'Engineering / Technical / Media' },
+    { department: 'FINANCE', fitStatus: 'Moderate', personaLabel: 'Logistics / Operations / Desk' },
+    { department: 'FINANCE', fitStatus: 'Moderate', personaLabel: 'Logistics / Operations / Desk' },
+  ];
+
+  it('puts the department in the most trouble at the top', () => {
+    const [first] = fitByDepartment(rows);
+    expect(first.department).toBe('ENGINEERING');
+    expect(first.riskIndex).toBe(50);
+  });
+
+  it('keeps a healthy department at nought', () => {
+    const finance = fitByDepartment(rows).find((row) => row.department === 'FINANCE');
+    expect(finance.riskIndex).toBe(0);
+    expect(finance.total).toBe(2);
   });
 });

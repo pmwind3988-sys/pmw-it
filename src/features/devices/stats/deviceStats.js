@@ -78,3 +78,76 @@ export function leaderboards(devices, now = Date.now()) {
     ),
   };
 }
+
+/** The four fit levels, worst first — the order every chart and legend uses. */
+export const FIT_ORDER = ['Critical', 'Needs Attention', 'Moderate', 'Optimal', 'Unknown'];
+
+/**
+ * The compliance and dependency figures the executive cards print.
+ *
+ * Percentages are whole numbers because a card that reads "97.4% compliant" is
+ * a figure nobody can act on; "3 machines to fix" is.
+ */
+export function complianceSummary(devices) {
+  const rows = complete(devices);
+  const graded = rows.filter((device) => device.fitStatus && device.fitStatus !== 'Unknown');
+  const licensed = rows.filter((device) => device.licenseStatus === 'Authentic').length;
+  const dependent = rows.filter((device) => device.serverDependent === true);
+
+  const pct = (part, whole) => (whole ? Math.round((part / whole) * 100) : null);
+
+  return {
+    total: rows.length,
+    graded: graded.length,
+    critical: graded.filter((device) => device.fitStatus === 'Critical').length,
+    criticalPct: pct(graded.filter((device) => device.fitStatus === 'Critical').length, graded.length),
+    optimal: graded.filter((device) => device.fitStatus === 'Optimal').length,
+    licensed,
+    unlicensed: rows.filter((device) => device.licenseStatus === 'Unlicensed').length,
+    undefinedLicense: rows.filter((device) => device.licenseStatus === 'Undefined').length,
+    complianceRate: pct(licensed, rows.length),
+    serverDependent: dependent.length,
+    networkBottlenecks: dependent.filter((device) => device.networkRisk === 'Severe').length,
+    mismatchedFormFactor: rows.filter((device) => device.formFactorMatches === false).length,
+  };
+}
+
+/**
+ * One row per department: how its machines are spread across the four levels,
+ * and the share of them that is not fit for the work. The dashboard sorts by
+ * that share, so the department in the most trouble is always the top row.
+ */
+export function fitByDepartment(devices) {
+  const byDepartment = new Map();
+
+  for (const device of complete(devices)) {
+    const label = labelOf(device.department);
+    const row = byDepartment.get(label) ?? {
+      department: label,
+      persona: device.personaLabel ?? 'Unclassified',
+      total: 0,
+      Critical: 0,
+      'Needs Attention': 0,
+      Moderate: 0,
+      Optimal: 0,
+      Unknown: 0,
+    };
+
+    row.total += 1;
+    const status = FIT_ORDER.includes(device.fitStatus) ? device.fitStatus : 'Unknown';
+    row[status] += 1;
+    byDepartment.set(label, row);
+  }
+
+  return [...byDepartment.values()]
+    .map((row) => ({
+      ...row,
+      // Critical counts double: a department with three unusable machines is
+      // in more trouble than one with six that merely want more memory.
+      riskIndex: row.total
+        ? Math.round(((row.Critical * 2 + row['Needs Attention']) / (row.total * 2)) * 100)
+        : 0,
+    }))
+    .sort((a, b) => b.riskIndex - a.riskIndex || b.total - a.total
+      || a.department.localeCompare(b.department));
+}

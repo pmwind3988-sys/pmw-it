@@ -23,9 +23,28 @@ import {
  * hidden here is a field nobody knows was collected.
  */
 const LEAD_KEYS = [
-  'computerName', 'owner', 'department', 'deviceType', 'computerModel', 'cpuModel',
+  'computerName', 'owner', 'department', 'personaLabel', 'fitStatus', 'actionRequired',
+  'suggestedFormFactor', 'deviceType', 'licenseStatus', 'computerModel', 'cpuModel',
   'installedRamGB', 'storageTotalGB', 'storageType', 'windowsVersion',
   'antivirusStatus', 'riskScore', 'riskLevel',
+];
+
+/**
+ * Columns worked out on the way in rather than stored. They are not in the
+ * SharePoint schema and never will be — the verdict is recomputed on every read
+ * — so the table has to name them itself.
+ */
+const CALCULATED_COLUMNS = [
+  { key: 'personaLabel', label: 'Workload Profile' },
+  { key: 'fitStatus', label: 'Device Health' },
+  { key: 'actionRequired', label: 'Action Required' },
+  { key: 'fitReasons', label: 'Why' },
+  { key: 'suggestedFormFactor', label: 'Suggested Form Factor' },
+  { key: 'licenseStatus', label: 'Office Licence' },
+  { key: 'licenseNote', label: 'Licence Detail' },
+  { key: 'gpuClass', label: 'Graphics' },
+  { key: 'networkRisk', label: 'Server Link' },
+  { key: 'networkNote', label: 'Server Link Detail' },
 ];
 
 /**
@@ -41,6 +60,7 @@ const keyFor = (staticName) => staticName.charAt(0).toLowerCase() + staticName.s
 const SCHEMA_COLUMNS = [
   // `Title` holds the computer name, so the schema never lists it.
   { key: 'computerName', label: 'Computer' },
+  ...CALCULATED_COLUMNS,
   ...DEVICE_COLUMNS
     .map((column) => ({
       key: keyFor(column.StaticName),
@@ -85,13 +105,15 @@ const FILTER_LABELS = {
   risk: 'Risk', attention: 'Needs attention', type: 'Type', department: 'Department',
   os: 'OS', av: 'Antivirus', storage: 'Storage', ram: 'RAM', cpu: 'CPU age',
   windows: 'Windows', stale: 'Stale scans', q: 'Search',
+  fit: 'Device health', persona: 'Workload profile', license: 'Office licence',
+  server: 'Server link', formfit: 'Form factor mismatch',
 };
 
 /**
  * The on/off filters carry no value worth reading -- their chip is the label
  * alone, not "Needs attention: 1".
  */
-const FLAG_FILTERS = new Set(['attention', 'stale']);
+const FLAG_FILTERS = new Set(['attention', 'stale', 'formfit']);
 
 const chipText = (key, value) =>
   (FLAG_FILTERS.has(key)
@@ -108,6 +130,23 @@ function download(name, text) {
 }
 
 const TYPE_OPTIONS = ['Laptop', 'Desktop', 'Unknown'];
+
+/**
+ * The two verdict columns are the only coloured ones. They share the risk
+ * palette rather than a second one of their own: red is "go and look", amber is
+ * "put it on the list", green is "leave it alone", whichever column says it.
+ */
+const FIT_TONE = {
+  Critical: 'critical',
+  'Needs Attention': 'watch',
+  Optimal: 'ok',
+};
+
+const toneClassFor = (device, key) => {
+  if (key === 'riskLevel') return `rg-risk rg-risk-${String(device.riskLevel).toLowerCase()}`;
+  const tone = key === 'fitStatus' ? FIT_TONE[device.fitStatus] : null;
+  return tone ? `rg-risk rg-risk-${tone}` : undefined;
+};
 
 export default function DeviceTable({
   devices, filters, onFilterChange, onSave, onDelete, onDeleteMany, busy,
@@ -404,14 +443,8 @@ export default function DeviceTable({
                         );
                       }
 
-                      const risky = column.key === 'riskLevel';
                       return (
-                        <td
-                          key={column.key}
-                          className={risky
-                            ? `rg-risk rg-risk-${String(device.riskLevel).toLowerCase()}`
-                            : undefined}
-                        >
+                        <td key={column.key} className={toneClassFor(device, column.key)}>
                           <ValueCell
                             value={device[column.key]}
                             fieldKey={column.key}

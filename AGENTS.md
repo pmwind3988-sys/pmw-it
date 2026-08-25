@@ -100,6 +100,9 @@ pmw-it/
 | Device report parsing | `src/features/devices/parse/` |
 | Device derived fields and risk | `src/features/devices/derive/` |
 | Drives that belong to IT, not to the machine | `src/features/devices/derive/itMedia.js` |
+| What each department asks of a machine | `src/features/devices/derive/persona.js` |
+| Whether a machine suits the desk it is on | `src/features/devices/derive/deviceFit.js` |
+| Office licensing, graphics and server dependency | `src/features/devices/derive/officeLicense.js`, `gpuClass.js`, `serverDependency.js` |
 | A form's fields, branching and validation | `src/features/forms/` |
 | The form controls themselves | `src/components/form/` |
 | What the checklist writes to SharePoint | `src/features/forms/toChecklistItem.js` |
@@ -259,6 +262,24 @@ alongside Pentium and Celeron. That last list is load-bearing: without it those
 parts reach the RAM-type fallback and a DDR4 board alone calls a 2014 APU
 Aging. Vendor detection reads the family names as well, so a report that says
 `Athlon(tm) II X2 240` and never says "AMD" is not counted as `Other`.
+
+**A machine is judged against the desk it sits on, not against one fleet-wide
+bar.** `persona.js` maps a department to a workload profile — Engineering /
+Technical / Media, Logistics / Operations / Desk, Executive / Field — and
+`deviceFit.js` grades every machine against that profile as Critical, Needs
+Attention, Moderate or Optimal, writing out the sentence behind each verdict.
+This sits BESIDE `riskScore.js`, which is unchanged and still department-blind:
+risk asks "is this machine dangerous?", fit asks "is it the right machine for
+this person?", and 16 GB with no graphics card can pass one and fail the other.
+
+The whole persona layer is computed on read (`enrichFit.js`, applied by
+`deriveDevice` on import and `refixStored` on every SharePoint read) and NOTHING
+of it is stored. Every ingredient it needs is already on the row, so changing
+the memory floor for Engineering re-grades the fleet on the next page load with
+no re-scan and no column migration.
+
+The portability suggestion is a label, never a fault: a desktop in a field role
+is tagged and counted, and does not on its own move a machine out of Moderate.
 
 **A device page colours its values, and can be told not to.** `fieldTone.js`
 holds the judgement -- red for what needs attention, green for what does not --

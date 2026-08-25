@@ -5,7 +5,7 @@ import StatCard from '../components/ui/StatCard';
 import { Card, EmptyState, ErrorBanner } from '../components/ui/Surfaces';
 import Button from '../components/ui/Button';
 import {
-  Laptop, AlertTriangle, ShieldCheck, MemoryStick, Clock, RefreshCw,
+  Laptop, AlertTriangle, ShieldCheck, MemoryStick, Clock, RefreshCw, Tag, WifiOff,
 } from '../components/ui/Icons';
 import { useSharePointToken } from '../hooks/useRequests';
 import DropZone from '../features/devices/ui/DropZone';
@@ -13,11 +13,12 @@ import ReviewGrid from '../features/devices/ui/ReviewGrid';
 import SaveProgress from '../features/devices/ui/SaveProgress';
 import DeviceTable from '../features/devices/ui/DeviceTable';
 import DeviceCharts from '../features/devices/ui/DeviceCharts';
+import DepartmentHeatmap from '../features/devices/ui/DepartmentHeatmap';
 import Leaderboards from '../features/devices/ui/Leaderboards';
 import { importFiles, mergeImports } from '../features/devices/importFiles';
 import { issuesFor, sortForReview } from '../features/devices/reviewIssues';
 import { useDevices } from '../features/devices/useDevices';
-import { fleetSummary } from '../features/devices/stats/deviceStats';
+import { fleetSummary, complianceSummary } from '../features/devices/stats/deviceStats';
 import { labelOf } from '../features/devices/deviceFilters';
 import { syncDevices } from '../features/devices/sharepoint/syncDevices';
 import { updateDevice, deleteDevice, deleteDevices } from '../features/devices/sharepoint/updateDevice';
@@ -35,6 +36,7 @@ const IDLE_SAVE = {
 const FILTER_KEYS = [
   'risk', 'attention', 'type', 'department', 'os', 'av',
   'storage', 'ram', 'cpu', 'windows', 'stale', 'q',
+  'fit', 'persona', 'license', 'server', 'formfit',
 ];
 
 export default function DevicesPage() {
@@ -87,6 +89,7 @@ export default function DevicesPage() {
   );
 
   const summary = useMemo(() => fleetSummary(scoped), [scoped]);
+  const compliance = useMemo(() => complianceSummary(scoped), [scoped]);
 
   const flagged = merged.filter((device) => issuesFor(device).length > 0).length;
   const included = merged.filter((device) => !excluded.has(device.sourceFileName)).length;
@@ -364,6 +367,39 @@ export default function DevicesPage() {
               loading={loading}
               onClick={() => openRegister('stale', '1')}
             />
+            <StatCard
+              icon={AlertTriangle}
+              label="Not fit for the work"
+              value={compliance.criticalPct ?? '—'}
+              unit={`% · ${compliance.critical} machines`}
+              color="var(--it-danger)"
+              loading={loading}
+              onClick={() => openRegister('fit', 'Critical')}
+            />
+            <StatCard
+              icon={ShieldCheck}
+              label="Office compliance"
+              value={compliance.complianceRate ?? '—'}
+              unit="%"
+              color={compliance.unlicensed ? 'var(--it-danger)' : 'var(--it-good)'}
+              loading={loading}
+              onClick={() => openRegister('license', 'Unlicensed')}
+            />
+            <StatCard
+              icon={WifiOff}
+              label="Server over Wi-Fi"
+              value={compliance.networkBottlenecks}
+              color="var(--it-danger)"
+              loading={loading}
+              onClick={() => openRegister('server', 'Bottleneck')}
+            />
+            <StatCard
+              icon={Tag}
+              label="Form factor mismatch"
+              value={compliance.mismatchedFormFactor}
+              loading={loading}
+              onClick={() => openRegister('formfit', '1')}
+            />
           </div>
 
           {!loading && scoped.length === 0 ? (
@@ -376,6 +412,13 @@ export default function DevicesPage() {
             </Card>
           ) : (
             <>
+              <DepartmentHeatmap
+                devices={scoped}
+                onSelect={(name, level) => {
+                  setParam('department', name);
+                  openRegister('fit', level);
+                }}
+              />
               <DeviceCharts devices={scoped} onFilter={openRegister} />
               <Leaderboards devices={scoped} />
             </>

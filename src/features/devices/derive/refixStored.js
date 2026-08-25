@@ -1,5 +1,6 @@
 import { deriveStorage } from './deriveStorage.js';
 import { riskScore } from './riskScore.js';
+import { enrichFit } from './enrichFit.js';
 
 /**
  * A stored row, brought back in line with today's rules.
@@ -16,6 +17,11 @@ import { riskScore } from './riskScore.js';
  * lines on the way out of SharePoint, applying today's `isItToolDrive` rules to
  * yesterday's rows. The row self-corrects the moment it is opened.
  *
+ * The persona verdict is laid over the row on the same trip, and for the same
+ * reason: department, Office products, graphics and mapped drives are all on
+ * the record already, so how well the machine suits its desk is worked out
+ * fresh rather than stored and left to go stale.
+ *
  * Nothing is written back: the correction lives on the record the page reads,
  * and the stored value is left for the next real sync to overwrite. Re-reading
  * is cheap and safe; a write on every read is neither.
@@ -29,22 +35,22 @@ function storageChanged(record, storage) {
 }
 
 export function refixStored(record) {
-  if (!record?.storageDrivesRaw) return record;
+  if (!record?.storageDrivesRaw) return enrichFit(record);
 
   const lines = String(record.storageDrivesRaw)
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean);
 
-  if (!lines.length) return record;
+  if (!lines.length) return enrichFit(record);
 
   const storage = deriveStorage(lines);
-  if (!storageChanged(record, storage)) return record;
+  if (!storageChanged(record, storage)) return enrichFit(record);
 
   // The spinning-disk charge and its reason both hang off `hasHdd`, so a drive
   // that just left the count must also leave the risk score — otherwise the
   // page would show an all-SSD machine still charged 10 points for a disk it
   // does not have.
   const next = { ...record, ...storage };
-  return { ...next, ...riskScore(next) };
+  return enrichFit({ ...next, ...riskScore(next) });
 }

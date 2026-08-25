@@ -36,6 +36,15 @@ const MATCHERS = {
   // read is unknown, not unprotected, and must not land in either bucket.
   av: (device, value) =>
     (value === 'Unprotected' ? device.avProtected === false : device.avProtected === true),
+  fit: (device, value) => device.fitStatus === value,
+  persona: (device, value) => labelOf(device.personaLabel) === value,
+  license: (device, value) => labelOf(device.licenseStatus) === value,
+  // Two different questions, one key: 'Dependent' is everyone whose work lives
+  // on the server, 'Bottleneck' is the subset reaching it over Wi-Fi.
+  server: (device, value) => (value === 'Bottleneck'
+    ? device.serverDependent === true && device.networkRisk === 'Severe'
+    : device.serverDependent === true),
+  formfit: (device) => device.formFactorMatches === false,
   stale: (device) => isStale(device),
   q: (device, value) => {
     const needle = value.toLowerCase();

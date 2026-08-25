@@ -935,3 +935,151 @@
     margin-left: 0;
   }
 }
+
+/* ── Department risk ─────────────────────────────────────────────────────────
+   One row per department, split into the four health levels. It runs the full
+   width of the chart grid because a bar cut in half is a bar nobody can read.
+--------------------------------------------------------------------------- */
+.dv-heat {
+  grid-column: 1 / -1;
+}
+
+.dv-heat-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dv-heat-row {
+  display: grid;
+  grid-template-columns: minmax(84px, 132px) 1fr 44px;
+  align-items: center;
+  gap: 10px;
+}
+
+.dv-heat-name {
+  overflow: hidden;
+  color: var(--it-ink-soft);
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dv-heat-bar {
+  display: flex;
+  overflow: hidden;
+  height: 22px;
+  border-radius: var(--it-radius);
+  background: var(--it-line);
+}
+
+.dv-heat-cell {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  color: #fff;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 22px;
+  text-align: center;
+  cursor: pointer;
+  transition: filter 120ms ease;
+}
+
+.dv-heat-cell:hover,
+.dv-heat-cell:focus-visible {
+  filter: brightness(1.15);
+  outline: none;
+}
+
+.dv-heat-index {
+  color: var(--it-ink-soft);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.dv-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--it-ink-soft);
+  font-size: 0.72rem;
+}
+
+.dv-legend li {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.dv-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+/* ── The persona verdict on a device page ─────────────────────────────────── */
+.dd-fit {
+  margin-bottom: 16px;
+  padding: 16px;
+}
+
+.dd-fit-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.dd-fit-persona {
+  color: var(--it-ink-soft);
+  font-size: 0.8rem;
+}
+
+.dd-fit-reasons {
+  margin: 0 0 14px;
+  padding-left: 18px;
+  color: var(--it-ink-soft);
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+
+.dd-fit-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px 20px;
+  margin: 0;
+}
+
+.dd-fit-facts dt {
+  margin-bottom: 2px;
+  color: var(--it-ink-soft);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dd-fit-facts dd {
+  margin: 0;
+  color: var(--it-ink);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.dd-fit-note {
+  display: block;
+  margin-top: 2px;
+  color: var(--it-ink-soft);
+  font-size: 0.76rem;
+  font-weight: 400;
+  line-height: 1.5;
+}

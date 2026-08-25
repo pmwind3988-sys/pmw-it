@@ -9,6 +9,20 @@ import { ramBucket } from '../deviceFilters';
  */
 const token = (name) => `var(${name})`;
 
+const FIT_COLOUR = {
+  Critical: token('--it-danger'),
+  'Needs Attention': token('--it-accent'),
+  Moderate: token('--it-brand'),
+  Optimal: token('--it-good'),
+  Unknown: token('--it-ink-soft'),
+};
+
+const LICENSE_COLOUR = {
+  Authentic: token('--it-good'),
+  Unlicensed: token('--it-danger'),
+  Undefined: token('--it-accent'),
+};
+
 const RISK_COLOUR = {
   Critical: token('--it-danger'),
   High: token('--it-danger'),
@@ -25,6 +39,30 @@ export default function DeviceCharts({ devices, onFilter }) {
 
   return (
     <div className="chart-grid">
+      <BarChart
+        title="Fit for the work"
+        blurb="Each machine measured against what its department actually does."
+        rows={paint(countBy(devices, (d) => d.fitStatus), (label) => FIT_COLOUR[label])}
+        onSelect={select('fit')}
+        emptyText="No devices imported yet."
+      />
+
+      <BarChart
+        title="Office licensing"
+        blurb="Authentic means a company product. Undefined means the scan found none."
+        rows={paint(countBy(devices, (d) => d.licenseStatus), (label) => LICENSE_COLOUR[label])}
+        onSelect={select('license')}
+        emptyText="No devices imported yet."
+      />
+
+      <BarChart
+        title="Workload profile"
+        blurb="The bar each machine is held to, taken from its department."
+        rows={paint(countBy(devices, (d) => d.personaLabel))}
+        onSelect={select('persona')}
+        emptyText="No devices imported yet."
+      />
+
       <BarChart
         title="Risk mix"
         blurb="Where the fleet stands. Click a band to see the machines in it."

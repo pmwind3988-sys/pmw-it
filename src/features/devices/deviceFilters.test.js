@@ -138,3 +138,46 @@ describe('toCsv', () => {
       .toBe('GPU\r\nIntel; NVIDIA');
   });
 });
+
+describe('the persona filters', () => {
+  const rows = [
+    {
+      computerName: 'A', fitStatus: 'Critical', personaLabel: 'Engineering / Technical / Media',
+      licenseStatus: 'Unlicensed', serverDependent: true, networkRisk: 'Severe',
+      formFactorMatches: true,
+    },
+    {
+      computerName: 'B', fitStatus: 'Optimal', personaLabel: 'Executive / Field',
+      licenseStatus: 'Authentic', serverDependent: true, networkRisk: 'Fine',
+      formFactorMatches: false,
+    },
+    {
+      computerName: 'C', fitStatus: 'Moderate', personaLabel: 'Logistics / Operations / Desk',
+      licenseStatus: 'Authentic', serverDependent: false, networkRisk: 'None',
+      formFactorMatches: true,
+    },
+  ];
+
+  const names = (params) => applyFilters(rows, params).map((row) => row.computerName);
+
+  it('finds the machines at one fit level', () => {
+    expect(names({ fit: 'Critical' })).toEqual(['A']);
+  });
+
+  it('finds every machine judged against one workload profile', () => {
+    expect(names({ persona: 'Executive / Field' })).toEqual(['B']);
+  });
+
+  it('separates working off the server from being slowed by it', () => {
+    expect(names({ server: 'Dependent' })).toEqual(['A', 'B']);
+    expect(names({ server: 'Bottleneck' })).toEqual(['A']);
+  });
+
+  it('finds the licences that need looking at', () => {
+    expect(names({ license: 'Unlicensed' })).toEqual(['A']);
+  });
+
+  it('finds the machines whose form factor does not suit the role', () => {
+    expect(names({ formfit: '1' })).toEqual(['B']);
+  });
+});

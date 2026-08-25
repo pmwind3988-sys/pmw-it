@@ -9,6 +9,7 @@ import { deriveCpu } from './deriveCpu.js';
 import { deriveIdentity } from './deriveIdentity.js';
 import { deriveHealth } from './deriveHealth.js';
 import { riskScore } from './riskScore.js';
+import { enrichFit } from './enrichFit.js';
 
 const firstOrNull = (lines) => (lines?.length ? cleanValue(lines[0]) : null);
 const joinLines = (lines) => (lines?.length ? lines.join('\n') : null);
@@ -72,5 +73,5 @@ export function deriveDevice({ text, fileName, lastModified }) {
     rawReport: text,
   };
 
-  return { ...base, ...riskScore(base) };
+  return enrichFit({ ...base, ...riskScore(base) });
 }

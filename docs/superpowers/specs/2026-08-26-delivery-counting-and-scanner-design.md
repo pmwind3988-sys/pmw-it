@@ -2,7 +2,7 @@
 
 Date: 2026-08-26
 Branch: `claude/inventory-delivery-scanner-fixes-1c27e4`
-Status: approved by the user, not yet implemented.
+Status: BUILT. All five sections landed on this branch, one commit each.
 
 ## Why
 
@@ -225,12 +225,24 @@ Each step is independently shippable and independently useful.
 - No retry queue, no background sync. A batch stays on the device until saved.
 - No new OCR or barcode engine, and no CDN.
 
-## Resuming this work
+## What was built, and where it differs from the above
 
-Nothing below section 1 has been written yet. To continue in a fresh session:
+All five sections landed, one commit each. Two deliberate departures:
 
-    Read docs/superpowers/specs/2026-08-26-delivery-counting-and-scanner-design.md
-    and implement section <n>, TDD, following AGENTS.md.
+- **Section 2** puts `detailsPending` IN `TRACKED_FIELDS`, which this document
+  said to avoid. The reasoning was churn, and there is none — the flag flips
+  once in a row's life. Without it `updateAsset` sees no change and the
+  "Details are complete" button writes nothing.
+- **Section 5** aligned `.as-reticle` (`22% 12%`) with `.as-sheet-frame`
+  (`18% 10%`). Two stylesheets drew two different aiming boxes and the crop can
+  only follow one; a box that differs from what is decoded has people aiming at
+  one thing while the scanner reads another.
 
-Check `git log --oneline` on this branch first — each section lands as its own
-commit named after it.
+Section 1 also had to touch `planEdit`, which this document did not anticipate:
+without it a delivery saved as one monitor could be corrected to ten and write
+a tracked row claiming one serial for ten machines.
+
+**Not verified in a browser.** The register is behind a Microsoft sign-in and
+the camera work needs a real phone, so every claim here rests on the test suite
+and a clean build. Worth walking one delivery through on a handset before
+trusting the scanner changes.

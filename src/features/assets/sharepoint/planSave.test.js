@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { planSave, coalesce, diffAsset, applyManualOverrides } from './planSave.js';
-import { newDraft } from '../draft/draftAsset.js';
+import { newDraft, setDraftField } from '../draft/draftAsset.js';
+import { unitsOf } from '../units.js';
 import { TRACKED, BULK } from '../assetKinds.js';
 
 const laptop = (overrides = {}) => newDraft({
@@ -197,6 +198,27 @@ describe('coalesce', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].partNumber).toBe('5UF44AA');
     expect(rows[0].model).toBe('Latitude 5540');
+  });
+
+  /**
+   * Ten monitors, entered as a count rather than scanned one at a time. The
+   * serial read off the box in front of the scanner is item 1's, not the
+   * line's — nine empty slots wait behind it for the rest.
+   */
+  it('puts a counted row\'s serial onto its first item', () => {
+    const monitors = setDraftField(
+      newDraft({ category: 'Monitor', model: 'P2422H', serialNumber: 'CN0MON001' }),
+      'quantity',
+      10,
+    );
+
+    const [row] = coalesce([monitors]);
+
+    expect(row.quantity).toBe(10);
+    expect(row.trackingMode).toBe(BULK);
+    expect(row.serialNumber).toBe('');
+    expect(unitsOf(row)[0].serialNumber).toBe('CN0MON001');
+    expect(unitsOf(row)[1].serialNumber).toBe('');
   });
 
   it('keeps genuinely different things apart', () => {

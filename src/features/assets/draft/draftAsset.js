@@ -1,4 +1,4 @@
-import { CATEGORIES, CONDITIONS, trackingModeFor, TRACKED } from '../assetKinds.js';
+import { CATEGORIES, CONDITIONS, trackingModeFor, TRACKED, BULK } from '../assetKinds.js';
 import { classifyCodes } from '../scan/classifyCode.js';
 import { assetKey, hasStableIdentity, normaliseCode } from '../identity.js';
 
@@ -84,6 +84,7 @@ const NUMERIC_FIELDS = new Set(['quantity']);
  */
 export function setDraftField(draft, field, value) {
   const next = { ...draft };
+  const manual = new Set(draft.manualFields);
 
   if (NUMERIC_FIELDS.has(field)) {
     const parsed = Number(value);
@@ -92,7 +93,23 @@ export function setDraftField(draft, field, value) {
     next[field] = value;
   }
 
-  if (field === 'category' && !draft.manualFields.includes('trackingMode')) {
+  // More than one of something is a line counted by quantity, whatever its
+  // category usually says. Ten monitors delivered together are one line
+  // reading ten, not ten rows — and the tracked-means-one-unit rule below is
+  // kept rather than broken to get there: the ROW stops being tracked, and
+  // each monitor's own serial goes to its own unit record (`units.js`), which
+  // is exactly what the `Tab` category already does.
+  //
+  // Only ever in this direction. Bringing the count back down to one must NOT
+  // flip it back, because lowering a quantity only HIDES units — pinning the
+  // row to a single tracked unit would take the other nine serials with it.
+  if (field === 'quantity' && next.quantity > 1 && next.trackingMode === TRACKED) {
+    next.trackingMode = BULK;
+    // Counted by hand, so a later category change cannot quietly undo it.
+    manual.add('trackingMode');
+  }
+
+  if (field === 'category' && !manual.has('trackingMode')) {
     next.trackingMode = trackingModeFor(value);
   }
 
@@ -101,9 +118,8 @@ export function setDraftField(draft, field, value) {
   if (next.trackingMode === TRACKED) next.quantity = 1;
 
   next.guessed = draft.guessed.filter((name) => name !== field);
-  next.manualFields = draft.manualFields.includes(field)
-    ? draft.manualFields
-    : [...draft.manualFields, field];
+  manual.add(field);
+  next.manualFields = [...manual];
 
   return next;
 }

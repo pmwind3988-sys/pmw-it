@@ -129,6 +129,29 @@ export default function DraftCard({ draft, issues = [], onChange, onRemove, inde
             <input value={draft.model} onChange={set('model')} placeholder="Latitude 5540" />
           </Field>
 
+          {/* Asked of every row, not only the ones the category already counts.
+              Ten monitors arriving together are one line reading ten, and
+              being made to scan each one before the register will take them is
+              how a delivery ends up never entered at all. Typing a number
+              above one turns the row into a counted line — `setDraftField`
+              does that, and says why. */}
+          <Field label="How many?" issue={issueFor('quantity')}>
+            <input
+              type="number"
+              min="1"
+              inputMode="numeric"
+              value={draft.quantity}
+              onChange={set('quantity')}
+            />
+          </Field>
+
+          {draft.trackingMode === BULK && draft.quantity > 1 && (
+            <p className="as-draft-note">
+              Counted as {draft.quantity} — each one keeps its own serial, label and
+              condition underneath, fillable later one at a time.
+            </p>
+          )}
+
           {/* On a line counted by quantity these four describe the box in
               front of you, not the line — they are saved against ITEM 1 of it,
               and the next box of the same thing becomes item 2. Said out loud,
@@ -180,18 +203,6 @@ export default function DraftCard({ draft, issues = [], onChange, onRemove, inde
           >
             <input value={draft.assetTag} onChange={set('assetTag')} placeholder="PMW-0142" />
           </Field>
-
-          {draft.trackingMode === BULK && (
-            <Field label="Quantity" issue={issueFor('quantity')}>
-              <input
-                type="number"
-                min="1"
-                inputMode="numeric"
-                value={draft.quantity}
-                onChange={set('quantity')}
-              />
-            </Field>
-          )}
 
           {/* A condition describes a thing, and a bulk line is a count of
               things. "All new" typed here would be written against item 1

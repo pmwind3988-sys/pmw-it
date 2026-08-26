@@ -6,6 +6,7 @@ import { formatMYT } from '../../../utils/malaysiaTime.js';
 import { ASSET_LIST_NAME, CHANGE_LIST_NAME, toListItem } from './assetSchema.js';
 import { diffAsset } from './planSave.js';
 import { assetKey, assetTitle } from '../identity.js';
+import { TRACKED, BULK } from '../assetKinds.js';
 import { diffUnits, withUnitsSplitOut } from '../units.js';
 import { provisionAssets } from './provisionAssets.js';
 
@@ -45,6 +46,16 @@ export function planEdit(existing, edits) {
     if (asText(existing[field]) === asText(edits[field])) continue;
     if (asText(edits[field])) manual.add(field);
     else manual.delete(field);
+  }
+
+  // More than one of something is a line counted by quantity — the same rule
+  // the review grid keeps (`setDraftField`), and it has to hold here too or a
+  // delivery of ten monitors saved as one could be corrected to ten and save a
+  // TRACKED row claiming a single serial for all ten. The flip must come
+  // before the split below, which is what moves that serial onto item 1.
+  if (Number(next.quantity) > 1 && next.trackingMode === TRACKED) {
+    next.trackingMode = BULK;
+    manual.add('trackingMode');
   }
 
   // A serial, a part number, a label, a condition and a status each describe

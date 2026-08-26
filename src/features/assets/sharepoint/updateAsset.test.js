@@ -192,4 +192,42 @@ describe('planEdit', () => {
 
     expect(parseUnits(record.units)[0].serialNumber).toBe('HA2KJDSW');
   });
+
+  /**
+   * A delivery of ten monitors saved as one, corrected afterwards. Ten tracked
+   * units cannot share the one serial on the row, so the row stops being
+   * tracked and that serial becomes item 1's — the same flip the review grid
+   * makes, and it has to happen here too or the correction saves a row that
+   * claims one serial for ten machines.
+   */
+  it('counts a tracked row by quantity once there is more than one of it', () => {
+    const monitor = {
+      id: 5,
+      title: 'Dell P2422H',
+      assetKey: 'serial:DELL|CN0MON001',
+      category: 'Monitor',
+      trackingMode: 'Tracked',
+      manufacturer: 'Dell',
+      model: 'P2422H',
+      serialNumber: 'CN0MON001',
+      quantity: 1,
+      manualFields: [],
+    };
+
+    const { record } = planEdit(monitor, { quantity: 10 });
+
+    expect(record.quantity).toBe(10);
+    expect(record.trackingMode).toBe('Bulk');
+    expect(record.serialNumber).toBe('');
+    expect(parseUnits(record.units)[0].serialNumber).toBe('CN0MON001');
+    expect(record.manualFields).toContain('trackingMode');
+  });
+
+  it('leaves a row of one tracked', () => {
+    const { record } = planEdit({
+      id: 5, trackingMode: 'Tracked', category: 'Monitor', quantity: 1, manualFields: [],
+    }, { quantity: 1 });
+
+    expect(record.trackingMode).toBe('Tracked');
+  });
 });

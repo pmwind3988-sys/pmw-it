@@ -85,6 +85,43 @@ describe('setDraftField', () => {
     expect(setDraftField(draft, 'quantity', '7.8').quantity).toBe(7);
   });
 
+  /**
+   * Ten monitors arriving together are one line reading ten, not ten rows.
+   * The tracked-means-one rule is not broken by this — the row stops being
+   * tracked, and each monitor's own serial goes to its unit record.
+   */
+  it('counts a tracked row by quantity once there is more than one of it', () => {
+    const counted = setDraftField(newDraft({ category: 'Monitor' }), 'quantity', 10);
+
+    expect(counted.quantity).toBe(10);
+    expect(counted.trackingMode).toBe(BULK);
+    expect(counted.manualFields).toContain('trackingMode');
+  });
+
+  it('leaves a single tracked item tracked', () => {
+    const one = setDraftField(newDraft({ category: 'Monitor' }), 'quantity', 1);
+
+    expect(one.quantity).toBe(1);
+    expect(one.trackingMode).toBe(TRACKED);
+  });
+
+  /**
+   * Lowering a count only ever HIDES units. Flipping the row back to tracked
+   * here would pin it to one and take the other nine monitors' serials with it.
+   */
+  it('does not un-count a line when the quantity comes back down to one', () => {
+    const counted = setDraftField(newDraft({ category: 'Monitor' }), 'quantity', 10);
+
+    expect(setDraftField(counted, 'quantity', 1).trackingMode).toBe(BULK);
+  });
+
+  /** The flip was the person's decision, so re-categorising must not undo it. */
+  it('keeps a counted line counted when the category changes', () => {
+    const counted = setDraftField(newDraft({ category: 'Monitor' }), 'quantity', 10);
+
+    expect(setDraftField(counted, 'category', 'Laptop').trackingMode).toBe(BULK);
+  });
+
   it('does not list the same field as hand-set twice', () => {
     const once = setDraftField(newDraft(), 'model', 'A');
     const twice = setDraftField(once, 'model', 'B');

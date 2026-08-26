@@ -48,7 +48,7 @@ const FIELDS = [
   { key: 'partNumber', label: 'Part number' },
   { key: 'macAddress', label: 'MAC address' },
   { key: 'assetTag', label: 'Asset label' },
-  { key: 'quantity', label: 'Quantity', type: 'number' },
+  { key: 'quantity', label: 'How many?', type: 'number' },
   { key: 'condition', label: 'Condition', options: CONDITIONS },
   { key: 'status', label: 'Status', options: STATUSES },
   { key: 'location', label: 'Where it is' },

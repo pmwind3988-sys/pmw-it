@@ -10,6 +10,7 @@ import {
 import { useAssets, SHAREPOINT_SITE_URL } from '../features/assets/useAssets';
 import { useSharePointToken } from '../hooks/useRequests';
 import { useScanner, CAMERA_STATE } from '../features/assets/scan/useScanner';
+import { useScrollLock } from '../hooks/useScrollLock';
 import { signalAccepted, signalDuplicate } from '../features/assets/scan/feedback';
 import {
   newBasket, newLine, newUnitLine, addLine, removeLine, setQuantity, replaceLine,
@@ -125,6 +126,8 @@ export default function AssetHandoverPage() {
   }, [assets, add, addUnit]);
 
   const { videoRef, state } = useScanner({ active: scanning, onCodes });
+
+  useScrollLock(scanning);
 
   const refusals = useMemo(() => new Map(
     basket.lines.map((line) => [line.lineId, lineRefusal(line, byId.get(line.assetId), basket)]),
@@ -304,8 +307,21 @@ export default function AssetHandoverPage() {
               <p className="as-hint">Nothing available matches that.</p>
             )}
 
+            {/* Over the whole screen rather than in the page. In a store room
+                the phone is held up over a shelf, and a viewfinder that sits
+                halfway down a page of search results is one you have to scroll
+                back to between every box. */}
             {scanning && (
-              <div className="as-viewfinder as-viewfinder-short">
+              <div className="as-fullcam as-fullcam-plain">
+                <button
+                  type="button"
+                  className="as-fullcam-close"
+                  onClick={() => setScanning(false)}
+                  aria-label="Close the camera"
+                >
+                  <X size={18} />
+                </button>
+                <div className="as-viewfinder">
                 <video ref={videoRef} playsInline muted className="as-video" />
                 <div className="as-reticle" aria-hidden="true" />
                 {flash && (
@@ -319,6 +335,7 @@ export default function AssetHandoverPage() {
                     This browser is not allowing the camera. Search for the items instead.
                   </p>
                 )}
+                </div>
               </div>
             )}
 

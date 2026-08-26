@@ -5,6 +5,7 @@ import { useScanner, CAMERA_STATE } from '../scan/useScanner';
 import { classifyCodes } from '../scan/classifyCode';
 import { labelFor } from '../scan/fieldLabels';
 import ScanControls from './ScanControls';
+import { useScrollLock } from '../../../hooks/useScrollLock';
 
 /**
  * The camera, over one box, reading its barcodes.
@@ -56,6 +57,9 @@ export default function CodeScanSheet({ title = 'Scan the barcodes', onCancel, o
   const {
     videoRef, state, error, controls, torchOn, toggleTorch, zoomTo, focusOn, quiet,
   } = useScanner({ active: true, onCodes });
+
+  // The page behind a full-screen camera must not scroll under the picture.
+  useScrollLock(true);
 
   const tapToFocus = (event) => {
     const box = event.currentTarget.getBoundingClientRect();

@@ -4,6 +4,7 @@ import Button from '../../../components/ui/Button';
 import { useTextScanner, SCAN_STATE } from '../scan/useTextScanner';
 import { settledValues } from '../scan/textScan';
 import { labelFor } from '../scan/fieldLabels';
+import { useScrollLock } from '../../../hooks/useScrollLock';
 
 /**
  * The camera, over the form, reading the label.
@@ -28,6 +29,9 @@ const MESSAGES = {
 
 export default function TextScanSheet({ title = 'Scan the label', onCancel, onUse }) {
   const { videoRef, state, error, scan, finish } = useTextScanner({ active: true });
+
+  // The page behind a full-screen camera must not scroll under the picture.
+  useScrollLock(true);
 
   const found = settledValues(scan);
   const names = Object.keys(found);

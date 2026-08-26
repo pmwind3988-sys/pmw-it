@@ -17,6 +17,7 @@ import { newId } from '../features/assets/draft/draftAsset';
 import { saveBatch, savePhoto } from '../features/assets/store/assetDb';
 import PhotoInput from '../features/assets/ui/PhotoInput';
 import ScanControls from '../features/assets/ui/ScanControls';
+import { useScrollLock } from '../hooks/useScrollLock';
 
 /**
  * Scanning a delivery.
@@ -45,6 +46,10 @@ export default function AssetScanPage() {
   const flashTimer = useRef(null);
 
   const scanning = step === STEP.SCANNING;
+
+  // The camera covers the screen while it is open, so the page behind it must
+  // not scroll under the picture.
+  useScrollLock(scanning);
 
   const show = useCallback((kind, text) => {
     setFlash({ kind, text });
@@ -285,7 +290,7 @@ export default function AssetScanPage() {
       )}
 
       {scanning && (
-        <div className="as-scan">
+        <div className="as-scan as-fullcam">
           <div className="as-viewfinder" onClick={tapToFocus}>
             <video ref={videoRef} playsInline muted className="as-video" />
             <div className="as-reticle" aria-hidden="true" />

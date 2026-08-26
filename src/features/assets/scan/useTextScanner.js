@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { CAMERA_STATE, useCamera } from './useCamera.js';
 import { createTextReader, readTextFrame, READER_SOURCE } from './textReader.js';
 import { readTextFields } from './classifyText.js';
-import { newTextScan, recordReading, isComplete } from './textScan.js';
+import {
+  newTextScan, recordReading, rejectValue, dismissExtra, MAX_PASSES,
+} from './textScan.js';
 
 /**
  * Pointing the camera at a label until the words stop changing.
@@ -90,7 +92,12 @@ export function useTextScanner({ active = true } = {}) {
           scanRef.current = next;
           setScan(next);
 
-          if (isComplete(next) || next.exhausted) {
+          // It keeps reading after a value settles rather than stopping on
+          // the first complete answer. Nothing is written into the form any
+          // more, so another pass costs only battery -- and while somebody is
+          // reading the list, the rest of the label is still worth picking
+          // up. `MAX_PASSES` is what ends it.
+          if (next.passes >= MAX_PASSES) {
             doneRef.current = true;
             setDone(true);
             return;
@@ -112,6 +119,23 @@ export function useTextScanner({ active = true } = {}) {
     setDone(true);
   }, []);
 
+  /**
+   * Crossed out. Written through the ref as well as through state because the
+   * reading loop reads the ref, and a refusal that only reached state would be
+   * overwritten by the pass already in flight.
+   */
+  const reject = useCallback((field) => {
+    const next = rejectValue(scanRef.current, field);
+    scanRef.current = next;
+    setScan(next);
+  }, []);
+
+  const dismiss = useCallback((value) => {
+    const next = dismissExtra(scanRef.current, value);
+    scanRef.current = next;
+    setScan(next);
+  }, []);
+
   let state = SCAN_STATE.STARTING;
   if (reader && !reader.read) state = SCAN_STATE.NO_READER;
   else if (camera.state === CAMERA_STATE.DENIED) state = SCAN_STATE.DENIED;
@@ -127,5 +151,7 @@ export function useTextScanner({ active = true } = {}) {
     source: reader?.source ?? READER_SOURCE.NONE,
     scan,
     finish,
+    reject,
+    dismiss,
   };
 }

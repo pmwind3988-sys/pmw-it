@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   newTextScan, recordReading, isSettled, settledValues, applyScannedFields, MAX_PASSES,
+  candidates, rejectValue, dismissExtra,
 } from './textScan.js';
 
 const reading = (fields) => ({
@@ -141,5 +142,103 @@ describe('applyScannedFields — a scan never overwrites what you typed', () => 
 
     expect(record.additionalCodes).toBeUndefined();
     expect(record.serialNumber).toBe('A1B2');
+  });
+});
+
+
+describe('offering what it read instead of writing it in', () => {
+  it('lists what has settled, saying which of it was a guess', () => {
+    const scan = readTwice({ serialNumber: 'CN0MON001', model: 'P2422H', guessed: ['model'] });
+
+    expect(candidates(scan)).toEqual([
+      { field: 'serialNumber', value: 'CN0MON001', guessed: false },
+      { field: 'model', value: 'P2422H', guessed: true },
+    ]);
+  });
+
+  it('says nothing about a value that is still being read', () => {
+    const once = recordReading(newTextScan(), reading({ serialNumber: 'CN0MON001' }));
+    expect(candidates(once)).toEqual([]);
+  });
+
+  it('takes a crossed-out value off the list', () => {
+    const scan = readTwice({ serialNumber: 'CN0MON001', model: 'P2422H' });
+    const after = rejectValue(scan, 'serialNumber');
+
+    expect(candidates(after).map((entry) => entry.field)).toEqual(['model']);
+  });
+
+  /**
+   * The camera is still pointed at the same label, so the value it was just
+   * told was wrong arrives again on the very next pass. Without remembering
+   * the refusal, crossing something out would be undone half a second later.
+   */
+  it('does not offer a crossed-out value again', () => {
+    const scan = rejectValue(readTwice({ serialNumber: 'CN0MON001' }), 'serialNumber');
+    const again = recordReading(
+      recordReading(scan, reading({ serialNumber: 'CN0MON001' })),
+      reading({ serialNumber: 'CN0MON001' }),
+    );
+
+    expect(candidates(again)).toEqual([]);
+  });
+
+  /**
+   * Crossing one out is "not that one", not "stop reading this field" — the
+   * usual reason it is wrong is that the camera misread it.
+   */
+  it('still offers a different value for the same field', () => {
+    const scan = rejectValue(readTwice({ serialNumber: 'CNOMONOO1' }), 'serialNumber');
+    const again = recordReading(
+      recordReading(scan, reading({ serialNumber: 'CN0MON001' })),
+      reading({ serialNumber: 'CN0MON001' }),
+    );
+
+    expect(candidates(again)).toEqual([
+      { field: 'serialNumber', value: 'CN0MON001', guessed: false },
+    ]);
+  });
+
+  it('drops a line of writing it could not name', () => {
+    const scan = readTwice({ serialNumber: 'CN0MON001', additional: ['MADE IN CHINA'] });
+
+    expect(scan.additional).toEqual(['MADE IN CHINA']);
+    expect(dismissExtra(scan, 'MADE IN CHINA').additional).toEqual([]);
+  });
+
+  it('does not pick a dismissed line up again', () => {
+    const scan = dismissExtra(
+      readTwice({ serialNumber: 'CN0MON001', additional: ['MADE IN CHINA'] }),
+      'MADE IN CHINA',
+    );
+
+    expect(recordReading(scan, reading({ additional: ['MADE IN CHINA'] })).additional).toEqual([]);
+  });
+});
+
+
+describe('a value somebody ticked', () => {
+  /**
+   * Nothing reaches the form now except by being ticked, and a deliberate
+   * choice has to outrank the next scan the same way typing it would --
+   * otherwise the camera drifting onto the next box undoes the decision that
+   * was just made on purpose.
+   */
+  it('outranks a later scan, the same as typing it would', () => {
+    const draft = { serialNumber: '', guessed: [], manualFields: [] };
+    const { record } = applyScannedFields(
+      draft, { serialNumber: 'CN0MON001' }, [], [], { byHand: true },
+    );
+
+    expect(record.serialNumber).toBe('CN0MON001');
+    expect(record.manualFields).toContain('serialNumber');
+    expect(record.guessed).not.toContain('serialNumber');
+  });
+
+  it('leaves the manual list alone when nothing was ticked', () => {
+    const draft = { serialNumber: '', guessed: [], manualFields: [] };
+    const { record } = applyScannedFields(draft, { serialNumber: 'CN0MON001' }, [], []);
+
+    expect(record.manualFields).toEqual([]);
   });
 });

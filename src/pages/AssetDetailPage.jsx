@@ -142,6 +142,8 @@ export default function AssetDetailPage() {
       values,
       guessedFields,
       additional,
+      // Nothing reaches here now except by being ticked off the list.
+      { byHand: true },
     );
 
     const next = { ...edits };
@@ -151,7 +153,8 @@ export default function AssetDetailPage() {
 
     setEdits(next);
     setHeldBack(result.heldBack);
-    setScanning(null);
+    // The sheet stays open: a label carries several values, and closing after
+    // the first would mean reopening the camera for each of them.
   };
 
   // The individual things inside a bulk line. Built from the quantity being

@@ -43,9 +43,23 @@ export function newTextScan() {
     settled: {},
     guessed: [],
     additional: [],
+    /**
+     * `{ field, value }` pairs somebody has crossed out. Remembered because
+     * the camera is still pointed at the same label: without this, a refusal
+     * would be undone by the very next pass, half a second later.
+     *
+     * Keyed on the PAIR, not the field. Crossing one out means "not that one",
+     * not "stop reading this field" -- the usual reason it is wrong is that
+     * the camera misread it, and the right value is the next thing to arrive.
+     */
+    rejected: [],
     exhausted: false,
   };
 }
+
+const isRejected = (scan, field, value) => (scan.rejected ?? []).some(
+  (entry) => entry.field === field && entry.value === value,
+);
 
 /** `fields` is one pass of `readTextFields`. */
 export function recordReading(scan, fields) {
@@ -62,6 +76,7 @@ export function recordReading(scan, fields) {
     // let the camera drifting onto the next box in the pile overwrite the
     // answer that was already good.
     if (settled[field]) continue;
+    if (isRejected(scan, field, value)) continue;
 
     const previous = pending[field];
     const count = previous?.value === value ? previous.count + 1 : 1;
@@ -75,7 +90,9 @@ export function recordReading(scan, fields) {
   }
 
   for (const value of fields?.additional ?? []) {
-    if (value && !additional.includes(value)) additional.push(value);
+    if (!value || additional.includes(value)) continue;
+    if (isRejected(scan, ADDITIONAL, value)) continue;
+    additional.push(value);
   }
 
   const passes = scan.passes + 1;
@@ -86,7 +103,56 @@ export function recordReading(scan, fields) {
     settled,
     guessed: [...guessed],
     additional,
+    rejected: scan.rejected ?? [],
     exhausted: passes >= MAX_PASSES && Object.keys(pending).length > 0,
+  };
+}
+
+/** The name the rejected list files a loose line of writing under. */
+const ADDITIONAL = '_additional';
+
+/**
+ * What the camera is offering, for a person to accept or cross out.
+ *
+ * Only what has SETTLED. A value still being read has been seen once and may
+ * yet turn out to be a misread of something else, and offering it would put
+ * the reader back in the business of judging half-finished guesses.
+ */
+export function candidates(scan) {
+  return SCAN_FIELDS
+    .filter((field) => scan.settled[field])
+    .map((field) => ({
+      field,
+      value: scan.settled[field],
+      guessed: (scan.guessed ?? []).includes(field),
+    }));
+}
+
+/** Crossed out: off the list, and not offered again. */
+export function rejectValue(scan, field) {
+  const value = scan.settled[field] ?? scan.pending[field]?.value;
+  if (!value) return scan;
+
+  const settled = { ...scan.settled };
+  const pending = { ...scan.pending };
+  delete settled[field];
+  delete pending[field];
+
+  return {
+    ...scan,
+    settled,
+    pending,
+    guessed: (scan.guessed ?? []).filter((name) => name !== field),
+    rejected: [...(scan.rejected ?? []), { field, value }],
+  };
+}
+
+/** The same, for a line of writing it read but could not name. */
+export function dismissExtra(scan, value) {
+  return {
+    ...scan,
+    additional: (scan.additional ?? []).filter((entry) => entry !== value),
+    rejected: [...(scan.rejected ?? []), { field: ADDITIONAL, value }],
   };
 }
 
@@ -121,9 +187,12 @@ function canFill(record, field) {
  * Returns the updated record, and the values it refused to write over so
  * the screen can offer them rather than swallow them.
  */
-export function applyScannedFields(record, values, guessedFields = [], additional = []) {
+export function applyScannedFields(
+  record, values, guessedFields = [], additional = [], { byHand = false } = {},
+) {
   const next = { ...record };
   const guessed = new Set(record.guessed ?? []);
+  const manual = new Set(record.manualFields ?? []);
   const heldBack = [];
 
   for (const field of SCAN_FIELDS) {
@@ -138,11 +207,23 @@ export function applyScannedFields(record, values, guessedFields = [], additiona
     }
 
     next[field] = value;
-    if (guessedFields.includes(field)) guessed.add(field);
-    else guessed.delete(field);
+    // Ticked off a list rather than written in by a scan that decided for
+    // itself. A deliberate choice outranks the next scan exactly as typing it
+    // would, or the camera drifting onto the next box in the pile undoes the
+    // decision somebody just made on purpose -- and it is no longer a guess,
+    // because a person looked at it.
+    if (byHand) {
+      manual.add(field);
+      guessed.delete(field);
+    } else if (guessedFields.includes(field)) {
+      guessed.add(field);
+    } else {
+      guessed.delete(field);
+    }
   }
 
   next.guessed = [...guessed];
+  if (byHand) next.manualFields = [...manual];
 
   // Only where the record already keeps them. A draft row carries the
   // codes it could not place; a saved asset has no such column, and

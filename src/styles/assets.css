@@ -1465,3 +1465,39 @@
   .as-fullcam-close { display: inline-flex; }
   .as-fullcam-plain { padding: 0; }
 }
+
+/* ---- What the camera read, offered rather than taken -------------------- */
+
+/* Each line carries its own tick and cross, so the list is a row of decisions
+   rather than a report. The value gets the room, because it is the thing being
+   judged -- a serial read wrong is wrong in one character. */
+.as-sheet-offer li {
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.as-sheet-offer li:last-child { border-bottom: 0; }
+
+.as-sheet-offer .as-sheet-found-label { flex: 0 0 84px; }
+
+.as-take {
+  color: var(--success, #10B981);
+  border-color: currentColor;
+}
+
+/* A line of writing it read but could not name. The dropdown is the whole
+   point: the reader knows what it is, and the alternative is retyping a serial
+   number that is already on screen. */
+.as-loose {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.as-loose:last-child { border-bottom: 0; }
+.as-loose .as-sheet-found-value { flex: 1 1 auto; }
+.as-loose select { flex: 0 0 auto; max-width: 42%; font-size: 16px; }

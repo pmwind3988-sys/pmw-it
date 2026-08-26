@@ -50,11 +50,13 @@ export default function DraftCard({ draft, issues = [], onChange, onRemove, inde
   const blocking = issues.some((issue) => issue.blocking);
   const codes = draft.additionalCodes ?? [];
 
+  // One ticked value at a time. The sheet stays open on purpose: a label
+  // carries several, and closing after the first would mean reopening the
+  // camera for each of them.
   const useScan = (values, guessedFields, additional) => {
-    const result = applyScannedFields(draft, values, guessedFields, additional);
+    const result = applyScannedFields(draft, values, guessedFields, additional, { byHand: true });
     onChange(result.record);
     setHeldBack(result.heldBack);
-    setScanning(null);
   };
 
   // Taking a held-back value is a correction made deliberately, so it

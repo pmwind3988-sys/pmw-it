@@ -1,53 +1,95 @@
-import { useEffect } from 'react';
-import { X, ScanLine, AlertTriangle, Check } from '../../../components/ui/Icons';
+import { useState } from 'react';
+import {
+  X, ScanLine, AlertTriangle, Check, Plus,
+} from '../../../components/ui/Icons';
 import Button from '../../../components/ui/Button';
 import { useTextScanner, SCAN_STATE } from '../scan/useTextScanner';
-import { settledValues } from '../scan/textScan';
+import { candidates, SCAN_FIELDS } from '../scan/textScan';
 import { labelFor } from '../scan/fieldLabels';
 import { useScrollLock } from '../../../hooks/useScrollLock';
 
 /**
- * The camera, over the form, reading the label.
+ * The camera, over the form, reading the label — and ASKING.
  *
- * It fills in and closes itself once the words stop changing (§ the
- * settling rule in `textScan.js`). Waiting for a person to press an
- * "accept" button would mean holding a phone steady over a box with one
- * hand while reading a list with the other.
+ * It used to fill six fields in and close itself the moment the words stopped
+ * changing. That is the wrong trade for printed text: a barcode carries a
+ * checksum and either decodes or does not, while a hand-held camera on a
+ * sticker reads `8` as `B` and `0` as `O` in one frame out of several, and no
+ * part of the answer says which frame that was. Writing that straight into the
+ * register makes the camera something to be undone rather than used.
  *
- * What it has read so far is on screen the whole time, because a
- * recogniser that works silently for four seconds and then changes six
- * fields is one nobody trusts the second time.
+ * So everything it reads is MARKED and nothing is taken. Each settled value
+ * gets a tick and a cross; crossing one out is remembered, or the camera —
+ * still pointed at the same label — would offer it again half a second later.
+ * Writing it recognised but could not name is offered at the bottom to be
+ * filed by hand, because a code nobody can place is still the only copy of
+ * what was printed on the box.
+ *
+ * It keeps reading while all this is going on. Nothing is written by itself
+ * any more, so another pass costs only battery.
  */
 
 const MESSAGES = {
   [SCAN_STATE.STARTING]: 'Starting the camera…',
-  [SCAN_STATE.READING]: 'Hold the camera over the label until it stops changing.',
+  [SCAN_STATE.READING]: 'Hold the camera over the label. Tick anything you want to keep.',
   [SCAN_STATE.DENIED]: 'The camera was blocked. Allow it in the browser, or type the value in.',
   [SCAN_STATE.UNAVAILABLE]: 'No camera on this device. Type the value in instead.',
   [SCAN_STATE.NO_READER]: 'This browser cannot read text from a picture. Type the value in instead.',
 };
 
-export default function TextScanSheet({ title = 'Scan the label', onCancel, onUse }) {
-  const { videoRef, state, error, scan, finish } = useTextScanner({ active: true });
+/** One line of writing the reader could not name, and the fields it could go in. */
+function LooseLine({ value, onFile, onDismiss }) {
+  const [field, setField] = useState(SCAN_FIELDS[0]);
 
-  // The page behind a full-screen camera must not scroll under the picture.
+  return (
+    <li className="as-loose">
+      <span className="as-sheet-found-value">{value}</span>
+      <select value={field} onChange={(event) => setField(event.target.value)}>
+        {SCAN_FIELDS.map((name) => (
+          <option key={name} value={name}>{labelFor(name)}</option>
+        ))}
+      </select>
+      <button
+        type="button"
+        className="as-iconbtn"
+        onClick={() => onFile(field, value)}
+        aria-label={`Put ${value} in ${labelFor(field)}`}
+      >
+        <Plus size={13} />
+      </button>
+      <button type="button" className="as-iconbtn" onClick={() => onDismiss(value)} aria-label="Discard">
+        <X size={13} />
+      </button>
+    </li>
+  );
+}
+
+export default function TextScanSheet({ title = 'Scan the label', onCancel, onUse }) {
+  const {
+    videoRef, state, error, scan, finish, reject, dismiss,
+  } = useTextScanner({ active: true });
+
   useScrollLock(true);
 
-  const found = settledValues(scan);
-  const names = Object.keys(found);
+  const found = candidates(scan);
+  const extras = scan.additional ?? [];
 
-  // Filling the form is the end of the scan, so it happens here rather
-  // than being offered: the phone is in the air over a box, and the next
-  // thing wanted is the form, not a confirmation.
-  useEffect(() => {
-    if (state !== SCAN_STATE.DONE || !names.length) return;
-    onUse(found, scan.guessed, scan.additional);
-  }, [state, names.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  /** One value, taken. The sheet stays open: a label carries several. */
+  const take = (field, value) => {
+    onUse({ [field]: value }, scan.guessed, []);
+    reject(field);
+  };
 
-  const failed = state === SCAN_STATE.DONE && !names.length;
+  const takeAll = () => {
+    const values = Object.fromEntries(found.map((entry) => [entry.field, entry.value]));
+    onUse(values, scan.guessed, extras);
+    onCancel();
+  };
+
   const broken = state === SCAN_STATE.DENIED
     || state === SCAN_STATE.UNAVAILABLE
     || state === SCAN_STATE.NO_READER;
+  const failed = state === SCAN_STATE.DONE && !found.length && !extras.length;
 
   return (
     <div className="as-sheet" role="dialog" aria-modal="true" aria-label={title}>
@@ -76,29 +118,69 @@ export default function TextScanSheet({ title = 'Scan the label', onCancel, onUs
 
         {error && broken && <p className="as-sheet-note as-sheet-note-bad">{error}</p>}
 
-        {names.length > 0 && (
-          <ul className="as-sheet-found">
-            {names.map((field) => (
-              <li key={field}>
-                <Check size={13} />
-                <span className="as-sheet-found-label">{labelFor(field)}</span>
-                <span className="as-sheet-found-value">{found[field]}</span>
+        {found.length > 0 && (
+          <ul className="as-sheet-found as-sheet-offer">
+            {found.map((entry) => (
+              <li key={entry.field}>
+                <span className="as-sheet-found-label">
+                  {labelFor(entry.field)}
+                  {/* Said out loud, because a guess that cannot be spotted is
+                      a guess that gets saved. */}
+                  {entry.guessed && (
+                    <span className="as-guess" title="Worked out from the shape of the writing">
+                      guessed
+                    </span>
+                  )}
+                </span>
+                <span className="as-sheet-found-value">{entry.value}</span>
+                <button
+                  type="button"
+                  className="as-iconbtn as-take"
+                  onClick={() => take(entry.field, entry.value)}
+                  aria-label={`Use ${entry.value} as ${labelFor(entry.field)}`}
+                >
+                  <Check size={13} />
+                </button>
+                <button
+                  type="button"
+                  className="as-iconbtn"
+                  onClick={() => reject(entry.field)}
+                  aria-label={`Discard ${entry.value}`}
+                >
+                  <X size={13} />
+                </button>
               </li>
             ))}
           </ul>
         )}
 
+        {extras.length > 0 && (
+          <>
+            <p className="as-sheet-note">Also on the label:</p>
+            <ul className="as-sheet-found">
+              {extras.map((value) => (
+                <LooseLine
+                  key={value}
+                  value={value}
+                  onFile={(field, text) => { onUse({ [field]: text }, [], []); dismiss(text); }}
+                  onDismiss={dismiss}
+                />
+              ))}
+            </ul>
+          </>
+        )}
+
         <footer className="as-sheet-foot">
-          <Button variant="secondary" size="sm" onClick={onCancel}>Cancel</Button>
-          {/* The way out of a label it cannot settle on: take the fields it
-              did read rather than losing them to a scan that never ends. */}
-          {state === SCAN_STATE.READING && (
-            <Button
-              size="sm"
-              onClick={names.length ? () => onUse(found, scan.guessed, scan.additional) : finish}
-            >
-              {names.length ? 'Use what it has' : 'Stop reading'}
+          <Button variant="secondary" size="sm" onClick={onCancel}>Close</Button>
+          {found.length > 0 && (
+            <Button size="sm" onClick={takeAll}>
+              Take all {found.length}
             </Button>
+          )}
+          {/* The way out of a label it cannot settle on, while it is still
+              trying and has nothing to show for it. */}
+          {state === SCAN_STATE.READING && !found.length && (
+            <Button variant="secondary" size="sm" onClick={finish}>Stop reading</Button>
           )}
         </footer>
       </div>

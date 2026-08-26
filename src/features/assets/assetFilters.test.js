@@ -91,6 +91,22 @@ describe('filterAssets', () => {
   });
 });
 
+describe('rows still waiting for their paperwork', () => {
+  const backfilled = { ...mice, title: 'Dell P2422H', detailsPending: 'Yes' };
+
+  it('finds only the ones marked as needing details', () => {
+    expect(filterAssets([laptop, backfilled], { pending: true })).toEqual([backfilled]);
+  });
+
+  it('shows everything when nobody asked', () => {
+    expect(filterAssets([laptop, backfilled], {})).toHaveLength(2);
+  });
+
+  it('finds a row by its DO number', () => {
+    expect(matchesQuery({ ...laptop, doNumber: 'DO-8891' }, 'do-8891')).toBe(true);
+  });
+});
+
 describe('sortAssets', () => {
   it('puts the newest arrival first by default', () => {
     expect(sortAssets([mice, laptop])[0]).toBe(laptop);

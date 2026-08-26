@@ -6,6 +6,7 @@ import Button from '../components/ui/Button';
 import { Card, ErrorBanner, EmptyState } from '../components/ui/Surfaces';
 import {
   ArrowLeft, Save, Trash2, Tag, Barcode, Check, Users, Clock, AlertTriangle,
+  ClipboardList,
 } from '../components/ui/Icons';
 import { useAssets, SHAREPOINT_SITE_URL } from '../features/assets/useAssets';
 import { useSharePointToken } from '../hooks/useRequests';
@@ -13,6 +14,7 @@ import { updateAsset, deleteAsset, EDITABLE_FIELDS } from '../features/assets/sh
 import {
   CATEGORIES, CONDITIONS, STATUSES, TRACKED, BULK, isTracked,
 } from '../features/assets/assetKinds';
+import { needsDetails, missingDetails } from '../features/assets/detailsPending';
 import { formatMYT } from '../utils/malaysiaTime';
 import { useHandovers } from '../features/assets/useHandovers';
 import {
@@ -172,11 +174,18 @@ export default function AssetDetailPage() {
   const shownFields = perUnit
     ? FIELDS.filter((field) => !PER_UNIT_ONLY.includes(field.key))
     : FIELDS;
+  // What the banner lists. Read off the values being SHOWN, so ticking the
+  // last serial into the pager empties the list before anything is saved.
+  const missing = useMemo(
+    () => (asset ? missingDetails({ ...asset, ...edits }) : []),
+    [asset, edits],
+  );
+
   const dirty = EDITABLE_FIELDS.some(
     (key) => key in edits && String(edits[key]) !== String(asset?.[key] ?? ''),
   );
 
-  const save = async () => {
+  const save = async (pending = edits) => {
     setSaving(true);
     setError('');
     setPhotoWarning('');
@@ -188,17 +197,17 @@ export default function AssetDetailPage() {
       // Photographs first, because a unit record must reach SharePoint holding
       // a library path and not a reference to a blob on this phone — which is
       // meaningless to everyone else who opens the row.
-      let next = edits;
+      let next = pending;
       let stranded = 0;
-      if ('units' in edits) {
+      if ('units' in pending) {
         const photos = await uploadUnitPhotos({
           siteUrl: SHAREPOINT_SITE_URL,
           token,
-          stored: edits.units,
+          stored: pending.units,
           seed: asset.assetKey || asset.title,
           photoFor: loadPhoto,
         });
-        next = { ...edits, units: photos.units };
+        next = { ...pending, units: photos.units };
         stranded = photos.failures.length;
 
         if (stranded) {
@@ -221,7 +230,7 @@ export default function AssetDetailPage() {
       // The phone's copies are only worth keeping until they are somewhere
       // everybody can see them.
       const stillWaiting = pendingPhotoIds(next.units);
-      for (const id of pendingPhotoIds(edits.units)) {
+      for (const id of pendingPhotoIds(pending.units)) {
         if (!stillWaiting.includes(id)) await deletePhoto(id).catch(() => {});
       }
 
@@ -238,6 +247,14 @@ export default function AssetDetailPage() {
       setSaving(false);
     }
   };
+
+  /**
+   * The row has been finished off. Saved in one press rather than by setting
+   * the flag and waiting for the person to find Save changes -- this button
+   * IS the save, and `save` is handed the edit directly because state set here
+   * would not be readable until the next render.
+   */
+  const completeDetails = () => save({ ...edits, detailsPending: false });
 
   const remove = async () => {
     // Deleting a row is not undoable and the change log is the only trace, so
@@ -299,6 +316,30 @@ export default function AssetDetailPage() {
             {repaired && ' The register was missing a column for the item records, '
               + 'so it was added first — later saves will be quick.'}
           </span>
+        </Card>
+      )}
+
+      {/* A row from a delivery entered long after it arrived. It says what is
+          still to be found rather than only that something is, because "needs
+          details" on its own sends somebody back to the shelf to work out
+          which detail. */}
+      {needsDetails(asset) && (
+        <Card className="as-notice as-notice-warn as-pending">
+          <ClipboardList size={16} />
+          <span>
+            <strong>Still to be filled in.</strong>{' '}
+            {missing.length
+              ? `Missing: ${missing.join(', ')}.`
+              : 'Everything on this row is filled in now.'}
+          </span>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={saving}
+            onClick={completeDetails}
+          >
+            Details are complete
+          </Button>
         </Card>
       )}
 

@@ -160,3 +160,20 @@ describe('what is out and what is left', () => {
     expect(assetStats([])).toMatchObject({ out: 0, available: 0 });
   });
 });
+
+describe('rows still waiting for their paperwork', () => {
+  /**
+   * Counted in ROWS, not units: a line of ten monitors is one delivery line to
+   * go back and finish, and reporting it as ten would make the card read like
+   * a backlog ten times the size of the job.
+   */
+  it('counts the lines that still need details', () => {
+    const stats = assetStats([
+      { category: 'Monitor', quantity: 10, detailsPending: 'Yes' },
+      { category: 'Laptop', quantity: 1, detailsPending: 'No' },
+      { category: 'Cable', quantity: 5 },
+    ]);
+
+    expect(stats.pending).toBe(1);
+  });
+});

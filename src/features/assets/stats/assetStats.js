@@ -1,4 +1,5 @@
 import { TRACKED } from '../assetKinds.js';
+import { needsDetails } from '../detailsPending.js';
 import { available, out as unitsOut } from '../handover/availability.js';
 import { perItem, countPerItem, unitsOf as itemsOf } from '../units.js';
 
@@ -72,6 +73,10 @@ export function assetStats(assets = []) {
     trackedUnits,
     bulkUnits: units - trackedUnits,
     unlabelled,
+    // ROWS, not units. A line of ten monitors is one delivery line to go back
+    // and finish; counting the units would make the card read like a backlog
+    // ten times the size of the job actually waiting.
+    pending: assets.filter(needsDetails).length,
     faulty,
     out,
     available: free,

@@ -1255,3 +1255,39 @@
   align-items: center;
   justify-content: center;
 }
+
+/* One decision taken once for a whole delivery, so it is given the room a
+   checkbox squeezed into a form row would not get. The explanation under it is
+   the point: "an older delivery" means nothing without the consequences. */
+.as-switch {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 4px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.as-switch input {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  width: 18px;
+  height: 18px;
+}
+
+.as-switch > span { display: grid; gap: 4px; }
+
+.as-switch strong {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.as-switch .as-hint { margin: 0; }
+
+/* The banner carries a button, which the ordinary notice does not: the row is
+   finished from here rather than by finding Save changes further down. */
+.as-pending { flex-wrap: wrap; }
+.as-pending > span { flex: 1 1 220px; }

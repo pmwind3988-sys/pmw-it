@@ -1,6 +1,7 @@
 import { normaliseCode } from './identity.js';
 import { TRACKED } from './assetKinds.js';
 import { unitsOf, countPerItem, UNIT_FIELDS } from './units.js';
+import { needsDetails } from './detailsPending.js';
 
 const UNIT_KEYS = UNIT_FIELDS.map((field) => field.key);
 
@@ -26,7 +27,7 @@ function labelled(asset) {
 
 const HAYSTACK_FIELDS = [
   'title', 'manufacturer', 'model', 'serialNumber', 'partNumber',
-  'macAddress', 'assetTag', 'location', 'supplier', 'poNumber',
+  'macAddress', 'assetTag', 'location', 'supplier', 'poNumber', 'doNumber',
   'batchTitle', 'remarks', 'specSummary', 'assignedTo',
 ];
 
@@ -63,7 +64,7 @@ export function matchesQuery(asset, query) {
 
 /**
  * `filters` is `{ query, category, status, condition, location, trackingMode,
- * unlabelled }`. An absent or empty value is "no opinion", never "match
+ * unlabelled, pending }`. An absent or empty value is "no opinion", never "match
  * nothing" — the filter bar starts empty and must show everything.
  */
 export function filterAssets(assets = [], filters = {}) {
@@ -77,6 +78,7 @@ export function filterAssets(assets = [], filters = {}) {
     if (filters.location && asset.location !== filters.location) return false;
     if (filters.trackingMode && asset.trackingMode !== filters.trackingMode) return false;
     if (filters.unlabelled && labelled(asset)) return false;
+    if (filters.pending && !needsDetails(asset)) return false;
     return matchesQuery(asset, filters.query);
   });
 }

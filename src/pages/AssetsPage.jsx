@@ -6,6 +6,7 @@ import StatCard from '../components/ui/StatCard';
 import { Card, ErrorBanner, EmptyState } from '../components/ui/Surfaces';
 import {
   ScanLine, Plus, Package, Tag, AlertTriangle, Truck, RefreshCw, Users, Clock,
+  ClipboardList,
 } from '../components/ui/Icons';
 import { useAssets } from '../features/assets/useAssets';
 import { useBatches } from '../features/assets/useBatches';
@@ -42,6 +43,7 @@ export default function AssetsPage() {
     condition: params.get('condition') ?? '',
     location: params.get('location') ?? '',
     unlabelled: params.get('unlabelled') === '1',
+    pending: params.get('pending') === '1',
   };
 
   const setFilter = (key, value) => {
@@ -129,6 +131,13 @@ export default function AssetsPage() {
           value={stats.unlabelled}
           loading={loading}
           onClick={() => setFilter('unlabelled', filters.unlabelled ? '' : '1')}
+        />
+        <StatCard
+          icon={ClipboardList}
+          label="Needs details"
+          value={stats.pending}
+          loading={loading}
+          onClick={() => setFilter('pending', filters.pending ? '' : '1')}
         />
         <StatCard
           icon={AlertTriangle}

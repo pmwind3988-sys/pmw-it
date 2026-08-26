@@ -1,6 +1,7 @@
 import { CATEGORIES, CONDITIONS, trackingModeFor, TRACKED, BULK } from '../assetKinds.js';
 import { classifyCodes } from '../scan/classifyCode.js';
 import { assetKey, hasStableIdentity, normaliseCode } from '../identity.js';
+import { needsDetails } from '../detailsPending.js';
 
 /**
  * One row of a batch, before it is anything in SharePoint.
@@ -44,7 +45,9 @@ export function newDraft(overrides = {}) {
     // "inherit", which is different from an empty string meaning "no supplier".
     supplier: undefined,
     poNumber: undefined,
+    doNumber: undefined,
     arrivedOn: undefined,
+    detailsPending: undefined,
     scanSource: 'Camera',
     guessed: [],
     manualFields: [],
@@ -204,7 +207,11 @@ export function draftIssues(draft, { registerTags = new Map(), batchTags = new M
     }
   }
 
-  if (!hasStableIdentity(key)) {
+  // On a delivery whose paperwork is missing this warning is true and useless:
+  // the serial is on a machine already sitting on somebody's desk, and saying
+  // so on all thirty rows is how the whole flag gets ignored. A CLASH is still
+  // a clash -- missing paperwork excuses a blank, never a collision.
+  if (!hasStableIdentity(key) && !needsDetails(draft)) {
     // Not blocking: an unserialised spare is a real thing to own. But it will
     // never be recognised again, and silence about that is how duplicates breed.
     issues.push({

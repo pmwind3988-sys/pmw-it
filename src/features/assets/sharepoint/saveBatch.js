@@ -1,4 +1,5 @@
 import { spFetch, listPath, ITEM_ACCEPT } from '../../sharepoint/spClient.js';
+import { needsDetails, PENDING_YES, PENDING_NO } from '../detailsPending.js';
 import { runPool, withRetry } from '../../sharepoint/writePool.js';
 import { formatMYT } from '../../../utils/malaysiaTime.js';
 import { provisionAssets } from './provisionAssets.js';
@@ -140,6 +141,8 @@ export async function saveBatchToSharePoint({
       Title: batchTitle(batch),
       Supplier: batch.purchase?.supplier ?? '',
       PoNumber: batch.purchase?.poNumber ?? '',
+      DoNumber: batch.purchase?.doNumber ?? '',
+      DetailsPending: needsDetails(batch.purchase) ? PENDING_YES : PENDING_NO,
       ArrivedOn: instantOrNull(batch.purchase?.arrivedOn),
       ArrivedOnMYT: typeof batch.purchase?.arrivedOn === 'number'
         ? formatMYT(batch.purchase.arrivedOn, 'datetime12')

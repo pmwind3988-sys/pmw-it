@@ -21,7 +21,8 @@ import { provisionAssets } from './provisionAssets.js';
 export const EDITABLE_FIELDS = [
   'category', 'trackingMode', 'manufacturer', 'model', 'serialNumber', 'partNumber',
   'macAddress', 'assetTag', 'quantity', 'condition', 'status', 'location',
-  'remarks', 'specSummary', 'supplier', 'poNumber', 'arrivedOn', 'units',
+  'remarks', 'specSummary', 'supplier', 'poNumber', 'doNumber', 'arrivedOn',
+  'detailsPending', 'units',
 ];
 
 const asText = (value) => (value === null || value === undefined ? '' : String(value));
@@ -70,6 +71,10 @@ export function planEdit(existing, edits) {
   // and a change log line reading `[{"index":1,...}]` is the same as no
   // history at all. It is logged below, one line per unit and field.
   manual.delete('units');
+  // Nothing re-scans a paperwork flag, so it has no business in the list of
+  // fields a scan must not overwrite -- and `asText(false)` is the truthy
+  // string 'false', which would otherwise put it there on the way OUT.
+  manual.delete('detailsPending');
   next.manualFields = [...manual];
   // Both derived, both re-derived: correcting a serial number changes which
   // physical thing this row claims to be, and the key has to follow it or the

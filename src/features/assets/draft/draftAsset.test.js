@@ -202,3 +202,32 @@ describe('swapSerialAndPart', () => {
     expect(swapSerialAndPart(draft).manualFields.filter((f) => f === 'serialNumber')).toHaveLength(1);
   });
 });
+
+describe('a row whose delivery is still missing its paperwork', () => {
+  const backfilled = (overrides) => newDraft({
+    category: 'Monitor', model: 'P2422H', detailsPending: true, ...overrides,
+  });
+
+  /**
+   * The warning is right on an ordinary delivery and useless on this one: the
+   * serial is on a machine already sitting on somebody's desk, and saying so
+   * thirty times is how the flag gets ignored.
+   */
+  it('does not warn that it has nothing to be recognised by', () => {
+    const issues = draftIssues(backfilled());
+    expect(issues.some((issue) => issue.field === 'serialNumber')).toBe(false);
+  });
+
+  it('still warns on a delivery nobody flagged', () => {
+    const issues = draftIssues(backfilled({ detailsPending: false }));
+    expect(issues.some((issue) => issue.field === 'serialNumber')).toBe(true);
+  });
+
+  /** Missing paperwork excuses a blank; it does not excuse a clash. */
+  it('still blocks a label that is on something else', () => {
+    const registerTags = new Map([['PMW-0142', { assetKey: 'other', title: 'HP EliteBook' }]]);
+    const issues = draftIssues(backfilled({ assetTag: 'PMW-0142' }), { registerTags });
+
+    expect(isBlocked(issues)).toBe(true);
+  });
+});

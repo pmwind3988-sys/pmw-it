@@ -1,5 +1,6 @@
 import { formatMYT } from '../../../utils/malaysiaTime.js';
 import { CATEGORIES, CONDITIONS, STATUSES, TRACKED, BULK } from '../assetKinds.js';
+import { needsDetails, PENDING_YES, PENDING_NO } from '../detailsPending.js';
 
 export const ASSET_LIST_NAME = 'IT Asset Register';
 export const BATCH_LIST_NAME = 'IT Asset Batches';
@@ -48,9 +49,14 @@ export const ASSET_COLUMNS = [
 
   text('Supplier', 'Purchased From'),
   text('PoNumber', 'PO Number'),
+  text('DoNumber', 'DO Number'),
   date('ArrivedOn', 'Arrived On'),
   text('ArrivedOnMYT', 'Arrived On (MYT)'),
   date('PurchasedOn', 'Purchased On'),
+  // A row entered long after it arrived, still missing its serial, its label
+  // or its paperwork. Stored as a word rather than a Yes/No column, to match
+  // every other flag in this schema.
+  choice('DetailsPending', 'Needs Details', ['Yes', 'No']),
 
   text('BatchId', 'Delivery ID'),
   text('BatchTitle', 'Delivery'),
@@ -79,9 +85,11 @@ export const ASSET_COLUMNS = [
 export const BATCH_COLUMNS = [
   text('Supplier', 'Purchased From'),
   text('PoNumber', 'PO Number'),
+  text('DoNumber', 'DO Number'),
   date('ArrivedOn', 'Arrived On'),
   text('ArrivedOnMYT', 'Arrived On (MYT)'),
   text('PoPhotoUrl', 'PO Scan'),
+  choice('DetailsPending', 'Needs Details', ['Yes', 'No']),
   num('ItemCount', 'Items'),
   note('Remarks', 'Remarks'),
   date('SavedOn', 'Saved On'),
@@ -108,7 +116,12 @@ export const TRACKED_FIELDS = [
   'category', 'trackingMode', 'manufacturer', 'model',
   'serialNumber', 'partNumber', 'assetTag',
   'quantity', 'condition', 'status', 'location',
-  'supplier', 'poNumber', 'assignedTo', 'quantityOut',
+  'supplier', 'poNumber', 'doNumber', 'assignedTo', 'quantityOut',
+  // Logged, despite the rule above about fields that churn: this one flips
+  // once in a row's life, when somebody walks up to the desk and finishes it.
+  // Without it the change is invisible and `updateAsset` decides the save is
+  // a no-op, so the button would appear to work and write nothing.
+  'detailsPending',
 ];
 
 /** camelCase record key for a StaticName: first letter lowered. */
@@ -136,6 +149,12 @@ export function toListItem(asset) {
     // Unguarded, one undated row takes the whole save down with it.
     if (column.StaticName === 'ArrivedOnMYT') value = readableMYT(asset.arrivedOn);
     if (column.StaticName === 'AddedOnMYT') value = readableMYT(asset.addedOn);
+    // A draft holds a boolean here and the column holds a word. Written
+    // unconditionally, so clearing the flag writes 'No' rather than leaving
+    // the row still advertising itself as unfinished.
+    if (column.StaticName === 'DetailsPending') {
+      value = needsDetails(asset) ? PENDING_YES : PENDING_NO;
+    }
 
     switch (column.kind) {
       case 'text':

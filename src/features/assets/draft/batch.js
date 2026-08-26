@@ -18,7 +18,13 @@ function newPurchase() {
   return {
     supplier: '',
     poNumber: '',
+    // The delivery order number off the note that came with the boxes. Blank
+    // on most deliveries, and the whole point of a backfilled one.
+    doNumber: '',
     arrivedOn: Date.now(),
+    // A delivery entered long after it arrived, with its paperwork gone. See
+    // `detailsPending.js` for why this is one switch and not thirty.
+    detailsPending: false,
     poPhotoId: null,
     remarks: '',
   };
@@ -53,6 +59,8 @@ export function resolveDraft(draft, batch) {
     ...draft,
     supplier: inherit(draft.supplier, purchase.supplier ?? ''),
     poNumber: inherit(draft.poNumber, purchase.poNumber ?? ''),
+    doNumber: inherit(draft.doNumber, purchase.doNumber ?? ''),
+    detailsPending: inherit(draft.detailsPending, purchase.detailsPending ?? false),
     arrivedOn: inherit(draft.arrivedOn, purchase.arrivedOn ?? null),
     batchId: batch?.id ?? null,
     batchTitle: batchTitle(batch),

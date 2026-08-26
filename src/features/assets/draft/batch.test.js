@@ -55,6 +55,30 @@ describe('purchase details flowing down', () => {
   });
 });
 
+describe('a delivery whose paperwork is missing', () => {
+  const backfilled = () => newBatch({
+    purchase: { doNumber: 'DO-8891', detailsPending: true },
+  });
+
+  it('copies the DO number and the flag onto every row', () => {
+    const resolved = resolveDraft(newDraft(), backfilled());
+
+    expect(resolved.doNumber).toBe('DO-8891');
+    expect(resolved.detailsPending).toBe(true);
+  });
+
+  /** One line of a delivery note can arrive complete while the rest does not. */
+  it('lets a row say the flag does not apply to it', () => {
+    const resolved = resolveDraft(newDraft({ detailsPending: false }), backfilled());
+
+    expect(resolved.detailsPending).toBe(false);
+  });
+
+  it('leaves an ordinary delivery unflagged', () => {
+    expect(resolveDraft(newDraft(), delivery()).detailsPending).toBe(false);
+  });
+});
+
 describe('batchTitle', () => {
   it('is the PO number when there is one, without stuttering the prefix', () => {
     expect(batchTitle(delivery())).toBe('PO-4471');

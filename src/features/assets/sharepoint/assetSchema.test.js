@@ -117,6 +117,26 @@ describe('toListItem', () => {
   });
 });
 
+describe('the paperwork flag', () => {
+  const asset = {
+    title: 'Dell P2422H', assetKey: 'k', category: 'Monitor', quantity: 1,
+    doNumber: 'DO-8891',
+  };
+
+  /** A boolean on the row; the word the choice column stores in SharePoint. */
+  it('writes the flag as a word and reads it back as one', () => {
+    const item = toListItem({ ...asset, detailsPending: true });
+
+    expect(item.DetailsPending).toBe('Yes');
+    expect(item.DoNumber).toBe('DO-8891');
+    expect(fromListItem({ Id: 1, ...item }).detailsPending).toBe('Yes');
+  });
+
+  it('writes No for a delivery that came in complete', () => {
+    expect(toListItem({ ...asset, detailsPending: false }).DetailsPending).toBe('No');
+  });
+});
+
 describe('fromListItem', () => {
   it('reads a row back into the shape the app works in', () => {
     const record = fromListItem({

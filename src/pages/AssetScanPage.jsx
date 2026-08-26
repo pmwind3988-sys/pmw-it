@@ -169,6 +169,15 @@ export default function AssetScanPage() {
             </label>
 
             <label className="as-field">
+              <span className="as-field-label">DO number</span>
+              <input
+                value={batch.purchase.doNumber}
+                onChange={setPurchase('doNumber')}
+                placeholder="DO-8891"
+              />
+            </label>
+
+            <label className="as-field">
               <span className="as-field-label">Arrived on</span>
               <input
                 type="datetime-local"
@@ -192,6 +201,30 @@ export default function AssetScanPage() {
               <textarea rows={2} value={batch.purchase.remarks} onChange={setPurchase('remarks')} />
             </label>
           </div>
+
+          {/* The delivery that arrived before there was anywhere to record it.
+              A register that will not take it until every serial has been
+              found is a register that never gets it at all, so it is taken as
+              it stands and MARKED -- one switch rather than a question against
+              each of thirty blanks (`detailsPending.js`). */}
+          <label className="as-switch">
+            <input
+              type="checkbox"
+              checked={Boolean(batch.purchase.detailsPending)}
+              onChange={(event) => setBatch((current) => ({
+                ...current,
+                purchase: { ...current.purchase, detailsPending: event.target.checked },
+              }))}
+            />
+            <span>
+              <strong>An older delivery I am entering late</strong>
+              <span className="as-hint">
+                The DO number, the serial numbers or the photos are missing. Nothing
+                will nag you about them, every item is marked as needing details,
+                and you can finish them off later from the register.
+              </span>
+            </span>
+          </label>
 
           <div className="as-po-photo">
             <span className="as-field-label">Photo of the PO or delivery note</span>

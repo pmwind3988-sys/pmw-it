@@ -223,6 +223,23 @@ describe('planEdit', () => {
     expect(record.manualFields).toContain('trackingMode');
   });
 
+  /**
+   * The button that finishes a backfilled row. Without the flag being a
+   * change the register notices, pressing it would appear to work and write
+   * nothing, and the row would still be listed as needing details tomorrow.
+   */
+  it('records the paperwork being completed as a change', () => {
+    const { changes, record } = planEdit({
+      id: 5, trackingMode: 'Tracked', category: 'Monitor', quantity: 1,
+      serialNumber: 'CN0MON001', detailsPending: 'Yes', manualFields: [],
+    }, { detailsPending: false });
+
+    expect(record.detailsPending).toBe(false);
+    expect(changes.some((change) => change.fieldName === 'detailsPending')).toBe(true);
+    // A flag nothing re-scans has no business in the manual-override list.
+    expect(record.manualFields).not.toContain('detailsPending');
+  });
+
   it('leaves a row of one tracked', () => {
     const { record } = planEdit({
       id: 5, trackingMode: 'Tracked', category: 'Monitor', quantity: 1, manualFields: [],

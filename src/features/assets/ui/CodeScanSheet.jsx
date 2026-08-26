@@ -4,6 +4,7 @@ import Button from '../../../components/ui/Button';
 import { useScanner, CAMERA_STATE } from '../scan/useScanner';
 import { classifyCodes } from '../scan/classifyCode';
 import { labelFor } from '../scan/fieldLabels';
+import ScanControls from './ScanControls';
 
 /**
  * The camera, over one box, reading its barcodes.
@@ -52,7 +53,15 @@ export default function CodeScanSheet({ title = 'Scan the barcodes', onCancel, o
     });
   }, []);
 
-  const { videoRef, state, error } = useScanner({ active: true, onCodes });
+  const {
+    videoRef, state, error, controls, torchOn, toggleTorch, zoomTo, focusOn, quiet,
+  } = useScanner({ active: true, onCodes });
+
+  const tapToFocus = (event) => {
+    const box = event.currentTarget.getBoundingClientRect();
+    if (!box.width || !box.height) return;
+    focusOn((event.clientX - box.left) / box.width, (event.clientY - box.top) / box.height);
+  };
 
   // Re-run on every new code, so the labels under the viewfinder change as the
   // second sticker arrives — which is exactly when the guess changes from "the
@@ -76,9 +85,23 @@ export default function CodeScanSheet({ title = 'Scan the barcodes', onCancel, o
         </header>
 
         {!broken && (
-          <div className="as-sheet-view">
+          <div className="as-sheet-view" onClick={tapToFocus}>
             <video ref={videoRef} className="as-sheet-video" playsInline muted />
             <div className="as-sheet-frame" aria-hidden="true" />
+
+            <ScanControls
+              controls={controls}
+              torchOn={torchOn}
+              onTorch={toggleTorch}
+              onZoom={zoomTo}
+            />
+
+            {quiet && state === CAMERA_STATE.RUNNING && (
+              <p className="as-camera-hint">
+                Nothing read yet. Fill the white box with the barcode and move a little
+                closer{controls.torch ? ', or turn the light on' : ''}.
+              </p>
+            )}
           </div>
         )}
 

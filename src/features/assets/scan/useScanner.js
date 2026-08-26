@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createDetector, readFrame, DETECTOR_SOURCE } from './detector';
+import { cropToCanvas } from './cropRegion';
+import {
+  VIDEO_CONSTRAINTS, trackControls, setTorch, setZoom, focusAt,
+} from './cameraTrack';
 
 /**
  * The camera, running.
@@ -22,8 +26,18 @@ export const CAMERA_STATE = {
   NO_DECODER: 'no-decoder',
 };
 
-/** ~8 reads a second. Faster wins nothing: the decode is the slow part. */
-const FRAME_INTERVAL_MS = 120;
+/**
+ * How long to wait before admitting nothing is being read.
+ *
+ * Long enough not to nag somebody still lining the box up, short enough to
+ * arrive while they are still holding the phone over it rather than after they
+ * have given up and put it down.
+ */
+export const QUIET_MS = 8000;
+
+/** A breath between passes, so a decoder that answers instantly does not
+ *  monopolise the main thread and stall the video it is reading. */
+const BREATH_MS = 30;
 
 export function useScanner({ active = true, onCodes } = {}) {
   const videoRef = useRef(null);
@@ -32,6 +46,9 @@ export function useScanner({ active = true, onCodes } = {}) {
   const [state, setState] = useState(CAMERA_STATE.STARTING);
   const [detectorSource, setDetectorSource] = useState(null);
   const [error, setError] = useState('');
+  const [controls, setControls] = useState({ torch: false, zoom: null });
+  const [torchOn, setTorchOn] = useState(false);
+  const [quiet, setQuiet] = useState(false);
 
   // In an effect rather than during render: a ref written while rendering is
   // a value React may have already read, and eslint fails the build over it.
@@ -72,11 +89,7 @@ export function useScanner({ active = true, onCodes } = {}) {
         // `environment` is the back camera. `ideal` rather than `exact` so a
         // laptop with only a front camera still works instead of throwing.
         streamRef.current = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: 'environment' },
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-          },
+          video: VIDEO_CONSTRAINTS,
           audio: false,
         });
       } catch (failure) {
@@ -104,22 +117,48 @@ export function useScanner({ active = true, onCodes } = {}) {
       }
 
       setState(CAMERA_STATE.RUNNING);
+      // What this handset can actually do, asked once the stream exists —
+      // capabilities are a property of the running track, not of the request.
+      setControls(trackControls(streamRef.current));
+
+      let lastFound = Date.now();
+      // Alternated rather than combined: the crop is where the barcode being
+      // aimed at is, and the whole frame is the safety net for one just
+      // outside the box. Reading both every pass would halve the rate.
+      let readCrop = true;
 
       const tick = async () => {
         if (cancelled) return;
 
         const frame = videoRef.current;
         // A frame with no dimensions yet decodes to nothing and costs a whole
-        // interval, so it is skipped rather than read.
+        // pass, so it is skipped rather than read.
         if (frame?.videoWidth) {
-          const codes = await readFrame(detector.detect, frame);
-          if (!cancelled && codes.length) handlerRef.current?.(codes);
+          // The aiming box at the camera's own resolution. A sticker held at
+          // arm's length is a handful of pixels wide in the whole frame and
+          // resolves to nothing; this is the single biggest reason a barcode
+          // is never read (`cropRegion.js`).
+          const source = (readCrop && cropToCanvas(frame)) || frame;
+          readCrop = !readCrop;
+
+          const codes = await readFrame(detector.detect, source);
+          if (!cancelled && codes.length) {
+            lastFound = Date.now();
+            setQuiet(false);
+            handlerRef.current?.(codes);
+          } else if (!cancelled && Date.now() - lastFound > QUIET_MS) {
+            setQuiet(true);
+          }
         }
 
-        if (!cancelled) timer = setTimeout(tick, FRAME_INTERVAL_MS);
+        // Sequential, not on a fixed interval. A software decoder on an iPhone
+        // takes longer than any interval worth setting, so timed passes queue
+        // up behind an engine that is already busy and the scan gets slower
+        // the harder it is working. Read, wait for the answer, read again.
+        if (!cancelled) timer = setTimeout(tick, BREATH_MS);
       };
 
-      timer = setTimeout(tick, FRAME_INTERVAL_MS);
+      timer = setTimeout(tick, BREATH_MS);
     })();
 
     return () => {
@@ -131,11 +170,30 @@ export function useScanner({ active = true, onCodes } = {}) {
   /** A still from the live camera, for the photo of the item being scanned. */
   const grabFrame = useCallback(() => videoRef.current ?? null, []);
 
+  const toggleTorch = useCallback(async () => {
+    const wanted = !torchOn;
+    // Only believed once the camera says yes: a button that latches on a
+    // handset that refused the torch is a light that is never coming on.
+    if (await setTorch(streamRef.current, wanted)) setTorchOn(wanted);
+  }, [torchOn]);
+
+  const zoomTo = useCallback((value) => setZoom(streamRef.current, value), []);
+
+  /** Where the person tapped, in the 0-to-1 coordinates the camera wants. */
+  const focusOn = useCallback((x, y) => focusAt(streamRef.current, x, y), []);
+
   return {
     videoRef,
     state,
     error,
     grabFrame,
+    controls,
+    torchOn,
+    toggleTorch,
+    zoomTo,
+    focusOn,
+    /** Nothing has decoded for a while, so the screen can say what to try. */
+    quiet,
     usingPonyfill: detectorSource === DETECTOR_SOURCE.PONYFILL,
   };
 }

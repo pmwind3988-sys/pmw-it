@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { VIDEO_CONSTRAINTS } from './cameraTrack.js';
 
 /**
  * The back camera, running, and nothing else.
@@ -46,12 +47,11 @@ export function useCamera({ active = true } = {}) {
       try {
         // `environment` is the back camera. `ideal` rather than `exact` so
         // a laptop with only a front camera still works instead of throwing.
+        // Shared with the barcode scanner: continuous focus and the highest
+        // resolution the handset will give. A label read close up is exactly
+        // where a fixed-focus stream produces an unreadable blur.
         streamRef.current = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: 'environment' },
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-          },
+          video: VIDEO_CONSTRAINTS,
           audio: false,
         });
       } catch (failure) {

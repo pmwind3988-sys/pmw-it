@@ -339,7 +339,11 @@
    need to and scan more slowly. It marks where to point, nothing more. */
 .as-reticle {
   position: absolute;
-  inset: 22% 12%;
+  /* The SAME box as `.as-sheet-frame`, and the same numbers as RETICLE_INSET
+     in `cropRegion.js`. What is inside it is what gets decoded at full
+     resolution, so a rectangle here that differs from the one there would
+     have people aiming at one thing and the scanner reading another. */
+  inset: 18% 10%;
   border: 2px solid rgba(255, 255, 255, 0.55);
   border-radius: 10px;
   box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.28);
@@ -1041,7 +1045,9 @@
    camera with nothing drawn on it gets aimed at the whole box. */
 .as-sheet-frame {
   position: absolute;
+  /* Kept in step with `.as-reticle` and RETICLE_INSET in `cropRegion.js`. */
   inset: 18% 10%;
+  pointer-events: none;
   border: 2px solid rgba(255, 255, 255, 0.75);
   border-radius: 8px;
 }
@@ -1291,3 +1297,76 @@
    finished from here rather than by finding Save changes further down. */
 .as-pending { flex-wrap: wrap; }
 .as-pending > span { flex: 1 1 220px; }
+
+
+/* The light and the zoom, over the picture rather than under it: the phone is
+   already held up over a box, and a control below the viewfinder is one the
+   thumb has to leave the frame to reach. */
+.as-camctl {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.as-camctl-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding: 7px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 8px;
+  background: transparent;
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.as-camctl-on {
+  background: #fff;
+  color: #111;
+  border-color: #fff;
+}
+
+.as-camctl-zoom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.as-camctl-label {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.as-camctl-zoom input { flex: 1 1 auto; min-width: 0; accent-color: #fff; }
+
+/* Said only after a while of nothing being decoded. The two things that fix an
+   unread barcode -- filling the box with it and turning a light on -- are not
+   guessable from a viewfinder that simply does nothing. */
+.as-camera-hint {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  top: 10px;
+  margin: 0;
+  padding: 9px 11px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 12.5px;
+  line-height: 1.45;
+  pointer-events: none;
+}

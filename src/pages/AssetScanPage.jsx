@@ -16,6 +16,7 @@ import { newBatch } from '../features/assets/draft/batch';
 import { newId } from '../features/assets/draft/draftAsset';
 import { saveBatch, savePhoto } from '../features/assets/store/assetDb';
 import PhotoInput from '../features/assets/ui/PhotoInput';
+import ScanControls from '../features/assets/ui/ScanControls';
 
 /**
  * Scanning a delivery.
@@ -85,10 +86,18 @@ export default function AssetScanPage() {
     });
   }, [show]);
 
-  const { videoRef, state, grabFrame, usingPonyfill } = useScanner({
-    active: scanning,
-    onCodes,
-  });
+  const {
+    videoRef, state, grabFrame, usingPonyfill,
+    controls, torchOn, toggleTorch, zoomTo, focusOn, quiet,
+  } = useScanner({ active: scanning, onCodes });
+
+  /** A tap on the picture is "focus there" — the coordinates the camera wants
+   *  are the tap position as a fraction of the element it landed on. */
+  const tapToFocus = (event) => {
+    const box = event.currentTarget.getBoundingClientRect();
+    if (!box.width || !box.height) return;
+    focusOn((event.clientX - box.left) / box.width, (event.clientY - box.top) / box.height);
+  };
 
   const setPurchase = (field) => (event) => setBatch((current) => ({
     ...current,
@@ -277,9 +286,28 @@ export default function AssetScanPage() {
 
       {scanning && (
         <div className="as-scan">
-          <div className="as-viewfinder">
+          <div className="as-viewfinder" onClick={tapToFocus}>
             <video ref={videoRef} playsInline muted className="as-video" />
             <div className="as-reticle" aria-hidden="true" />
+
+            <ScanControls
+              controls={controls}
+              torchOn={torchOn}
+              onTorch={toggleTorch}
+              onZoom={zoomTo}
+            />
+
+            {/* Said only after a while, and only while the camera is
+                otherwise fine: the two things that fix an unread barcode are
+                filling the box with it and turning a light on, and neither is
+                obvious from a viewfinder that simply does nothing. */}
+            {quiet && state === CAMERA_STATE.RUNNING && (
+              <p className="as-camera-hint">
+                Nothing read yet. Fill the white box with the barcode, move a little
+                closer{controls.torch ? ', or turn the light on' : ''} — and tap the
+                picture to focus.
+              </p>
+            )}
 
             {flash && (
               <div className={`as-flash as-flash-${flash.kind}`} role="status">

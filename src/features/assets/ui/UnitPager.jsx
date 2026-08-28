@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ChevronLeft, ChevronRight, Boxes, Check, Camera,
 } from '../../../components/ui/Icons';
@@ -9,6 +9,8 @@ import { labelFor } from '../scan/fieldLabels';
 import ScanField from './ScanField';
 import CodeScanSheet from './CodeScanSheet';
 import AssetPhoto from './AssetPhoto';
+import { prefetchSharePointImage } from './useSharePointImage';
+import { useSharePointToken } from '../../../hooks/useRequests';
 import PhotoInput from './PhotoInput';
 
 /**
@@ -50,6 +52,18 @@ export default function UnitPager({
     // Codes read off the box in your hand say nothing about the next box.
     setHeldBack([]);
   };
+
+  // The neighbouring items' photographs are fetched while this one is being
+  // read. Paging through a delivery of ten is the one place where the wait for
+  // a picture is felt every few seconds, and by the time the arrow is pressed
+  // the next one is already here.
+  const getToken = useSharePointToken();
+  useEffect(() => {
+    for (const step of [1, -1]) {
+      const near = units[index + step];
+      if (near?.photoUrl) prefetchSharePointImage(siteUrl, near.photoUrl, getToken);
+    }
+  }, [units, index, siteUrl, getToken]);
 
   const put = (field, value) => onChange(setUnitField(units, unit.index, field, value));
   const set = (field) => (event) => put(field, event.target.value);

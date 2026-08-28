@@ -30,6 +30,7 @@ import TextScanSheet from '../features/assets/ui/TextScanSheet';
 import { labelFor } from '../features/assets/scan/fieldLabels';
 import { applyScannedFields, SCAN_FIELDS } from '../features/assets/scan/textScan';
 import AssetPhoto from '../features/assets/ui/AssetPhoto';
+import SignatureShot from '../features/assets/ui/SignatureShot';
 import { absoluteFileUrl } from '../features/assets/sharepoint/fileUrl';
 import { uploadUnitPhotos } from '../features/assets/sharepoint/uploadUnitPhotos';
 import { loadPhoto, deletePhoto } from '../features/assets/store/assetDb';
@@ -552,6 +553,22 @@ export default function AssetDetailPage() {
                       {row.quantity} · {row.issuedOnMYT || ''}
                       {row.returnedOnMYT ? ` — back ${row.returnedOnMYT}` : ''}
                       {row.returnCondition ? ` (${row.returnCondition})` : ''}
+                    </span>
+                    {/* Each time this thing changed hands, signed for by the
+                        hand it went to. The history of one laptop is exactly
+                        where those signatures are wanted, and it used to show
+                        none of them. */}
+                    <span className="as-sigpair">
+                      <SignatureShot
+                        stored={row.issueSignature}
+                        when="signed on the way out"
+                        by={row.personName || row.personEmail}
+                      />
+                      <SignatureShot
+                        stored={row.returnSignature}
+                        when="signed on the way back"
+                        by={row.personName || row.personEmail}
+                      />
                     </span>
                   </li>
                 ))}

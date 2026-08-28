@@ -88,7 +88,13 @@ export const ASSET_VIEWS = [
     fields: [
       NAME, 'ItemTitle', 'SerialNumber', 'Category', 'PersonName', 'PersonEmail', 'Quantity',
       'ReturnedQuantity', 'Kind', 'HandoverStatus', 'IssuedOnMYT', 'DueOnMYT',
-      'ReturnedOnMYT', 'ReturnCondition', 'IssuedBy', 'Remarks',
+      'ReturnedOnMYT', 'ReturnCondition', 'IssuedBy', 'ReturnedBy',
+      // A REST-created column joins no view, so these were written on every
+      // row and shown on none: the list read as though nobody had ever signed
+      // for anything. They hold the path to the picture, which is what makes
+      // the signature findable from SharePoint itself and not only in the app.
+      'IssueSignature', 'ReturnSignature',
+      'Remarks',
     ],
     query: '<OrderBy><FieldRef Name="IssuedOn" Ascending="FALSE" /></OrderBy>',
   },

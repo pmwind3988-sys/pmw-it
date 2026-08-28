@@ -1599,3 +1599,51 @@
 }
 
 .as-signed:hover { text-decoration: underline; }
+
+/* ---- A signature against the handover it belongs to -------------------- */
+
+/* Small enough to sit inside a table cell or a line of a history, big enough
+   that the hand is recognisable. A row that carries two of these — signed out
+   and signed back — puts them side by side and wraps on a phone rather than
+   squeezing both into one unreadable strip. */
+.as-sigpair {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.as-sigshot {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.as-sigshot-open {
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  /* White regardless of theme: the ink is black, and a dark card behind it
+     shows a black rectangle with a signature hidden inside. */
+  background: #fff;
+  cursor: zoom-in;
+  line-height: 0;
+}
+
+.as-sigshot-open:hover { border-color: var(--accent, #2563EB); }
+
+.as-sigshot-img {
+  display: block;
+  width: 104px;
+  height: 38px;
+  object-fit: contain;
+}
+
+.as-sigshot-when {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}

@@ -12,7 +12,7 @@ import { SHAREPOINT_SITE_URL } from '../features/assets/useAssets';
 import { useSharePointToken } from '../hooks/useRequests';
 import { commitReturn } from '../features/assets/sharepoint/writeHandover';
 import SignatureField from '../features/assets/ui/SignatureField';
-import { absoluteFileUrl } from '../features/assets/sharepoint/fileUrl';
+import SignatureShot from '../features/assets/ui/SignatureShot';
 import { returnEverything } from '../features/assets/handover/planReturn';
 import {
   heldBy, outstanding, isOverdue, isOpen, HANDOVER_KIND,
@@ -28,27 +28,6 @@ import { initialsOf } from '../utils/initials';
  * identity everything per-person hangs off (§4.5) — and a name in a path would
  * break the moment somebody's changed.
  */
-/**
- * A signature that was captured, as a link to the picture of it. Nothing at
- * all when there is none -- a handover recorded without one is a normal thing
- * and does not need a row saying "unsigned" against it.
- */
-function Signed({ stored, what }) {
-  if (!stored) return null;
-
-  return (
-    <a
-      href={absoluteFileUrl(SHAREPOINT_SITE_URL, stored)}
-      target="_blank"
-      rel="noreferrer"
-      className="as-signed"
-      title={`Signed for ${what}`}
-    >
-      <Check size={11} /> signed
-    </a>
-  );
-}
-
 export default function AssetPersonPage() {
   const { email } = useParams();
   const navigate = useNavigate();
@@ -94,7 +73,11 @@ export default function AssetPersonPage() {
         signature,
       });
       setReport(result);
-      setSignature(null);
+      // Kept when it did NOT save. Clearing it regardless threw the drawing
+      // away at the one moment it still existed, so "the signature could not
+      // be saved" was a dead end — now the button can simply be pressed again
+      // and the same signature goes up with it.
+      if (!result.signatureFailed) setSignature(null);
       reload();
     } catch (thrown) {
       setFailure(thrown.message || 'The return could not be recorded');
@@ -138,7 +121,8 @@ export default function AssetPersonPage() {
               && ` ${report.blocked.length} could not be: ${report.blocked[0].reason}`}
             {report.signed && ' Signed for.'}
             {report.signatureFailed
-              && ' The signature could not be saved, so it is recorded unsigned.'}
+              && ' The signature could not be saved, so this is recorded unsigned.'
+                + ' It is still on the screen below and will go up with the next return.'}
           </span>
         </Card>
       )}
@@ -218,7 +202,15 @@ export default function AssetPersonPage() {
                   <td>{row.kind}</td>
                   <td className="as-when">
                     {row.issuedOnMYT || '—'}
-                    <Signed stored={row.issueSignature} what="handing this over" />
+                    {/* This handover's own signature, not a tick shared by
+                        every line on the page. Two things taken on two
+                        different days were signed for twice, and the register
+                        should show both. */}
+                    <SignatureShot
+                      stored={row.issueSignature}
+                      when="signed on the way out"
+                      by={row.personName || row.personEmail}
+                    />
                   </td>
                   <td className="as-when">
                     {row.kind === HANDOVER_KIND.BORROWED
@@ -254,8 +246,22 @@ export default function AssetPersonPage() {
                 <span className="as-sub">
                   {row.quantity} back {row.returnedOnMYT || ''}
                   {row.returnCondition ? ` — ${row.returnCondition}` : ''}
-                  <Signed stored={row.issueSignature} what="taking it" />
-                  <Signed stored={row.returnSignature} what="bringing it back" />
+                </span>
+                {/* Both halves of the round trip, side by side. Whether the
+                    hand that took it is the hand that brought it back is the
+                    question this record exists to answer, and it can only be
+                    answered by seeing the two. */}
+                <span className="as-sigpair">
+                  <SignatureShot
+                    stored={row.issueSignature}
+                    when="signed on the way out"
+                    by={row.personName || row.personEmail}
+                  />
+                  <SignatureShot
+                    stored={row.returnSignature}
+                    when="signed on the way back"
+                    by={row.personName || row.personEmail}
+                  />
                 </span>
               </li>
             ))}

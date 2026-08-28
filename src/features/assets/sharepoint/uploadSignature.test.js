@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { dataUrlToBytes, signatureBlob } from './uploadSignature.js';
+import { describe, it, expect, vi } from 'vitest';
+import { dataUrlToBytes, signatureBlob, uploadSignature } from './uploadSignature.js';
 
 const png = 'data:image/png;base64,iVBORw0KGgo=';
 
@@ -30,5 +30,68 @@ describe('signatureBlob', () => {
   it('is nothing when nobody signed, so nothing is uploaded', () => {
     expect(signatureBlob(null)).toBeNull();
     expect(signatureBlob('data:image/png;base64,')).toBeNull();
+  });
+});
+
+describe('uploadSignature', () => {
+  /** One folder lookup and one upload, both answering as SharePoint would. */
+  const okFetch = () => vi.fn(async (url) => {
+    if (String(url).includes('RootFolder')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ d: { ServerRelativeUrl: '/sites/it/Photos' } }),
+      };
+    }
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ d: { ServerRelativeUrl: '/sites/it/Photos/signature-amir-1.png' } }),
+      text: async () => '',
+    };
+  });
+
+  const upload = (extra) => uploadSignature({
+    siteUrl: 'https://sp/sites/it',
+    token: 't',
+    digest: 'd',
+    dataUrl: png,
+    seed: 'amir',
+    wait: async () => {},
+    ...extra,
+  });
+
+  it('gives back where the signature landed', async () => {
+    globalThis.fetch = okFetch();
+
+    await expect(upload()).resolves.toBe('/sites/it/Photos/signature-amir-1.png');
+  });
+
+  it('tries again when the upload drops, rather than losing the signature', async () => {
+    // The case that actually happens: store-room wifi drops one request while
+    // the person is still standing at the desk. A signature only exists for
+    // those few seconds, so one failure must not be the end of it.
+    const good = okFetch();
+    let calls = 0;
+    globalThis.fetch = vi.fn(async (...args) => {
+      calls += 1;
+      if (calls === 1) throw new Error('network');
+      return good(...args);
+    });
+
+    await expect(upload()).resolves.toBe('/sites/it/Photos/signature-amir-1.png');
+  });
+
+  it('gives up in the end, and says why', async () => {
+    globalThis.fetch = vi.fn(async () => { throw new Error('network'); });
+
+    await expect(upload({ attempts: 2 })).rejects.toThrow('network');
+  });
+
+  it('does not upload anything when nobody signed', async () => {
+    globalThis.fetch = vi.fn();
+
+    await expect(upload({ dataUrl: null })).resolves.toBe('');
+    expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 });

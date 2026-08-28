@@ -35,24 +35,47 @@ export function signatureBlob(dataUrl) {
   return new Blob([bytes], { type: 'image/png' });
 }
 
+const defaultWait = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
+
 /**
  * Uploads one signature and gives back its path, or an empty string when there
  * was nothing to upload. Throwing is left to the caller to catch: what a
  * failure should cost differs between handing out and taking back, and neither
  * of them is "lose the record".
+ *
+ * Tried more than once, unlike an item photograph. A photograph can be retaken
+ * from the thing itself an hour later; a signature exists for the few seconds
+ * the person is standing at the desk, and one dropped request on store-room
+ * wifi is the difference between a handover somebody signed for and a handover
+ * nobody can prove. Three tries with a short wait between them costs a second
+ * at worst and saves the signature in the case that actually happens.
  */
 export async function uploadSignature({
-  siteUrl, token, digest, dataUrl, seed,
+  siteUrl, token, digest, dataUrl, seed, attempts = 3, wait = defaultWait,
 }) {
   const blob = signatureBlob(dataUrl);
   if (!blob) return '';
 
-  const folder = await photoFolderUrl(siteUrl, token);
-  const url = await uploadPhoto(siteUrl, token, digest, {
-    folder,
-    blob,
-    seed: `signature-${seed || 'handover'}`,
-  });
+  let last;
 
-  return url ?? '';
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const folder = await photoFolderUrl(siteUrl, token);
+      const url = await uploadPhoto(siteUrl, token, digest, {
+        folder,
+        blob,
+        // The moment is part of the name, so a second try never lands on the
+        // first try's half-written file and two people signing in the same
+        // minute keep two signatures rather than one.
+        seed: `signature-${seed || 'handover'}`,
+      });
+
+      return url ?? '';
+    } catch (thrown) {
+      last = thrown;
+      if (attempt < attempts) await wait(400 * attempt);
+    }
+  }
+
+  throw last;
 }

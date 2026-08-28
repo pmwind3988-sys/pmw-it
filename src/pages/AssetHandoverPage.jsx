@@ -165,8 +165,12 @@ export default function AssetHandoverPage() {
       // Only what was refused stays in the basket, so pressing the button again
       // cannot hand the successful half over a second time.
       // The signature belongs to the handover that was just recorded. Keeping
-      // it would put one person's signature on the next person's items.
-      setSignature(null);
+      // it would put one person's signature on the next person's items — so it
+      // goes, EXCEPT when it never made it to SharePoint. Throwing away the one
+      // copy of a signature that failed to upload is how a signed handover
+      // quietly becomes an unsigned one; kept, it goes up with the refused
+      // lines when the button is pressed again.
+      if (!result.signatureFailed) setSignature(null);
       const refused = new Set(result.blocked.map((entry) => entry.line.lineId));
       setBasket((current) => ({
         ...current,

@@ -24,6 +24,7 @@ import {
   unitsOf, serialiseUnits, filledCount, parseUnits, PER_UNIT_ONLY,
 } from '../features/assets/units';
 import UnitPager from '../features/assets/ui/UnitPager';
+import QuantityInput from '../features/assets/ui/QuantityInput';
 import ScanField from '../features/assets/ui/ScanField';
 import TextScanSheet from '../features/assets/ui/TextScanSheet';
 import { labelFor } from '../features/assets/scan/fieldLabels';
@@ -398,6 +399,14 @@ export default function AssetDetailPage() {
                         onChange={(e) => setEdits((current) => ({ ...current, [field.key]: e.target.value }))}
                       />
                     </Scannable>
+                  ) : field.type === 'number' ? (
+                    // A count that can be emptied while it is being replaced.
+                    <QuantityInput
+                      value={valueOf(field.key)}
+                      onCommit={(count) => setEdits(
+                        (current) => ({ ...current, [field.key]: count }),
+                      )}
+                    />
                   ) : (
                     <Scannable field={field} onScan={() => setScanning(field.key)}>
                       <input

@@ -6,6 +6,7 @@ import { Trash2, Barcode, AlertTriangle, RefreshCw } from '../../../components/u
 import PhotoInput from './PhotoInput';
 import ScanField from './ScanField';
 import TextScanSheet from './TextScanSheet';
+import QuantityInput from './QuantityInput';
 import { labelFor } from '../scan/fieldLabels';
 
 /**
@@ -138,12 +139,9 @@ export default function DraftCard({ draft, issues = [], onChange, onRemove, inde
               above one turns the row into a counted line — `setDraftField`
               does that, and says why. */}
           <Field label="How many?" issue={issueFor('quantity')}>
-            <input
-              type="number"
-              min="1"
-              inputMode="numeric"
+            <QuantityInput
               value={draft.quantity}
-              onChange={set('quantity')}
+              onCommit={(count) => onChange(setDraftField(draft, 'quantity', count))}
             />
           </Field>
 

@@ -362,6 +362,14 @@ nineteen hidden behind it. A row saved before the rule has them MOVED onto item
 1 rather than deleted, and `unitsOf` reads them there from the moment the rule
 landed, so nothing looks lost in between.
 
+**Rows that are one thing bought ten times can be put back together.**
+`combine.js` (pure) plans it and `sharepoint/combineAssets.js` writes it: the
+oldest row survives, every other row's serial, label, condition and status
+becomes an ITEM on it, the quantity is the sum, and the other rows are removed
+-- survivor written first, so a failure halfway leaves everything twice rather
+than losing it. Picked on `/assets` behind "Combine rows". Refused while any of
+them is out with somebody, because a handover names the row it came from.
+
 **A bulk line knows its individual items.** One UNIT RECORD per physical thing
 (`units.js`, paged one at a time by `ui/UnitPager.jsx` on `/assets/:id`, by the
 arrows -- the sideways swipe was removed, it fought the text boxes on the card). They live as one JSON string in the `Units` column, SPARSE and with

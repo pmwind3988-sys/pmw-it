@@ -8,6 +8,9 @@ import { unitsOf, perItem, isBlankUnit } from '../units';
 /**
  * The register, as a list.
  *
+ * It also picks: `picking` puts a checkbox against every row, which is how
+ * rows that are really one thing bought ten times are chosen to be combined.
+ *
  * A quantity is shown as "× 20" rather than as a bare number in a column
  * nobody reads the header of, because the difference between one mouse and
  * twenty is the whole point of a bulk row.
@@ -63,12 +66,15 @@ function conditionOf(asset) {
     .join(', ');
 }
 
-export default function AssetTable({ assets }) {
+export default function AssetTable({
+  assets, picking = false, picked = [], onPick,
+}) {
   return (
     <div className="as-table-wrap">
       <table className="as-table">
         <thead>
           <tr>
+            {picking && <th className="as-pick" aria-label="Combine" />}
             <th>Item</th>
             <th>Category</th>
             <th>Serial / label</th>
@@ -81,7 +87,17 @@ export default function AssetTable({ assets }) {
         </thead>
         <tbody>
           {assets.map((asset) => (
-            <tr key={asset.id}>
+            <tr key={asset.id} className={picked.includes(asset.id) ? 'as-row-picked' : undefined}>
+              {picking && (
+                <td className="as-pick">
+                  <input
+                    type="checkbox"
+                    checked={picked.includes(asset.id)}
+                    onChange={() => onPick(asset.id)}
+                    aria-label={`Combine ${asset.title || asset.model || 'this item'}`}
+                  />
+                </td>
+              )}
               <td>
                 <Link to={`/assets/${asset.id}`} className="as-link">
                   {asset.title || asset.model || 'Untitled item'}

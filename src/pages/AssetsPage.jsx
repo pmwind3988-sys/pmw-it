@@ -1,14 +1,18 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useMsal } from '@azure/msal-react';
 import AppShell from '../components/AppShell';
 import Button from '../components/ui/Button';
 import StatCard from '../components/ui/StatCard';
 import { Card, ErrorBanner, EmptyState } from '../components/ui/Surfaces';
 import {
   ScanLine, Plus, Package, Tag, AlertTriangle, Truck, RefreshCw, Users, Clock,
-  ClipboardList,
+  ClipboardList, Boxes, X,
 } from '../components/ui/Icons';
-import { useAssets } from '../features/assets/useAssets';
+import { useAssets, SHAREPOINT_SITE_URL } from '../features/assets/useAssets';
+import { useSharePointToken } from '../hooks/useRequests';
+import { blockersFor, planCombine } from '../features/assets/combine';
+import { combineAssets } from '../features/assets/sharepoint/combineAssets';
 import { useBatches } from '../features/assets/useBatches';
 import { useHandovers } from '../features/assets/useHandovers';
 import { isOverdue } from '../features/assets/handover/availability';
@@ -35,6 +39,17 @@ export default function AssetsPage() {
   const { handovers } = useHandovers();
   const [params, setParams] = useSearchParams();
   const [query, setQuery] = useState(params.get('q') ?? '');
+
+  const { instance } = useMsal();
+  const getToken = useSharePointToken();
+  // Rows that are really one thing bought ten times, being put back together.
+  // Off unless asked for: a register you cannot read without ticking things by
+  // accident is worse than one that takes an extra tap to tidy.
+  const [picking, setPicking] = useState(false);
+  const [picked, setPicked] = useState([]);
+  const [combining, setCombining] = useState(false);
+  const [combined, setCombined] = useState('');
+  const [combineError, setCombineError] = useState('');
 
   const filters = {
     query,
@@ -64,6 +79,65 @@ export default function AssetsPage() {
     [assets, query, params],
   );
 
+  const chosen = useMemo(
+    () => assets.filter((row) => picked.includes(row.id)),
+    [assets, picked],
+  );
+  const blockers = picked.length ? blockersFor(chosen, handovers) : [];
+  const plan = picked.length >= 2 && !blockers.length ? planCombine(chosen) : null;
+
+  const togglePick = (id) => setPicked(
+    (current) => (current.includes(id)
+      ? current.filter((other) => other !== id)
+      : [...current, id]),
+  );
+
+  const stopPicking = () => {
+    setPicking(false);
+    setPicked([]);
+    setCombineError('');
+  };
+
+  /**
+   * Ten rows become one line of ten. It asks first: the rows themselves go,
+   * and while everything typed on them is carried onto the items of the
+   * surviving line, undoing it means retyping ten rows.
+   */
+  const combine = async () => {
+    const summary = `Combine ${chosen.length} rows into one line of `
+      + `${plan.edits.quantity}? Everything on them is kept as ${plan.edits.quantity} `
+      + `items on "${plan.keep.title || plan.keep.model || 'the oldest row'}", `
+      + `and the other ${plan.remove.length} rows are removed.`;
+    if (!window.confirm(summary)) return;
+
+    setCombining(true);
+    setCombineError('');
+    try {
+      const tokenRes = await getToken();
+      const account = instance.getActiveAccount();
+      const result = await combineAssets({
+        siteUrl: SHAREPOINT_SITE_URL,
+        token: tokenRes.accessToken,
+        rows: chosen,
+        changedBy: account?.username ?? account?.name ?? '',
+      });
+
+      setCombined(
+        `Combined into one line of ${result.quantity}.`
+        + (result.failures.length
+          ? ` ${result.failures.length} of the old rows could not be removed — `
+            + 'everything is safe, try combining what is left again.'
+          : ''),
+      );
+      stopPicking();
+      reload();
+    } catch (failure) {
+      setCombineError(failure.message || 'Those rows could not be combined');
+    } finally {
+      setCombining(false);
+    }
+  };
+
   /** Adding by hand is the same review grid, just with nothing scanned into it. */
   const addByHand = async () => {
     const batch = newBatch();
@@ -78,6 +152,13 @@ export default function AssetsPage() {
       search={{ value: query, onChange: setQuery, placeholder: 'Serial, model, label…' }}
       actions={(
         <>
+          <Button
+            variant="ghost"
+            icon={picking ? X : Boxes}
+            onClick={() => (picking ? stopPicking() : setPicking(true))}
+          >
+            {picking ? 'Stop combining' : 'Combine rows'}
+          </Button>
           <Button variant="ghost" icon={Plus} onClick={addByHand}>Add by hand</Button>
           <Button variant="secondary" icon={Users} onClick={() => navigate('/assets/handover')}>
             Hand over
@@ -188,6 +269,44 @@ export default function AssetsPage() {
         <Button variant="ghost" size="sm" icon={RefreshCw} onClick={reload}>Refresh</Button>
       </Card>
 
+      {/* Ten rows of one monitor that were always one line of ten. What it is
+          about to do is spelled out before it does it, because the rows
+          themselves go and only the items on the survivor remain. */}
+      {picking && (
+        <Card className="as-notice as-combine">
+          <Boxes size={16} />
+          <span>
+            {picked.length < 2
+              ? 'Tick the rows that are the same thing, and they become one line '
+                + 'with each of them kept as an item on it.'
+              : `${picked.length} rows → one line of ${plan?.edits.quantity ?? '—'}.`}
+            {plan?.warnings.length > 0 && (
+              <strong>
+                {' '}They do not agree on {plan.warnings.join(' or ')} — check that
+                these really are the same thing.
+              </strong>
+            )}
+            {blockers.map((blocker) => <strong key={blocker}> {blocker}</strong>)}
+          </span>
+          <Button
+            size="sm"
+            disabled={!plan || combining}
+            onClick={combine}
+          >
+            {combining ? 'Combining…' : 'Combine into one line'}
+          </Button>
+        </Card>
+      )}
+
+      {combined && !picking && (
+        <Card className="as-notice as-notice-ok">
+          <Boxes size={16} />
+          <span>{combined}</span>
+        </Card>
+      )}
+
+      {combineError && <ErrorBanner message={combineError} onRetry={() => setCombineError('')} />}
+
       {loading && <div className="spinner" />}
 
       {!loading && shown.length === 0 && (
@@ -203,7 +322,12 @@ export default function AssetsPage() {
           <p className="as-hint">
             {shown.length} of {assets.length} row{assets.length === 1 ? '' : 's'}
           </p>
-          <AssetTable assets={shown} />
+          <AssetTable
+            assets={shown}
+            picking={picking}
+            picked={picked}
+            onPick={togglePick}
+          />
         </>
       )}
 

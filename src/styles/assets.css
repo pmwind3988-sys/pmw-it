@@ -1516,3 +1516,30 @@
   /* 16px or the phone zooms the whole page in when it is tapped. */
   font-size: 16px;
 }
+
+/* Picking rows to combine: a column of checkboxes that is only there while
+   somebody is choosing, and a tint on what they have chosen so a pick made
+   three screens up is still visible from down here. */
+.as-table th.as-pick,
+.as-table td.as-pick {
+  width: 34px;
+  padding-right: 0;
+  text-align: center;
+}
+
+.as-table td.as-pick input {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--it-accent);
+}
+
+.as-table tr.as-row-picked > td {
+  background: var(--it-accent-wash);
+}
+
+/* The bar that says what combining is about to do. */
+.as-combine {
+  position: sticky;
+  top: calc(var(--it-header-h, 56px) + 8px);
+  z-index: 20;
+}

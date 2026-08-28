@@ -156,8 +156,6 @@
   }
 }
 
-/* `both` matters: without it the element paints at full opacity for the frame
-   before the animation starts, which reads as a flicker, not an entrance. */
 @keyframes itRiseIn {
   from {
     opacity: 0;
@@ -169,12 +167,27 @@
   }
 }
 
+/* `backwards`, not `both`.
+ *
+ * The fill has to reach backwards or the element paints at full opacity for
+ * the frame before the animation starts, which reads as a flicker rather than
+ * an entrance. It must NOT reach forwards: a forwards fill leaves the last
+ * frame's transform on the element for as long as the page lives, and any
+ * transform -- even one that moves nothing, and even `none`, which fills as an
+ * identity matrix -- makes that element the frame of reference for every
+ * `position: fixed` thing inside it. The page then stands in for the screen,
+ * so a camera or a dialog opened after scrolling down centres itself in the
+ * middle of the whole page instead of in the part being looked at, and lands
+ * off screen entirely.
+ *
+ * Ending the fill at the end of the animation costs nothing: full opacity and
+ * no offset is what the element looks like anyway with no animation on it. */
 .rise {
-  animation: itRiseIn 0.4s ease both;
+  animation: itRiseIn 0.4s ease backwards;
 }
 
 .rise-slow {
-  animation: itRiseIn 0.55s ease both;
+  animation: itRiseIn 0.55s ease backwards;
 }
 
 /* ---------------------------------------------------------------------------

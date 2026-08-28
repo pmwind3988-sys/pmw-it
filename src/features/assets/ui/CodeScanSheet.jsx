@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { useCallback, useMemo, useState } from 'react';
 import { X, ScanLine, AlertTriangle, Check, Barcode } from '../../../components/ui/Icons';
 import Button from '../../../components/ui/Button';
@@ -77,7 +78,11 @@ export default function CodeScanSheet({ title = 'Scan the barcodes', onCancel, o
     || state === CAMERA_STATE.UNAVAILABLE
     || state === CAMERA_STATE.NO_DECODER;
 
-  return (
+  // Hung off the body rather than left where it was opened: the camera covers
+  // the SCREEN, and inside the page it would be positioned against whatever
+  // the shell's entrance animation left transformed -- which is the page, not
+  // the screen, and puts the viewfinder wherever the reader is not.
+  return createPortal(
     <div className="as-sheet" role="dialog" aria-modal="true" aria-label={title}>
       <div className="as-sheet-inner">
         <header className="as-sheet-head">
@@ -150,6 +155,7 @@ export default function CodeScanSheet({ title = 'Scan the barcodes', onCancel, o
           </Button>
         </footer>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

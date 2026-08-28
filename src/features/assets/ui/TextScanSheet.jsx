@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { useState } from 'react';
 import {
   X, ScanLine, AlertTriangle, Check, Plus,
@@ -91,7 +92,11 @@ export default function TextScanSheet({ title = 'Scan the label', onCancel, onUs
     || state === SCAN_STATE.NO_READER;
   const failed = state === SCAN_STATE.DONE && !found.length && !extras.length;
 
-  return (
+  // Hung off the body rather than left where it was opened: the camera covers
+  // the SCREEN, and inside the page it would be positioned against whatever
+  // the shell's entrance animation left transformed -- which is the page, not
+  // the screen, and puts the viewfinder wherever the reader is not.
+  return createPortal(
     <div className="as-sheet" role="dialog" aria-modal="true" aria-label={title}>
       <div className="as-sheet-inner">
         <header className="as-sheet-head">
@@ -184,6 +189,7 @@ export default function TextScanSheet({ title = 'Scan the label', onCancel, onUs
           )}
         </footer>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

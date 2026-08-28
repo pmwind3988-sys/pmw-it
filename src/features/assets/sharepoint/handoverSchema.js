@@ -54,6 +54,15 @@ export const HANDOVER_COLUMNS = [
   text('IssuedBy', 'Issued By'),
   text('ReturnedBy', 'Returned By'),
   note('Remarks', 'Remarks'),
+
+  // Where the signature picture lives, not the picture itself. A signature is
+  // a few tens of kilobytes of PNG and a text column is 255 characters; the
+  // image goes in the same library as the item photographs and the row keeps
+  // the path to it. Empty is a normal, honest value -- a signature is asked
+  // for and can be skipped, and a blank one says nobody signed rather than
+  // pretending somebody did.
+  text('IssueSignature', 'Signed For (out)'),
+  text('ReturnSignature', 'Signed For (in)'),
 ];
 
 const keyFor = (staticName) => staticName.charAt(0).toLowerCase() + staticName.slice(1);

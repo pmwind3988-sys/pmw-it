@@ -1543,3 +1543,59 @@
   top: calc(var(--it-header-h, 56px) + 8px);
   z-index: 20;
 }
+
+/* Signing for something, on the way out and on the way back in. */
+.as-signature {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.as-signature-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.as-signature-done {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* The signature itself rather than a tick claiming there is one: somebody who
+   signed the wrong box has to be able to see that they did. White, because
+   the ink is black and a dark theme would otherwise show a black square. */
+.as-signature-shot {
+  width: 168px;
+  height: 62px;
+  object-fit: contain;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.as-signature-ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12.5px;
+  color: var(--success, #10B981);
+}
+
+/* On a row in a list: small, and only there when somebody actually signed. */
+.as-signed {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 6px;
+  font-size: 11.5px;
+  color: var(--success, #10B981);
+  text-decoration: none;
+}
+
+.as-signed:hover { text-decoration: underline; }

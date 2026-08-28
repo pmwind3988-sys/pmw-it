@@ -61,7 +61,9 @@ export function coalesceLines(lines) {
  * Returns `{ handovers, assetUpdates, blocked }`. A blocked line never stops
  * the others: one refusal is one line's problem.
  */
-export function planHandover(basket, register, { issuedOn = Date.now(), issuedBy = '' } = {}) {
+export function planHandover(basket, register, {
+  issuedOn = Date.now(), issuedBy = '', issueSignature = '',
+} = {}) {
   const byId = new Map(register.map((asset) => [asset.id, asset]));
 
   const handovers = [];
@@ -138,6 +140,11 @@ export function planHandover(basket, register, { issuedOn = Date.now(), issuedBy
       returnCondition: '',
       issuedBy,
       returnedBy: '',
+      // The same signature against every line of one handover: the person
+      // signed for the basket, once, and copying it onto each row is what lets
+      // one line be returned later without losing what was signed for.
+      issueSignature,
+      returnSignature: '',
       remarks: line.remarks ?? '',
       title: `${person.name || person.email || 'Someone'} — ${itemTitle}${serialNumber ? ` (${serialNumber})` : ''}`,
     });

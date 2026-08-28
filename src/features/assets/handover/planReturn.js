@@ -20,7 +20,7 @@ import { outstanding, out, statusFor, HANDOVER_STATUS } from './availability.js'
  * what happened, and quietly rounding it hides a miscount.
  */
 export function planReturn(returns, handovers, register, {
-  returnedOn = Date.now(), returnedBy = '',
+  returnedOn = Date.now(), returnedBy = '', returnSignature = '',
 } = {}) {
   const handoverById = new Map(handovers.map((row) => [row.id, row]));
   const assetById = new Map(register.map((asset) => [asset.id, asset]));
@@ -68,6 +68,9 @@ export function planReturn(returns, handovers, register, {
         returnedOn,
         returnedBy,
         returnCondition: entry.condition ?? '',
+        // Only written when somebody actually signed. Writing '' would rub out
+        // the signature on a line being returned a second time, in part.
+        ...(returnSignature ? { returnSignature } : {}),
       },
     });
 

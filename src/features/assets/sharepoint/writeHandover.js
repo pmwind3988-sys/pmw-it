@@ -7,6 +7,7 @@ import { ASSET_LIST_NAME, toUpdateItem as assetPatch } from './assetSchema.js';
 import {
   HANDOVER_LIST_NAME, toListItem, toUpdateItem as handoverPatch,
 } from './handoverSchema.js';
+import { uploadSignature } from './uploadSignature.js';
 import { planHandover } from '../handover/planHandover.js';
 import { planReturn } from '../handover/planReturn.js';
 
@@ -39,7 +40,7 @@ const merge = (siteUrl, token, digest, listName, id, body) => withRetry(
  * line (§8).
  */
 export async function commitHandover({
-  siteUrl, token, basket, issuedBy, onProgress,
+  siteUrl, token, basket, issuedBy, signature, onProgress,
 }) {
   const report = (phase, done = 0, total = 0) => onProgress?.({ phase, done, total });
 
@@ -52,7 +53,30 @@ export async function commitHandover({
   const register = await readAllAssets(siteUrl, token);
 
   const issuedOn = Date.now();
-  const plan = planHandover(basket, register, { issuedOn, issuedBy: issuedBy ?? '' });
+
+  // The signature is asked for and can be skipped, so one that will not upload
+  // must not stop the handover: the laptop has changed hands either way, and a
+  // register that refuses to say so is worse than one saying so unsigned.
+  let issueSignature = '';
+  let signatureFailed = '';
+  if (signature) {
+    report('signature');
+    try {
+      issueSignature = await uploadSignature({
+        siteUrl,
+        token,
+        digest,
+        dataUrl: signature,
+        seed: basket.person?.email || basket.person?.name || 'handover',
+      });
+    } catch (thrown) {
+      signatureFailed = thrown.message || 'The signature could not be saved';
+    }
+  }
+
+  const plan = planHandover(basket, register, {
+    issuedOn, issuedBy: issuedBy ?? '', issueSignature,
+  });
 
   report('writing', 0, plan.handovers.length);
   const written = await runPool(plan.handovers, async (handover) => {
@@ -84,6 +108,8 @@ export async function commitHandover({
 
   return {
     handedOver: written.filter((result) => !result.error).length,
+    signed: Boolean(issueSignature),
+    signatureFailed,
     blocked: plan.blocked,
     writeFailures: written
       .map((result, index) => (result.error
@@ -104,7 +130,7 @@ export async function commitHandover({
  * two left has to be refused rather than driving `quantityOut` negative.
  */
 export async function commitReturn({
-  siteUrl, token, returns, returnedBy, onProgress,
+  siteUrl, token, returns, returnedBy, signature, onProgress,
 }) {
   const report = (phase, done = 0, total = 0) => onProgress?.({ phase, done, total });
 
@@ -115,9 +141,26 @@ export async function commitReturn({
   ]);
 
   const digest = await provisionAssets(siteUrl, token);
+
+  // Same bargain as handing out: the thing is back on the shelf whether or not
+  // the picture of the signature made it there.
+  let returnSignature = '';
+  let signatureFailed = '';
+  if (signature) {
+    report('signature');
+    try {
+      returnSignature = await uploadSignature({
+        siteUrl, token, digest, dataUrl: signature, seed: 'return',
+      });
+    } catch (thrown) {
+      signatureFailed = thrown.message || 'The signature could not be saved';
+    }
+  }
+
   const plan = planReturn(returns, handovers, register, {
     returnedOn: Date.now(),
     returnedBy: returnedBy ?? '',
+    returnSignature,
   });
 
   report('writing', 0, plan.handoverUpdates.length);
@@ -140,6 +183,8 @@ export async function commitReturn({
 
   return {
     returned: written.filter((result) => !result.error).length,
+    signed: Boolean(returnSignature),
+    signatureFailed,
     blocked: plan.blocked,
     writeFailures: written.filter((result) => result.error).length,
     staleRows: updated

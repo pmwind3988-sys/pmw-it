@@ -153,3 +153,22 @@ describe('returnEverything', () => {
     expect(returnEverything([laptopOut], 'Good')[0].condition).toBe('Good');
   });
 });
+
+describe('signing for a return', () => {
+  it('records where the signature is when there is one', () => {
+    const plan = planReturn(
+      [{ handoverId: 11, quantity: 1 }],
+      handovers, register, { returnSignature: '/sites/it/Photos/signature-1.png' },
+    );
+
+    expect(plan.handoverUpdates[0].body.returnSignature)
+      .toBe('/sites/it/Photos/signature-1.png');
+  });
+
+  it('leaves the field alone entirely when nobody signed', () => {
+    const plan = planReturn([{ handoverId: 11, quantity: 1 }], handovers, register);
+
+    // Not '' -- a blank would rub out the signature on the half returned first.
+    expect('returnSignature' in plan.handoverUpdates[0].body).toBe(false);
+  });
+});

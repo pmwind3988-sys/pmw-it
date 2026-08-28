@@ -20,6 +20,7 @@ import { lineRefusal } from '../features/assets/handover/planHandover';
 import { findScanTarget } from '../features/assets/handover/scanMatch';
 import { available, owned, HANDOVER_KIND } from '../features/assets/handover/availability';
 import { commitHandover } from '../features/assets/sharepoint/writeHandover';
+import SignatureField from '../features/assets/ui/SignatureField';
 import { matchesQuery } from '../features/assets/assetFilters';
 import { TRACKED } from '../features/assets/assetKinds';
 import PersonPicker from '../features/assets/ui/PersonPicker';
@@ -35,6 +36,7 @@ import PersonPicker from '../features/assets/ui/PersonPicker';
 const PHASE_LABEL = {
   provisioning: 'Setting up the SharePoint lists',
   reading: 'Checking what is available',
+  signature: 'Saving the signature',
   writing: 'Recording the handover',
   updating: 'Updating the register',
 };
@@ -135,6 +137,11 @@ export default function AssetHandoverPage() {
 
   const blockedCount = [...refusals.values()].filter(Boolean).length;
 
+  // What the person signed, if they did. Held on the page rather than in the
+  // basket: the basket is saved to this phone between visits, and a signature
+  // is about one moment of handing something over, not about a shopping list.
+  const [signature, setSignature] = useState(null);
+
   const handOver = async () => {
     setFailure('');
     setReport(null);
@@ -147,6 +154,7 @@ export default function AssetHandoverPage() {
         token: tokenRes.accessToken,
         basket,
         issuedBy: account?.username ?? account?.name ?? '',
+        signature,
         onProgress: setProgress,
       });
 
@@ -156,6 +164,9 @@ export default function AssetHandoverPage() {
 
       // Only what was refused stays in the basket, so pressing the button again
       // cannot hand the successful half over a second time.
+      // The signature belongs to the handover that was just recorded. Keeping
+      // it would put one person's signature on the next person's items.
+      setSignature(null);
       const refused = new Set(result.blocked.map((entry) => entry.line.lineId));
       setBasket((current) => ({
         ...current,
@@ -206,6 +217,9 @@ export default function AssetHandoverPage() {
             {report.blocked.length > 0 && ` ${report.blocked.length} refused — still in the basket below.`}
             {report.staleRows.length > 0
               && ' Some register rows could not be updated; the handover itself is recorded.'}
+            {report.signed && ' Signed for.'}
+            {report.signatureFailed
+              && ' The signature could not be saved, so it is recorded unsigned.'}
           </span>
           {done && (
             <span className="as-notice-links">
@@ -410,6 +424,22 @@ export default function AssetHandoverPage() {
               </p>
             )}
           </Card>
+
+          {/* Last, and next to the button that does it: signing is the last
+              thing that happens before the thing leaves the room. */}
+          {basket.lines.length > 0 && (
+            <Card className="as-panel">
+              <h2 className="as-h2">Signed for</h2>
+              <SignatureField
+                label={`${person.name || 'They'} received these`}
+                hint={'Recommended — ask them to sign for what they are taking. '
+                  + 'It can be skipped.'}
+                value={signature}
+                onChange={setSignature}
+                disabled={Boolean(progress)}
+              />
+            </Card>
+          )}
         </>
       )}
     </AppShell>

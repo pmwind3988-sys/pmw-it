@@ -297,3 +297,30 @@ describe('per-unit handover', () => {
     expect(assetUpdates[0].body.assignedTo).toBeUndefined();
   });
 });
+
+describe('signing for a handover', () => {
+  it('puts the signature on every line of the basket', () => {
+    const basket = addLine(
+      addLine(newBasket({ person }), newLine(laptop())),
+      newLine(cables(), { quantity: 2 }),
+    );
+    const plan = planHandover(basket, [laptop(), cables()], {
+      issueSignature: '/sites/it/Photos/signature-amir.png',
+    });
+
+    expect(plan.handovers).toHaveLength(2);
+    for (const row of plan.handovers) {
+      expect(row.issueSignature).toBe('/sites/it/Photos/signature-amir.png');
+      // Nothing has come back yet, so nothing has been signed for coming back.
+      expect(row.returnSignature).toBe('');
+    }
+  });
+
+  it('records an unsigned handover as unsigned rather than refusing it', () => {
+    const basket = addLine(newBasket({ person }), newLine(laptop()));
+    const plan = planHandover(basket, [laptop()]);
+
+    expect(plan.handovers).toHaveLength(1);
+    expect(plan.handovers[0].issueSignature).toBe('');
+  });
+});

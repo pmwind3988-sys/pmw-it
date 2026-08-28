@@ -11,6 +11,8 @@ import { useHandovers } from '../features/assets/useHandovers';
 import { SHAREPOINT_SITE_URL } from '../features/assets/useAssets';
 import { useSharePointToken } from '../hooks/useRequests';
 import { commitReturn } from '../features/assets/sharepoint/writeHandover';
+import SignatureField from '../features/assets/ui/SignatureField';
+import { absoluteFileUrl } from '../features/assets/sharepoint/fileUrl';
 import { returnEverything } from '../features/assets/handover/planReturn';
 import {
   heldBy, outstanding, isOverdue, isOpen, HANDOVER_KIND,
@@ -26,6 +28,27 @@ import { initialsOf } from '../utils/initials';
  * identity everything per-person hangs off (§4.5) — and a name in a path would
  * break the moment somebody's changed.
  */
+/**
+ * A signature that was captured, as a link to the picture of it. Nothing at
+ * all when there is none -- a handover recorded without one is a normal thing
+ * and does not need a row saying "unsigned" against it.
+ */
+function Signed({ stored, what }) {
+  if (!stored) return null;
+
+  return (
+    <a
+      href={absoluteFileUrl(SHAREPOINT_SITE_URL, stored)}
+      target="_blank"
+      rel="noreferrer"
+      className="as-signed"
+      title={`Signed for ${what}`}
+    >
+      <Check size={11} /> signed
+    </a>
+  );
+}
+
 export default function AssetPersonPage() {
   const { email } = useParams();
   const navigate = useNavigate();
@@ -34,6 +57,10 @@ export default function AssetPersonPage() {
   const { handovers, loading, error, reload } = useHandovers();
 
   const [condition, setCondition] = useState(CONDITIONS[1] ?? 'Good');
+  // Signed for on the way back in, the same as on the way out. Cleared after
+  // each return: one signature covers what was just handed back, not the next
+  // thing somebody carries in an hour later.
+  const [signature, setSignature] = useState(null);
   const [busy, setBusy] = useState(false);
   const [report, setReport] = useState(null);
   const [failure, setFailure] = useState('');
@@ -64,8 +91,10 @@ export default function AssetPersonPage() {
         token: tokenRes.accessToken,
         returns: entries,
         returnedBy: account?.username ?? account?.name ?? '',
+        signature,
       });
       setReport(result);
+      setSignature(null);
       reload();
     } catch (thrown) {
       setFailure(thrown.message || 'The return could not be recorded');
@@ -107,6 +136,9 @@ export default function AssetPersonPage() {
             {report.returned} line{report.returned === 1 ? '' : 's'} returned.
             {report.blocked.length > 0
               && ` ${report.blocked.length} could not be: ${report.blocked[0].reason}`}
+            {report.signed && ' Signed for.'}
+            {report.signatureFailed
+              && ' The signature could not be saved, so it is recorded unsigned.'}
           </span>
         </Card>
       )}
@@ -138,6 +170,18 @@ export default function AssetPersonPage() {
           >
             {CONDITIONS.map((entry) => <option key={entry} value={entry}>{entry}</option>)}
           </select>
+
+          {/* Signed on the way in as well as on the way out. "It came back" is
+              a claim about somebody else's property, and the person handing it
+              back is the one who can stand behind it. */}
+          <SignatureField
+            label={`${name} handed these back`}
+            hint={'Recommended — ask them to sign for what they are returning. '
+              + 'It can be skipped.'}
+            value={signature}
+            onChange={setSignature}
+            disabled={busy}
+          />
         </Card>
       )}
 
@@ -172,7 +216,10 @@ export default function AssetPersonPage() {
                   </td>
                   <td className="as-qty">{outstanding(row)}</td>
                   <td>{row.kind}</td>
-                  <td className="as-when">{row.issuedOnMYT || '—'}</td>
+                  <td className="as-when">
+                    {row.issuedOnMYT || '—'}
+                    <Signed stored={row.issueSignature} what="handing this over" />
+                  </td>
                   <td className="as-when">
                     {row.kind === HANDOVER_KIND.BORROWED
                       ? (row.dueOnMYT || (row.dueOn ? formatMYT(row.dueOn, 'datetime12') : '—'))
@@ -207,6 +254,8 @@ export default function AssetPersonPage() {
                 <span className="as-sub">
                   {row.quantity} back {row.returnedOnMYT || ''}
                   {row.returnCondition ? ` — ${row.returnCondition}` : ''}
+                  <Signed stored={row.issueSignature} what="taking it" />
+                  <Signed stored={row.returnSignature} what="bringing it back" />
                 </span>
               </li>
             ))}

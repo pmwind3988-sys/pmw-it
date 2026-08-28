@@ -362,6 +362,14 @@ nineteen hidden behind it. A row saved before the rule has them MOVED onto item
 1 rather than deleted, and `unitsOf` reads them there from the moment the rule
 landed, so nothing looks lost in between.
 
+**A handover can be signed for, both ways.** `SignatureField` on the handover
+and person pages draws into the existing `SignatureDialog`; the PNG goes to the
+asset photo library (`sharepoint/uploadSignature.js`) and the row keeps the
+path in `IssueSignature` / `ReturnSignature`. RECOMMENDED, never required: a
+signature that will not upload is reported and the handover is still recorded,
+because the laptop changed hands either way. A blank means nobody signed and is
+never written over an existing one.
+
 **Rows that are one thing bought ten times can be put back together.**
 `combine.js` (pure) plans it and `sharepoint/combineAssets.js` writes it: the
 oldest row survives, every other row's serial, label, condition and status

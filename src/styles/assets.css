@@ -1506,3 +1506,13 @@
 .as-loose:last-child { border-bottom: 0; }
 .as-loose .as-sheet-found-value { flex: 1 1 auto; }
 .as-loose select { flex: 0 0 auto; max-width: 42%; font-size: 16px; }
+
+/* The field a reading is being filed under. Same control as the one on a line
+   the reader could not name -- there is no difference worth drawing between
+   "we do not know what this is" and "we think we know, and might be wrong". */
+.as-sheet-found-field {
+  flex: 0 0 auto;
+  max-width: 42%;
+  /* 16px or the phone zooms the whole page in when it is tapped. */
+  font-size: 16px;
+}

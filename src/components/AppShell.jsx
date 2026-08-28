@@ -50,7 +50,9 @@ const NAV_ITEMS = [
   { to: '/semantic-analysis', label: 'Semantic Analysis', icon: BarChart3 },
 ];
 
-export default function AppShell({ title, subtitle, actions, search, children }) {
+export default function AppShell({
+  title, subtitle, actions, search, stickyHead = false, children,
+}) {
   const { instance, inProgress } = useMsal();
   const isAuthenticated = useIsAuthenticated();
   const { isDarkMode, toggleTheme } = useTheme();
@@ -58,6 +60,28 @@ export default function AppShell({ title, subtitle, actions, search, children })
   // before the redirect, or the automatic sign-in reads the sign-out as a
   // timeout and puts the user straight back in.
   const { signOut, recovering } = useSession();
+  // How tall the bar at the top actually is. A page head that sticks has to
+  // stop underneath it, and that height changes with the breakpoint and with
+  // the notch on a phone, so it is measured rather than guessed. Held as the
+  // element itself rather than a ref, because the header is not in the tree
+  // on the sign-in and recovery screens and a ref would never fire for it.
+  const [headerEl, setHeaderEl] = useState(null);
+
+  useEffect(() => {
+    if (!headerEl) return undefined;
+
+    const publish = () => {
+      headerEl.closest('.shell')?.style.setProperty(
+        '--it-header-h', `${headerEl.offsetHeight}px`,
+      );
+    };
+
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(headerEl);
+    return () => observer.disconnect();
+  }, [headerEl]);
+
   const location = useLocation();
   const navigate = useNavigate();
   const [navOpen, setNavOpen] = useState(false);
@@ -203,7 +227,7 @@ export default function AppShell({ title, subtitle, actions, search, children })
       </aside>
 
       <div className="shell-main">
-        <header className="shell-header">
+        <header className="shell-header" ref={setHeaderEl}>
           <div className="shell-headerrow">
             <button
               type="button"
@@ -253,7 +277,7 @@ export default function AppShell({ title, subtitle, actions, search, children })
             the content changed, on a phone where there is no other cue. */}
         <main key={location.pathname} className="shell-body rise">
           {(title || actions) && (
-            <div className="shell-pagehead">
+            <div className={`shell-pagehead${stickyHead ? ' shell-pagehead-sticky' : ''}`}>
               <div>
                 {title && <h1>{title}</h1>}
                 {subtitle && <p>{subtitle}</p>}

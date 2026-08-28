@@ -297,6 +297,9 @@ export default function AssetDetailPage() {
 
   return (
     <AppShell
+      // Everything on this page is an edit waiting to be saved, and the page
+      // is long enough that Save changes would otherwise scroll away.
+      stickyHead
       title={asset.title || 'Item'}
       subtitle={[asset.category, asset.assetTag && `label ${asset.assetTag}`]
         .filter(Boolean).join(' · ')}

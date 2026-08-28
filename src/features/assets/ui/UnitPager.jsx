@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import {
   ChevronLeft, ChevronRight, Boxes, Check, Camera,
 } from '../../../components/ui/Icons';
@@ -21,12 +21,13 @@ import PhotoInput from './PhotoInput';
  *
  * It pages rather than scrolls. Five identical cards stacked down a phone
  * screen are impossible to tell apart, and the question being answered is
- * always about ONE of them; a swipe left and right is how that thing is held
- * and turned over in real life.
+ * always about ONE of them.
+ *
+ * The arrows are the only way between them. It used to turn on a sideways
+ * swipe as well, which sat on top of a card full of text boxes: selecting a
+ * serial number to correct it, or dragging the pager itself, turned the page
+ * and took the field being worked on with it.
  */
-
-/** Below this a drag is a scroll, not a swipe. */
-const SWIPE_PX = 45;
 
 export default function UnitPager({
   units, onChange, siteUrl, rowPhoto, poPhoto,
@@ -37,7 +38,6 @@ export default function UnitPager({
   // Offered rather than dropped: the code on the box is evidence, and the
   // value sitting in the field might be last week's typo.
   const [heldBack, setHeldBack] = useState([]);
-  const touch = useRef(null);
 
   const count = units.length;
   // Clamped during render rather than in an effect: lowering the quantity from
@@ -80,35 +80,10 @@ export default function UnitPager({
     setScanning(false);
   };
 
-  const onTouchStart = (event) => {
-    touch.current = { x: event.touches[0].clientX, y: event.touches[0].clientY };
-  };
-
-  /**
-   * A vertical drag is the page scrolling and must not turn the card. The
-   * comparison against the vertical distance is what stops the pager from
-   * stealing every scroll that starts on top of it.
-   */
-  const onTouchEnd = (event) => {
-    const start = touch.current;
-    touch.current = null;
-    if (!start) return;
-
-    const dx = event.changedTouches[0].clientX - start.x;
-    const dy = event.changedTouches[0].clientY - start.y;
-    if (Math.abs(dx) < SWIPE_PX || Math.abs(dx) < Math.abs(dy)) return;
-
-    go(index + (dx < 0 ? 1 : -1));
-  };
-
   const recorded = filledCount(units);
 
   return (
-    <div
-      className="as-units"
-      onTouchStart={onTouchStart}
-      onTouchEnd={onTouchEnd}
-    >
+    <div className="as-units">
       <div className="as-units-bar">
         <button
           type="button"
@@ -283,7 +258,7 @@ export default function UnitPager({
       <p className="as-units-foot">
         <Boxes size={13} />
         <span>
-          Swipe, or use the arrows, to reach the other {count === 2 ? 'one' : 'ones'}.
+          Use the arrows to reach the other {count === 2 ? 'one' : 'ones'}.
           {' '}Changes to every item are saved together with Save changes.
         </span>
         {!isBlankUnit(unit) && <Check size={13} className="as-units-tick" />}

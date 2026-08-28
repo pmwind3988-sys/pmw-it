@@ -566,6 +566,21 @@
   margin: 0;
 }
 
+/* Long pages put the way to save the work out of reach of the work: an item
+   with twenty individual units on it is several screens tall, and Save changes
+   was at the top of the first one. Stuck to just under the bar at the top --
+   `--it-header-h` is that bar, measured in `AppShell` -- it stays in reach
+   from wherever the person is on the page. */
+.shell-pagehead-sticky {
+  position: sticky;
+  top: var(--it-header-h, 56px);
+  z-index: 25;
+  padding: 10px 0;
+  margin-bottom: 12px;
+  background: var(--it-canvas);
+  border-bottom: 1px solid var(--it-line);
+}
+
 .shell-pagehead-actions {
   display: flex;
   align-items: center;

@@ -1,6 +1,6 @@
 import { createPortal } from 'react-dom';
 import { useCallback, useMemo, useState } from 'react';
-import { X, ScanLine, AlertTriangle, Check, Barcode } from '../../../components/ui/Icons';
+import { X, ScanLine, AlertTriangle, Barcode } from '../../../components/ui/Icons';
 import Button from '../../../components/ui/Button';
 import { useScanner, CAMERA_STATE } from '../scan/useScanner';
 import { classifyCodes } from '../scan/classifyCode';
@@ -72,7 +72,26 @@ export default function CodeScanSheet({ title = 'Scan the barcodes', onCancel, o
   // second sticker arrives — which is exactly when the guess changes from "the
   // only code is the serial" to "the shared one is the part number".
   const reading = useMemo(() => classifyCodes(codes), [codes]);
-  const named = FILLED.filter((field) => reading[field]);
+
+  // Where each code is being filed, and which have been crossed out. Which
+  // barcode on a box is the serial and which is the part number is worked out
+  // from their shape (`classifyCode.js`), and a box with two similar-looking
+  // stickers is a coin toss. Saying "guessed" and offering no way to move it
+  // left the person retyping a code they had just scanned.
+  const [filedAs, setFiledAs] = useState({});
+  const [dropped, setDropped] = useState([]);
+
+  const named = FILLED.filter((field) => reading[field] && !dropped.includes(field));
+  const fieldOf = (field) => filedAs[field] ?? field;
+
+  /** What the form gets: the surviving codes, under the fields chosen here. */
+  const chosen = () => {
+    const values = {
+      guessed: reading.guessed.filter((field) => named.includes(field)).map(fieldOf),
+    };
+    for (const field of named) values[fieldOf(field)] = reading[field];
+    return values;
+  };
 
   const broken = state === CAMERA_STATE.DENIED
     || state === CAMERA_STATE.UNAVAILABLE
@@ -125,24 +144,41 @@ export default function CodeScanSheet({ title = 'Scan the barcodes', onCancel, o
           <ul className="as-sheet-found">
             {named.map((field) => (
               <li key={field}>
-                <Check size={13} />
-                <span className="as-sheet-found-label">
-                  {labelFor(field)}
-                  {/* Said out loud, because a guess that cannot be spotted is
-                      a guess that gets saved. */}
-                  {reading.guessed.includes(field) && (
-                    <span className="as-guess" title="Worked out from the shape of the code">
-                      guessed
-                    </span>
-                  )}
-                </span>
                 <span className="as-sheet-found-value">{reading[field]}</span>
+                {/* The field is a choice, not a verdict. */}
+                <select
+                  className="as-sheet-found-field"
+                  value={fieldOf(field)}
+                  onChange={(event) => setFiledAs(
+                    (current) => ({ ...current, [field]: event.target.value }),
+                  )}
+                  aria-label={`Which field ${reading[field]} goes in`}
+                >
+                  {FILLED.map((name) => (
+                    <option key={name} value={name}>{labelFor(name)}</option>
+                  ))}
+                </select>
+                {/* Said out loud, because a guess that cannot be spotted is
+                    a guess that gets saved. */}
+                {reading.guessed.includes(field) && (
+                  <span className="as-guess" title="Worked out from the shape of the code">
+                    guessed
+                  </span>
+                )}
+                <button
+                  type="button"
+                  className="as-iconbtn"
+                  onClick={() => setDropped((current) => [...current, field])}
+                  aria-label={`Discard ${reading[field]}`}
+                >
+                  <X size={13} />
+                </button>
               </li>
             ))}
           </ul>
         )}
 
-        {codes.length > 0 && named.length === 0 && (
+        {codes.length > 0 && named.length === 0 && dropped.length === 0 && (
           <p className="as-sheet-note">
             <Barcode size={13} /> Read {codes.length}, still working out which is which.
           </p>
@@ -150,7 +186,7 @@ export default function CodeScanSheet({ title = 'Scan the barcodes', onCancel, o
 
         <footer className="as-sheet-foot">
           <Button variant="secondary" size="sm" onClick={onCancel}>Cancel</Button>
-          <Button size="sm" disabled={!named.length} onClick={() => onUse(reading)}>
+          <Button size="sm" disabled={!named.length} onClick={() => onUse(chosen())}>
             {named.length ? `Use ${named.length === 1 ? 'this' : 'these'}` : 'Nothing read yet'}
           </Button>
         </footer>

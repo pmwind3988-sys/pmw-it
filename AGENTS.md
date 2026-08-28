@@ -363,8 +363,8 @@ nineteen hidden behind it. A row saved before the rule has them MOVED onto item
 landed, so nothing looks lost in between.
 
 **A bulk line knows its individual items.** One UNIT RECORD per physical thing
-(`units.js`, paged one at a time by `ui/UnitPager.jsx` on `/assets/:id`, swipe
-or arrows). They live as one JSON string in the `Units` column, SPARSE and with
+(`units.js`, paged one at a time by `ui/UnitPager.jsx` on `/assets/:id`, by the
+arrows -- the sideways swipe was removed, it fought the text boxes on the card). They live as one JSON string in the `Units` column, SPARSE and with
 blank fields dropped: only the units somebody has written on are stored, so a
 box of twenty cables costs nothing until one of them is written on. The count
 follows the row's quantity and lowering it only HIDES units — a quantity typed

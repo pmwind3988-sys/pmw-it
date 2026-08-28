@@ -22,6 +22,10 @@ import { useScrollLock } from '../../../hooks/useScrollLock';
  * So everything it reads is MARKED and nothing is taken. Each settled value
  * gets a tick and a cross; crossing one out is remembered, or the camera —
  * still pointed at the same label — would offer it again half a second later.
+ * Which field it goes in is a dropdown, not a verdict: the reader's best guess
+ * at what a number IS gets it wrong often enough — a part number read as a
+ * serial — that being told "guessed" and then having to accept it anyway was
+ * only half an answer. Move it, or cross it out.
  * Writing it recognised but could not name is offered at the bottom to be
  * filed by hand, because a code nobody can place is still the only copy of
  * what was printed on the box.
@@ -75,14 +79,20 @@ export default function TextScanSheet({ title = 'Scan the label', onCancel, onUs
   const found = candidates(scan);
   const extras = scan.additional ?? [];
 
+  // Where each reading is being filed, when that is not where the reader put
+  // it. Keyed by the field it was READ as, which is the name the scan knows it
+  // by and the one it has to be crossed off under.
+  const [filedAs, setFiledAs] = useState({});
+  const fieldOf = (entry) => filedAs[entry.field] ?? entry.field;
+
   /** One value, taken. The sheet stays open: a label carries several. */
-  const take = (field, value) => {
-    onUse({ [field]: value }, scan.guessed, []);
-    reject(field);
+  const take = (entry) => {
+    onUse({ [fieldOf(entry)]: entry.value }, scan.guessed, []);
+    reject(entry.field);
   };
 
   const takeAll = () => {
-    const values = Object.fromEntries(found.map((entry) => [entry.field, entry.value]));
+    const values = Object.fromEntries(found.map((entry) => [fieldOf(entry), entry.value]));
     onUse(values, scan.guessed, extras);
     onCancel();
   };
@@ -127,22 +137,33 @@ export default function TextScanSheet({ title = 'Scan the label', onCancel, onUs
           <ul className="as-sheet-found as-sheet-offer">
             {found.map((entry) => (
               <li key={entry.field}>
-                <span className="as-sheet-found-label">
-                  {labelFor(entry.field)}
-                  {/* Said out loud, because a guess that cannot be spotted is
-                      a guess that gets saved. */}
-                  {entry.guessed && (
-                    <span className="as-guess" title="Worked out from the shape of the writing">
-                      guessed
-                    </span>
-                  )}
-                </span>
                 <span className="as-sheet-found-value">{entry.value}</span>
+                {/* The field is a choice, not a verdict. It opens on what the
+                    reader decided, and says so when that was a guess. */}
+                <select
+                  className="as-sheet-found-field"
+                  value={fieldOf(entry)}
+                  onChange={(event) => setFiledAs(
+                    (current) => ({ ...current, [entry.field]: event.target.value }),
+                  )}
+                  aria-label={`Which field ${entry.value} goes in`}
+                >
+                  {SCAN_FIELDS.map((name) => (
+                    <option key={name} value={name}>{labelFor(name)}</option>
+                  ))}
+                </select>
+                {/* Said out loud, because a guess that cannot be spotted is
+                    a guess that gets saved. */}
+                {entry.guessed && (
+                  <span className="as-guess" title="Worked out from the shape of the writing">
+                    guessed
+                  </span>
+                )}
                 <button
                   type="button"
                   className="as-iconbtn as-take"
-                  onClick={() => take(entry.field, entry.value)}
-                  aria-label={`Use ${entry.value} as ${labelFor(entry.field)}`}
+                  onClick={() => take(entry)}
+                  aria-label={`Use ${entry.value} as ${labelFor(fieldOf(entry))}`}
                 >
                   <Check size={13} />
                 </button>

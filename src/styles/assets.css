@@ -989,22 +989,26 @@
 .as-sheet {
   position: fixed;
   inset: 0;
+  /* `dvh`, not the viewport `inset` alone: a phone browser's address bar comes
+     and goes, and centring inside a box taller than the screen puts the window
+     slightly low and its buttons under the chrome. */
+  height: 100dvh;
   z-index: 60;
   display: flex;
-  align-items: flex-end;
+  /* Centred in every layout -- phone, tablet, desktop, portrait or landscape.
+     It used to sit against the bottom edge on a narrow screen and fill the
+     whole screen on a phone, which is three different windows to aim. */
+  align-items: center;
   justify-content: center;
   background: rgba(0, 0, 0, 0.55);
   padding: 12px;
 }
 
-@media (min-width: 640px) {
-  .as-sheet { align-items: center; }
-}
-
 .as-sheet-inner {
-  width: 100%;
-  max-width: 460px;
-  max-height: 100%;
+  /* A small window, wherever it opens: never wider than the screen it is
+     centred in, and never taller than what is left after the padding. */
+  width: min(100%, 400px);
+  max-height: calc(100dvh - 24px);
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -1036,8 +1040,11 @@
   display: block;
   width: 100%;
   /* Taller than it is wide: a label is read close up, and a landscape
-     viewfinder on a phone leaves the box half out of frame. */
+     viewfinder on a phone leaves the box half out of frame. Capped in screen
+     heights as well, so a short window -- a phone held sideways -- keeps the
+     picture and the buttons under it on screen together. */
   aspect-ratio: 4 / 3;
+  max-height: 42dvh;
   object-fit: cover;
 }
 
@@ -1424,22 +1431,20 @@
 
   .as-fullcam .as-hint-inline { padding: 0 12px 8px; color: rgba(255, 255, 255, 0.7); }
 
-  /* A sheet is already fixed; on a phone it stops being a card at the bottom
-     and becomes the whole screen. */
-  .as-sheet { padding: 0; align-items: stretch; }
-
-  .as-sheet-inner {
-    max-width: none;
-    height: 100dvh;
-    border: 0;
-    border-radius: 0;
-    padding: calc(12px + env(safe-area-inset-top)) 12px
-             calc(12px + env(safe-area-inset-bottom));
+  /* The scan window stays the same small centred card on a phone as it is on
+     a desktop -- only the safe area is kept clear of the notch and the home
+     bar, so nothing lands under either. */
+  .as-sheet {
+    padding: calc(12px + env(safe-area-inset-top))
+             calc(12px + env(safe-area-inset-right))
+             calc(12px + env(safe-area-inset-bottom))
+             calc(12px + env(safe-area-inset-left));
   }
 
-  .as-sheet-view { flex: 1 1 auto; min-height: 0; }
-
-  .as-sheet-video { height: 100%; aspect-ratio: auto; }
+  .as-sheet-inner {
+    max-height: calc(100dvh - 24px - env(safe-area-inset-top)
+                     - env(safe-area-inset-bottom));
+  }
 }
 
 /* The handover page has no bar of its own under the picture, so the way out

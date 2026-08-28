@@ -303,13 +303,16 @@ export default function AssetDetailPage() {
       actions={(
         <>
           <Button variant="ghost" icon={ArrowLeft} onClick={() => navigate('/assets')}>Back</Button>
-          <Button icon={Save} onClick={save} disabled={!dirty || saving}>
+          {/* Wrapped, not passed: a button hands its click event to whatever
+              it is given, and `save(event)` would treat that event as the
+              edits -- saving nothing while clearing everything typed in. */}
+          <Button icon={Save} onClick={() => save()} disabled={!dirty || saving}>
             {saving ? 'Saving…' : 'Save changes'}
           </Button>
         </>
       )}
     >
-      {error && <ErrorBanner message={error} onRetry={save} />}
+      {error && <ErrorBanner message={error} onRetry={() => save()} />}
 
       {saved && !dirty && (
         <Card className="as-notice as-notice-ok">
@@ -375,7 +378,7 @@ export default function AssetDetailPage() {
                   {field.options ? (
                     <select
                       value={valueOf(field.key)}
-                      onChange={(e) => setEdits({ ...edits, [field.key]: e.target.value })}
+                      onChange={(e) => setEdits((current) => ({ ...current, [field.key]: e.target.value }))}
                     >
                       <option value="">—</option>
                       {field.options.map((option) => (
@@ -389,7 +392,7 @@ export default function AssetDetailPage() {
                       <textarea
                         rows={3}
                         value={valueOf(field.key)}
-                        onChange={(e) => setEdits({ ...edits, [field.key]: e.target.value })}
+                        onChange={(e) => setEdits((current) => ({ ...current, [field.key]: e.target.value }))}
                       />
                     </Scannable>
                   ) : (
@@ -397,7 +400,7 @@ export default function AssetDetailPage() {
                       <input
                         type={field.type ?? 'text'}
                         value={valueOf(field.key)}
-                        onChange={(e) => setEdits({ ...edits, [field.key]: e.target.value })}
+                        onChange={(e) => setEdits((current) => ({ ...current, [field.key]: e.target.value }))}
                       />
                     </Scannable>
                   )}
@@ -419,7 +422,7 @@ export default function AssetDetailPage() {
                       type="button"
                       className="as-heldback-take"
                       onClick={() => {
-                        setEdits({ ...edits, [entry.field]: entry.value });
+                        setEdits((current) => ({ ...current, [entry.field]: entry.value }));
                         setHeldBack(heldBack.filter((held) => held.field !== entry.field));
                       }}
                     >
@@ -453,7 +456,7 @@ export default function AssetDetailPage() {
               </h2>
               <UnitPager
                 units={units}
-                onChange={(next) => setEdits({ ...edits, units: serialiseUnits(next) })}
+                onChange={(next) => setEdits((current) => ({ ...current, units: serialiseUnits(next) }))}
                 siteUrl={SHAREPOINT_SITE_URL}
                 rowPhoto={asset.photoUrl}
                 poPhoto={asset.poPhotoUrl}

@@ -374,9 +374,62 @@ never written over an existing one.
 `combine.js` (pure) plans it and `sharepoint/combineAssets.js` writes it: the
 oldest row survives, every other row's serial, label, condition and status
 becomes an ITEM on it, the quantity is the sum, and the other rows are removed
--- survivor written first, so a failure halfway leaves everything twice rather
-than losing it. Picked on `/assets` behind "Combine rows". Refused while any of
-them is out with somebody, because a handover names the row it came from.
+-- survivor written first, then the handovers are repointed, then the rows go,
+so a failure halfway leaves MORE record rather than less. Picked on `/assets`
+behind "Combine rows". A row that is OUT WITH SOMEBODY can be combined: it
+stays out. Its handover keeps the person and the serial and is moved onto the
+keeper -- new key, new row id, and the item number the thing has just been
+given (`planCombine().moves`, `repointFor`). The folded row's SERIAL is written onto a handover that had
+none, and `itemTitle` is deliberately NOT rewritten: a tracked row handed out
+kept no serial of its own, and everybody read which monitor was on whose desk
+off the row's title -- fold ten of those into one line and every title becomes
+the same, so unless the serial moves onto the handover the register can no
+longer say which one Iskandar has. `nameOfItem` is the reader for it: the
+handover's own serial, or the unit its `unitIndex` points at, or "item 3".
+Item N of a row lands at
+`offset + N` rather than being packed down, because a handover may name an item
+nobody has written a serial on yet and then its number is all it has. The
+counts move together in ONE write (`COMBINE_FIELDS` in `updateAsset.js`):
+`quantityOut` is the sum, and the tracked row's `assignedTo` copies are cleared
+because a bulk line never names one holder.
+
+**Long lists are paged and long panels fold.** `components/ui/paginate.js`
+(pure, tested) plus `ui/Pager.jsx` render one page at a time on the asset
+register and the device register -- a thousand rows of fifty cells laid out at
+once is a phone that looks hung. The page number is held together with the list
+it counts (`at = { of, page }`, compared during render) rather than reset by an
+effect, which would paint the wrong page first. `ui/Collapsible.jsx` folds the
+filter panels and the item's Details and Delivery-order panels; the fold is
+remembered per browser under `fold:<id>`, and the header ALWAYS says what is
+inside while it is shut -- a hidden filter is a page lying about what it shows.
+Both tables scroll in their own box, sideways and up-down, with a sticky header,
+so the horizontal bar stays on screen instead of parking below the fold.
+
+**"Who has it" is one line per PERSON.** `groupHolders` in
+`handover/availability.js` gathers the open handovers on an item by email:
+somebody who took five cables on Monday and one more on Wednesday is two
+handover rows -- correctly, they were two events -- and ONE line reading 6. The
+serials, the soonest deadline and "overdue if any of them is" all survive the
+gathering. The item's photographs panel now holds only the delivery order: the
+whole-line picture stood in for twenty things that each have their own photo on
+their own item card.
+
+**Every removal asks first, in the app's own dialog.** `ui/useConfirm` returns
+`{ ask, dialog }`; `await ask({...})` reads like `window.confirm` did and the
+page renders `{dialog}`. It opens with CANCEL focused and Escape cancels, so no
+keystroke destroys anything without being aimed. Guarding: a register row, a
+delivery (saved or still on the phone), a review row, a scanned item, the codes
+pooled off a box, and combining rows. The device table keeps its own inline
+confirm bars, which already did the job.
+
+**Categories can be added.** `categories.js` (pure) offers the built-in
+`CATEGORIES` plus every category the register is actually USING -- no second
+list to disagree with the rows. `ui/CategoryField.jsx` adds one, and
+`sharepoint/addCategory.js` writes it into the `Category` CHOICE column on BOTH
+the register and the handover list before anything else is saved, because
+SharePoint refuses a choice it has never heard of and a handover would fail on
+the same rule. `draftIssues` therefore accepts any named category rather than
+checking membership of the shipped list.
 
 **A bulk line knows its individual items.** One UNIT RECORD per physical thing
 (`units.js`, paged one at a time by `ui/UnitPager.jsx` on `/assets/:id`, by the

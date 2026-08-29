@@ -2,6 +2,9 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, EmptyState } from '../../../components/ui/Surfaces';
 import Button from '../../../components/ui/Button';
+import Collapsible from '../../../components/ui/Collapsible';
+import Pager from '../../../components/ui/Pager';
+import { paginate } from '../../../components/ui/paginate';
 import {
   Download, Search, X, Pencil, Check, AlertTriangle, Trash2,
 } from '../../../components/ui/Icons';
@@ -158,6 +161,10 @@ export default function DeviceTable({
   const [selected, setSelected] = useState(() => new Set());
   const [confirmingMany, setConfirmingMany] = useState(false);
   const [removing, setRemoving] = useState(null);
+  // Only the page being looked at is laid out. The register runs to a
+  // thousand machines and every row of it carries fifty cells.
+  const [pageSize, setPageSize] = useState(25);
+  const [at, setAt] = useState({ of: '', page: 1 });
 
   const startEdit = (device) => {
     setConfirming(null);
@@ -209,8 +216,22 @@ export default function DeviceTable({
     setSelected((current) => visibleSelection(next(current), rows));
   };
 
+  /**
+   * The page number is held together with the list it counts, so a filter that
+   * shortens the list puts the reader back on page 1 in the same render. An
+   * effect would show page 7 of the old list first and correct it afterwards.
+   */
+  const of = `${JSON.stringify(filters)}|${sort.key}|${sort.dir}|${pageSize}`;
+  const page = at.of === of ? at.page : 1;
+  const setPage = (next) => setAt({ of, page: next });
+  const paged = useMemo(() => paginate(rows, page, pageSize), [rows, page, pageSize]);
+
+  // Ticks are scoped to the FILTER, not to the page: one ticked on page 1 is
+  // still ticked on page 2, and "Remove 12" still cannot mean a machine the
+  // filters are hiding. The header box works a page at a time, because that is
+  // what somebody pressing it is looking at.
   const chosen = useMemo(() => selectedDevices(selected, rows), [selected, rows]);
-  const headBox = headerState(selected, rows);
+  const headBox = headerState(selected, paged.rows);
 
   const removeChosen = async () => {
     setRemoving({ done: 0, total: chosen.length });
@@ -289,20 +310,21 @@ export default function DeviceTable({
 
   return (
     <Card className="rg-card">
-      <div className="dt-head">
-        <div className="dt-search">
-          <Search size={14} />
-          <input
-            type="search"
-            value={filters.q ?? ''}
-            placeholder="Search computer or owner"
-            aria-label="Search computer or owner"
-            onChange={(event) => onFilterChange('q', event.target.value)}
-          />
-        </div>
-
-        <div className="dt-head-right">
-          <span className="dt-count">{rows.length} of {devices.length}</span>
+      {/* The search box and the filter chips fold away together. On a phone
+          they took the top third of the screen before a single machine was
+          visible, and most visits here come from a dashboard card that has
+          already chosen the filter. What is ON is still said while they are
+          folded, because a hidden filter is a list lying about what it shows. */}
+      <Collapsible
+        id="devices-filters"
+        className="dt-fold"
+        title="Search and filters"
+        defaultOpen={false}
+        summary={[
+          `${rows.length} of ${devices.length} devices`,
+          ...activeFilters.map(([key, value]) => chipText(key, value)),
+        ].join(' · ')}
+        actions={(
           <Button
             variant="secondary"
             size="sm"
@@ -312,25 +334,38 @@ export default function DeviceTable({
           >
             CSV
           </Button>
+        )}
+      >
+        <div className="dt-head">
+          <div className="dt-search">
+            <Search size={14} />
+            <input
+              type="search"
+              value={filters.q ?? ''}
+              placeholder="Search computer or owner"
+              aria-label="Search computer or owner"
+              onChange={(event) => onFilterChange('q', event.target.value)}
+            />
+          </div>
         </div>
-      </div>
 
-      {activeFilters.length > 0 && (
-        <div className="dt-chips">
-          {activeFilters.map(([key, value]) => (
-            <button
-              type="button"
-              className="dt-chip"
-              key={key}
-              onClick={() => onFilterChange(key, '')}
-              aria-label={`Remove the ${FILTER_LABELS[key] ?? key} filter`}
-            >
-              {chipText(key, value)}
-              <X size={12} />
-            </button>
-          ))}
-        </div>
-      )}
+        {activeFilters.length > 0 && (
+          <div className="dt-chips">
+            {activeFilters.map(([key, value]) => (
+              <button
+                type="button"
+                className="dt-chip"
+                key={key}
+                onClick={() => onFilterChange(key, '')}
+                aria-label={`Remove the ${FILTER_LABELS[key] ?? key} filter`}
+              >
+                {chipText(key, value)}
+                <X size={12} />
+              </button>
+            ))}
+          </div>
+        )}
+      </Collapsible>
 
       {chosen.length > 0 && <div className="dt-bulk">{selectionBar}</div>}
 
@@ -352,8 +387,8 @@ export default function DeviceTable({
                       // cannot be expressed as a prop.
                       if (box) box.indeterminate = headBox === 'some';
                     }}
-                    onChange={() => updateSelection((current) => toggleAll(current, rows))}
-                    aria-label="Select every device shown"
+                    onChange={() => updateSelection((current) => toggleAll(current, paged.rows))}
+                    aria-label="Select every device on this page"
                   />
                   <button
                     type="button"
@@ -384,7 +419,7 @@ export default function DeviceTable({
               </tr>
             </thead>
             <tbody>
-              {rows.map((device) => {
+              {paged.rows.map((device) => {
                 const editing = editingId === device.id;
                 const ticked = isSelectable(device) && selected.has(device.id);
                 const manual = new Set(device.manualFields ?? []);
@@ -522,6 +557,16 @@ export default function DeviceTable({
             </tbody>
           </table>
         </div>
+      )}
+
+      {rows.length > 0 && (
+        <Pager
+          page={paged}
+          onPage={setPage}
+          size={pageSize}
+          onSize={setPageSize}
+          label="devices"
+        />
       )}
     </Card>
   );

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { CATEGORIES, CONDITIONS, TRACKED, BULK } from '../assetKinds';
+import CategoryField from './CategoryField';
 import { setDraftField, swapSerialAndPart } from '../draft/draftAsset';
 import { applyScannedFields } from '../scan/textScan';
 import { Trash2, Barcode, AlertTriangle, RefreshCw } from '../../../components/ui/Icons';
@@ -35,7 +36,9 @@ function Field({ label, children, guessed, issue, onScan }) {
   );
 }
 
-export default function DraftCard({ draft, issues = [], onChange, onRemove, index }) {
+export default function DraftCard({
+  draft, issues = [], onChange, onRemove, index, categories = CATEGORIES,
+}) {
   // Which field's button opened the camera. It titles the sheet and
   // nothing more: a label carries several values, and the scan fills
   // whichever of them it recognises rather than only the one pressed.
@@ -105,11 +108,13 @@ export default function DraftCard({ draft, issues = [], onChange, onRemove, inde
 
         <div className="as-draft-fields">
           <Field label="Category" issue={issueFor('category')}>
-            <select value={draft.category} onChange={set('category')}>
-              {CATEGORIES.map((category) => (
-                <option key={category} value={category}>{category}</option>
-              ))}
-            </select>
+            {/* A delivery is where a thing the list has never heard of arrives,
+                so this is the first place worth being able to add one. */}
+            <CategoryField
+              value={draft.category}
+              options={categories}
+              onChange={(next) => onChange({ ...draft, category: next })}
+            />
           </Field>
 
           <Field label="Counted as">

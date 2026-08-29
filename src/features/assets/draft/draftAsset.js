@@ -1,4 +1,4 @@
-import { CATEGORIES, CONDITIONS, trackingModeFor, TRACKED, BULK } from '../assetKinds.js';
+import { CONDITIONS, trackingModeFor, TRACKED, BULK } from '../assetKinds.js';
 import { classifyCodes } from '../scan/classifyCode.js';
 import { assetKey, hasStableIdentity, normaliseCode } from '../identity.js';
 import { needsDetails } from '../detailsPending.js';
@@ -158,7 +158,10 @@ export function swapSerialAndPart(draft) {
 export function draftIssues(draft, { registerTags = new Map(), batchTags = new Map() } = {}) {
   const issues = [];
 
-  if (!CATEGORIES.includes(draft.category)) {
+  // Anything named counts. The built-in list is there to help somebody pick,
+  // not to police the answer: a category can be added now (`categories.js`),
+  // and a delivery of the first projector must not be refused for using it.
+  if (!String(draft.category ?? '').trim()) {
     issues.push({ field: 'category', message: 'Pick a category.' });
   }
 

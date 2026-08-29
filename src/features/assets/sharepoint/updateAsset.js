@@ -25,6 +25,26 @@ export const EDITABLE_FIELDS = [
   'detailsPending', 'units',
 ];
 
+/**
+ * Fields nobody types, that only a combine moves.
+ *
+ * `quantityOut` and the copies of an open handover are owned by the handover
+ * list, not by a person editing a row — which is why they are kept out of
+ * `EDITABLE_FIELDS` and out of the edit screens. Folding several rows into one
+ * has to move them all the same: the count of what is out is the sum of the
+ * rows' counts, and a bulk line never names one holder, so a tracked row's
+ * "assigned to" has to be cleared in the same write that turns it into a line.
+ * Doing it in a second request would leave the register briefly claiming that
+ * nine monitors on nine desks were back on the shelf.
+ *
+ * The other two copies — `assignedOn` and `dueOn` — are not here because this
+ * write cannot clear them: a whole-record write skips a date it has no value
+ * for, which is what stops an item nobody dated losing every other column. The
+ * app never reads them off the row, and the handover list still says exactly
+ * when the thing went out and when it is due.
+ */
+export const COMBINE_FIELDS = ['quantityOut', 'assignedTo', 'assignedToEmail'];
+
 const asText = (value) => (value === null || value === undefined ? '' : String(value));
 
 /**
@@ -40,7 +60,7 @@ export function planEdit(existing, edits) {
   const manual = new Set(existing.manualFields ?? []);
   let next = { ...existing };
 
-  for (const field of EDITABLE_FIELDS) {
+  for (const field of [...EDITABLE_FIELDS, ...COMBINE_FIELDS]) {
     if (!(field in edits)) continue;
     next[field] = edits[field];
 
@@ -75,6 +95,10 @@ export function planEdit(existing, edits) {
   // fields a scan must not overwrite -- and `asText(false)` is the truthy
   // string 'false', which would otherwise put it there on the way OUT.
   manual.delete('detailsPending');
+  // Nothing scans who has a thing either, so the same applies to everything a
+  // combine moves: they have no business in the list of fields a scan must not
+  // overwrite.
+  for (const field of COMBINE_FIELDS) manual.delete(field);
   next.manualFields = [...manual];
   // Both derived, both re-derived: correcting a serial number changes which
   // physical thing this row claims to be, and the key has to follow it or the

@@ -406,16 +406,21 @@
   outline: none;
 }
 
-.dt-head-right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+/* The fold sits INSIDE the register card, so it drops the panel look it wears
+   on the assets page: a bordered box inside a bordered box reads as two
+   things. The rule under the header is kept, since it is what separates the
+   controls from the table below them. */
+.dt-fold {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  background: none;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border);
 }
 
-.dt-count {
-  font-size: 0.82rem;
-  color: var(--it-ink-soft);
-}
+.dt-fold .ui-fold-head { padding-left: 0; padding-right: 0; }
+.dt-fold .ui-fold-body { padding-left: 0; padding-right: 0; }
 
 .dt-chips {
   display: flex;

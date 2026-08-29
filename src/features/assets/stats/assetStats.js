@@ -1,4 +1,4 @@
-import { TRACKED } from '../assetKinds.js';
+import { TRACKED, trackingModeFor } from '../assetKinds.js';
 import { needsDetails } from '../detailsPending.js';
 import { available, out as unitsOut } from '../handover/availability.js';
 import { perItem, countPerItem, unitsOf as itemsOf } from '../units.js';
@@ -16,14 +16,24 @@ const unitsOf = (asset) => (Number.isFinite(asset?.quantity) ? asset.quantity : 
 /**
  * How many items on a bulk line are still waiting for a sticker.
  *
- * Only counted on a line where labelling has already STARTED. A bag of twenty
- * cables was never going to wear twenty stickers, and counting it would bury
- * the number this card exists for; but two tabs with one labelled is exactly
- * the case somebody needs reminding about.
+ * A bag of twenty cables was never going to wear twenty stickers, and counting
+ * it would bury the number this card exists for. So a line is counted only
+ * when one of two things is true:
+ *
+ *  - labelling has already STARTED on it — two tabs with one labelled is
+ *    exactly the case somebody needs reminding about; or
+ *  - it is a line of the KIND of thing that carries a label each. Monitors and
+ *    laptops do, whatever `trackingMode` the row happens to be set to.
+ *
+ * That second rule is what makes the figure survive a combine. Ten monitors
+ * scanned as ten tracked rows counted ten; folded into one line of ten they
+ * counted ZERO, because nobody had started labelling the new line — so tidying
+ * the register appeared to clear a job that nobody had done.
  */
 function awaitingLabel(asset, count) {
   const tagged = itemsOf(asset).filter((unit) => unit.assetTag).length;
-  return tagged === 0 ? 0 : Math.max(0, count - tagged);
+  if (tagged === 0 && trackingModeFor(asset?.category) !== TRACKED) return 0;
+  return Math.max(0, count - tagged);
 }
 
 export function assetStats(assets = []) {

@@ -4,6 +4,8 @@ import { useMsal } from '@azure/msal-react';
 import AppShell from '../components/AppShell';
 import Button from '../components/ui/Button';
 import { Card, ErrorBanner, EmptyState } from '../components/ui/Surfaces';
+import Collapsible from '../components/ui/Collapsible';
+import { useConfirm } from '../components/ui/useConfirm';
 import {
   ArrowLeft, Save, Trash2, Tag, Barcode, Check, Users, Clock, AlertTriangle,
   ClipboardList,
@@ -12,13 +14,15 @@ import { useAssets, SHAREPOINT_SITE_URL } from '../features/assets/useAssets';
 import { useSharePointToken } from '../hooks/useRequests';
 import { updateAsset, deleteAsset, EDITABLE_FIELDS } from '../features/assets/sharepoint/updateAsset';
 import {
-  CATEGORIES, CONDITIONS, STATUSES, TRACKED, BULK, isTracked,
+  CONDITIONS, STATUSES, TRACKED, BULK, isTracked,
 } from '../features/assets/assetKinds';
+import { categoriesIn } from '../features/assets/categories';
+import CategoryField from '../features/assets/ui/CategoryField';
 import { needsDetails, missingDetails } from '../features/assets/detailsPending';
 import { formatMYT } from '../utils/malaysiaTime';
 import { useHandovers } from '../features/assets/useHandovers';
 import {
-  holdersOf, outstanding, isOpen, isOverdue, available, owned,
+  holdersOf, groupHolders, isOpen, available, owned,
 } from '../features/assets/handover/availability';
 import {
   unitsOf, serialiseUnits, filledCount, parseUnits, PER_UNIT_ONLY,
@@ -44,7 +48,8 @@ import { loadPhoto, deletePhoto } from '../features/assets/store/assetDb';
  */
 
 const FIELDS = [
-  { key: 'category', label: 'Category', options: CATEGORIES },
+  // Its options are worked out per render, from what the register is using.
+  { key: 'category', label: 'Category', category: true },
   { key: 'trackingMode', label: 'Counted as', options: [TRACKED, BULK] },
   { key: 'manufacturer', label: 'Make' },
   { key: 'model', label: 'Model' },
@@ -83,6 +88,8 @@ export default function AssetDetailPage() {
   const getToken = useSharePointToken();
   const { assets, loading, reload } = useAssets();
   const { handovers } = useHandovers();
+  const { ask, dialog } = useConfirm();
+  const categories = useMemo(() => categoriesIn(assets), [assets]);
 
   const asset = useMemo(
     () => assets.find((row) => String(row.id) === String(id)),
@@ -91,8 +98,21 @@ export default function AssetDetailPage() {
 
   // Split rather than one list: who has it NOW is the answer somebody opened
   // this page for, and its history is the answer they might scroll to.
+  /**
+   * One line per PERSON, not one per handover row.
+   *
+   * Somebody who took five cables on Monday and one more on Wednesday is two
+   * rows in the handover list and one person on this panel. Six identical
+   * lines under a person's name is a list nobody reads; "Aisyah · 6" is the
+   * answer the panel was opened for, and the serials of the ones that have
+   * them are still named underneath it.
+   */
   const holders = useMemo(
-    () => (asset ? holdersOf(handovers, asset.assetKey) : []),
+    // The units are handed in so that a handover naming item 4 of a bulk line
+    // can say WHICH monitor that is. Before combining, the row title carried
+    // the serial by accident; a line of ten has one title and ten serials, so
+    // the item records are the only place left that knows.
+    () => (asset ? groupHolders(holdersOf(handovers, asset.assetKey), unitsOf(asset)) : []),
     [handovers, asset],
   );
   const history = useMemo(
@@ -264,7 +284,14 @@ export default function AssetDetailPage() {
   const remove = async () => {
     // Deleting a row is not undoable and the change log is the only trace, so
     // it asks first.
-    if (!window.confirm(`Remove "${asset.title}" from the register?`)) return;
+    if (!await ask({
+      title: `Remove "${asset.title}" from the register?`,
+      body: 'Its photographs, its item records and everything typed on it go with it. '
+        + 'The change log keeps a line saying it was removed, and that is the only '
+        + 'trace left.',
+      confirmLabel: 'Remove it',
+      cancelLabel: 'Keep it',
+    })) return;
 
     setSaving(true);
     try {
@@ -366,8 +393,18 @@ export default function AssetDetailPage() {
             things around it — photo, who has it, where it came from — down the
             right. The unit pager belongs with the record, not beside it. */}
         <div className="as-detail-main">
-          <Card className="as-panel">
-            <h2 className="as-h2">Details</h2>
+          {/* Sixteen boxes is the whole item and most of a phone screen. It
+              folds, and the fold is remembered — somebody who came to look at
+              the items or at who has it should not have to scroll past the
+              form every time. The header says what the row IS while it is
+              shut, so folding it away costs nothing at a glance. */}
+          <Collapsible
+            id="asset-details"
+            className="as-panel as-fold-panel"
+            title="Details"
+            summary={[asset.manufacturer, asset.model, asset.category]
+              .filter(Boolean).join(' · ') || 'Nothing filled in yet'}
+          >
             <div className="as-form">
               {shownFields.map((field) => (
                 <label className="as-field" key={field.key}>
@@ -380,7 +417,15 @@ export default function AssetDetailPage() {
                     )}
                   </span>
 
-                  {field.options ? (
+                  {field.category ? (
+                    // The one dropdown that can be added to. Everything else
+                    // here is a fixed list where a new value would be a typo.
+                    <CategoryField
+                      value={valueOf(field.key)}
+                      options={categories}
+                      onChange={(next) => setEdits((current) => ({ ...current, [field.key]: next }))}
+                    />
+                  ) : field.options ? (
                     <select
                       value={valueOf(field.key)}
                       onChange={(e) => setEdits((current) => ({ ...current, [field.key]: e.target.value }))}
@@ -445,7 +490,7 @@ export default function AssetDetailPage() {
                 ))}
               </ul>
             )}
-          </Card>
+          </Collapsible>
 
           {scanning && (
             <TextScanSheet
@@ -479,20 +524,21 @@ export default function AssetDetailPage() {
         </div>
 
         <div className="as-detail-side">
-          <Card className="as-panel">
-            <h2 className="as-h2">Photographs</h2>
+          {/* Only the paperwork now. The picture of the whole line used to sit
+              above it and was worth very little: on a bulk row it is one
+              photograph standing in for twenty things, each of which has its
+              own picture on its own item card below, and on a tracked row it
+              repeats what the item card already shows. The delivery order is
+              the one picture with nothing else showing it — the paper saying
+              what was SUPPOSED to arrive, which is exactly what somebody
+              counting a delivery wants without signing into SharePoint. */}
+          <Collapsible
+            id="asset-paperwork"
+            className="as-panel as-fold-panel"
+            title="Delivery order / PO"
+            summary={asset.poPhotoUrl ? 'Scanned' : 'Nothing scanned'}
+          >
             <div className="as-shots">
-              <AssetPhoto
-                siteUrl={SHAREPOINT_SITE_URL}
-                stored={asset.photoUrl}
-                alt={asset.title}
-                caption={perUnit ? 'The whole line' : 'The item'}
-              />
-              {/* The delivery order as a PICTURE, not a link. It is the paper
-                  that says what was supposed to arrive, and checking a count
-                  against it should not mean leaving the page and signing into
-                  SharePoint. The link to the original is still one tap away,
-                  inside the enlarged view. */}
               <AssetPhoto
                 siteUrl={SHAREPOINT_SITE_URL}
                 stored={asset.poPhotoUrl}
@@ -501,7 +547,7 @@ export default function AssetDetailPage() {
                 empty="No delivery order was scanned for this one."
               />
             </div>
-          </Card>
+          </Collapsible>
 
           <Card className="as-panel">
             <h2 className="as-h2">Who has it</h2>
@@ -511,20 +557,24 @@ export default function AssetDetailPage() {
               </p>
             ) : (
               <ul className="as-holders">
-                {holders.map((row) => (
-                  <li key={row.id} className={isOverdue(row) ? 'as-row-overdue' : undefined}>
+                {holders.map((person) => (
+                  <li key={person.key} className={person.overdue ? 'as-row-overdue' : undefined}>
                     <Link
-                      to={`/assets/people/${encodeURIComponent(row.personEmail)}`}
+                      to={`/assets/people/${encodeURIComponent(person.email)}`}
                       className="as-link"
                     >
-                      <Users size={13} /> {row.personName || row.personEmail}
+                      <Users size={13} /> {person.name}
+                      {/* The count belongs beside the name: one person with six
+                          cables is the fact, and six lines saying "1" was not. */}
+                      {person.units > 1 && <span className="as-count">× {person.units}</span>}
                     </Link>
                     <span className="as-sub">
-                      {row.serialNumber ? `${row.serialNumber} · ` : ''}
-                      {outstanding(row)} · {row.kind}
-                      {row.dueOnMYT ? ` · due ${row.dueOnMYT}` : ''}
+                      {person.serials.length ? `${person.serials.join(', ')} · ` : ''}
+                      {person.units} · {person.kinds.join(' & ')}
+                      {person.dueOnMYT ? ` · due ${person.dueOnMYT}` : ''}
+                      {person.lines > 1 ? ` · ${person.lines} handovers` : ''}
                     </span>
-                    {isOverdue(row) && (
+                    {person.overdue && (
                       <span className="as-overdue"><Clock size={12} /> overdue</span>
                     )}
                   </li>
@@ -637,6 +687,8 @@ export default function AssetDetailPage() {
           </Button>
         </div>
       </div>
+
+      {dialog}
     </AppShell>
   );
 }

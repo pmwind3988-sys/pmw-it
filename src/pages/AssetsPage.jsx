@@ -5,13 +5,17 @@ import AppShell from '../components/AppShell';
 import Button from '../components/ui/Button';
 import StatCard from '../components/ui/StatCard';
 import { Card, ErrorBanner, EmptyState } from '../components/ui/Surfaces';
+import Collapsible from '../components/ui/Collapsible';
+import Pager from '../components/ui/Pager';
+import { paginate } from '../components/ui/paginate';
+import { useConfirm } from '../components/ui/useConfirm';
 import {
   ScanLine, Plus, Package, Tag, AlertTriangle, Truck, RefreshCw, Users, Clock,
   ClipboardList, Boxes, X,
 } from '../components/ui/Icons';
 import { useAssets, SHAREPOINT_SITE_URL } from '../features/assets/useAssets';
 import { useSharePointToken } from '../hooks/useRequests';
-import { blockersFor, planCombine } from '../features/assets/combine';
+import { blockersFor, planCombine, stillOut } from '../features/assets/combine';
 import { combineAssets } from '../features/assets/sharepoint/combineAssets';
 import { useBatches } from '../features/assets/useBatches';
 import { useHandovers } from '../features/assets/useHandovers';
@@ -20,7 +24,8 @@ import { assetStats } from '../features/assets/stats/assetStats';
 import {
   filterAssets, sortAssets, optionsFor,
 } from '../features/assets/assetFilters';
-import { CATEGORIES, CONDITIONS, STATUSES } from '../features/assets/assetKinds';
+import { CONDITIONS, STATUSES } from '../features/assets/assetKinds';
+import { categoriesIn } from '../features/assets/categories';
 import { batchTitle } from '../features/assets/draft/batch';
 import { newBatch } from '../features/assets/draft/batch';
 import { saveBatch } from '../features/assets/store/assetDb';
@@ -50,6 +55,12 @@ export default function AssetsPage() {
   const [combining, setCombining] = useState(false);
   const [combined, setCombined] = useState('');
   const [combineError, setCombineError] = useState('');
+  const { ask, dialog } = useConfirm();
+
+  // Only the page being looked at is built. Two thousand rows laid out at once
+  // is a phone that appears to have hung.
+  const [pageSize, setPageSize] = useState(25);
+  const [at, setAt] = useState({ of: '', page: 1 });
 
   const filters = {
     query,
@@ -79,12 +90,50 @@ export default function AssetsPage() {
     [assets, query, params],
   );
 
+  /**
+   * Back to the first page whenever the list underneath changes. Staying on
+   * page 7 of a search with three results shows an empty table, which reads as
+   * "nothing found".
+   *
+   * The page number is held together with the list it counts rather than being
+   * reset by an effect: an effect would render the wrong page first and correct
+   * it afterwards, which is a visible flicker of somebody else's rows.
+   */
+  const of = `${query}|${params.toString()}|${pageSize}`;
+  const page = at.of === of ? at.page : 1;
+  const setPage = (next) => setAt({ of, page: next });
+
+  const paged = useMemo(() => paginate(shown, page, pageSize), [shown, page, pageSize]);
+
+  // The built-in kinds, plus anything the register is actually using — which
+  // is how a category somebody added shows up here without a second list.
+  const categories = useMemo(() => categoriesIn(assets), [assets]);
+
+  /** "category, make or model" rather than "category or make or model". */
+  const listOf = (parts) => (parts.length < 2
+    ? parts.join('')
+    : `${parts.slice(0, -1).join(', ')} or ${parts[parts.length - 1]}`);
+
+  /** What the filter panel would say, for the line it shows while folded. */
+  const activeFilters = [
+    filters.category,
+    filters.status,
+    filters.condition,
+    filters.location,
+    filters.unlabelled && 'waiting for a label',
+    filters.pending && 'needs details',
+  ].filter(Boolean);
+
   const chosen = useMemo(
     () => assets.filter((row) => picked.includes(row.id)),
     [assets, picked],
   );
-  const blockers = picked.length ? blockersFor(chosen, handovers) : [];
-  const plan = picked.length >= 2 && !blockers.length ? planCombine(chosen) : null;
+  const blockers = picked.length ? blockersFor(chosen) : [];
+  const plan = picked.length >= 2 && !blockers.length ? planCombine(chosen, handovers) : null;
+  // What is on somebody's desk right now. Not a refusal any more: it stays
+  // out, and its handover follows it onto the combined line.
+  const outNow = picked.length ? stillOut(chosen, handovers) : [];
+  const holders = new Set(outNow.map((row) => row.personEmail || row.personName)).size;
 
   const togglePick = (id) => setPicked(
     (current) => (current.includes(id)
@@ -104,11 +153,19 @@ export default function AssetsPage() {
    * surviving line, undoing it means retyping ten rows.
    */
   const combine = async () => {
-    const summary = `Combine ${chosen.length} rows into one line of `
-      + `${plan.edits.quantity}? Everything on them is kept as ${plan.edits.quantity} `
+    const summary = `Everything on them is kept as ${plan.edits.quantity} `
       + `items on "${plan.keep.title || plan.keep.model || 'the oldest row'}", `
-      + `and the other ${plan.remove.length} rows are removed.`;
-    if (!window.confirm(summary)) return;
+      + `and the other ${plan.remove.length} rows are removed. This cannot be undone.`
+      + (outNow.length
+        ? ` The ${outNow.length} still out stay out — the same people keep the same `
+          + 'things, as items on the new line.'
+        : '');
+    if (!await ask({
+      title: `Combine ${chosen.length} rows?`,
+      body: summary,
+      confirmLabel: 'Combine into one line',
+      cancelLabel: 'Leave them as they are',
+    })) return;
 
     setCombining(true);
     setCombineError('');
@@ -124,8 +181,12 @@ export default function AssetsPage() {
 
       setCombined(
         `Combined into one line of ${result.quantity}.`
+        + (result.moved
+          ? ` ${result.moved} handover${result.moved === 1 ? '' : 's'} now point`
+            + `${result.moved === 1 ? 's' : ''} at it, so nobody's item changed hands.`
+          : '')
         + (result.failures.length
-          ? ` ${result.failures.length} of the old rows could not be removed — `
+          ? ` ${result.failures.length} of the old rows could not be finished — `
             + 'everything is safe, try combining what is left again.'
           : ''),
       );
@@ -136,6 +197,26 @@ export default function AssetsPage() {
     } finally {
       setCombining(false);
     }
+  };
+
+  /**
+   * A delivery still sitting on this phone. Nobody else can see it, so
+   * discarding it is the one deletion here with no copy anywhere — it asks.
+   */
+  const discardBatch = async (batch) => {
+    const held = batch.drafts?.length ?? 0;
+    if (!await ask({
+      title: 'Discard this delivery?',
+      body: (held
+        ? `"${batchTitle(batch)}" holds ${held} item${held === 1 ? '' : 's'} that `
+          + `${held === 1 ? 'has' : 'have'} never been saved. Nobody else can see `
+          + `${held === 1 ? 'it' : 'them'}, so nothing is left behind once this goes.`
+        : `"${batchTitle(batch)}" holds no items yet, so nothing is lost — the `
+          + 'delivery details themselves go.'),
+      confirmLabel: 'Discard it',
+      cancelLabel: 'Keep it',
+    })) return;
+    discard(batch.id);
   };
 
   /** Adding by hand is the same review grid, just with nothing scanned into it. */
@@ -229,45 +310,59 @@ export default function AssetsPage() {
         />
       </div>
 
-      <Card className="as-filters">
-        <select
-          value={filters.category}
-          onChange={(e) => setFilter('category', e.target.value)}
-          aria-label="Category"
-        >
-          <option value="">Every category</option>
-          {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
+      {/* Five dropdowns fill a phone screen before a single row of the
+          register is visible. They fold away, and the header says what is on
+          while they are folded — a hidden filter is a page lying about what it
+          is showing. */}
+      <Collapsible
+        id="assets-filters"
+        title="Filters"
+        defaultOpen={false}
+        summary={activeFilters.length
+          ? activeFilters.join(' · ')
+          : 'Everything, anywhere, any condition'}
+        actions={(
+          <Button variant="ghost" size="sm" icon={RefreshCw} onClick={reload}>Refresh</Button>
+        )}
+      >
+        <div className="as-filters">
+          <select
+            value={filters.category}
+            onChange={(e) => setFilter('category', e.target.value)}
+            aria-label="Category"
+          >
+            <option value="">Every category</option>
+            {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
 
-        <select
-          value={filters.status}
-          onChange={(e) => setFilter('status', e.target.value)}
-          aria-label="Status"
-        >
-          <option value="">Any status</option>
-          {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-        </select>
+          <select
+            value={filters.status}
+            onChange={(e) => setFilter('status', e.target.value)}
+            aria-label="Status"
+          >
+            <option value="">Any status</option>
+            {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
 
-        <select
-          value={filters.condition}
-          onChange={(e) => setFilter('condition', e.target.value)}
-          aria-label="Condition"
-        >
-          <option value="">Any condition</option>
-          {CONDITIONS.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
+          <select
+            value={filters.condition}
+            onChange={(e) => setFilter('condition', e.target.value)}
+            aria-label="Condition"
+          >
+            <option value="">Any condition</option>
+            {CONDITIONS.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
 
-        <select
-          value={filters.location}
-          onChange={(e) => setFilter('location', e.target.value)}
-          aria-label="Location"
-        >
-          <option value="">Anywhere</option>
-          {optionsFor(assets, 'location').map((l) => <option key={l} value={l}>{l}</option>)}
-        </select>
-
-        <Button variant="ghost" size="sm" icon={RefreshCw} onClick={reload}>Refresh</Button>
-      </Card>
+          <select
+            value={filters.location}
+            onChange={(e) => setFilter('location', e.target.value)}
+            aria-label="Anywhere"
+          >
+            <option value="">Anywhere</option>
+            {optionsFor(assets, 'location').map((l) => <option key={l} value={l}>{l}</option>)}
+          </select>
+        </div>
+      </Collapsible>
 
       {/* Ten rows of one monitor that were always one line of ten. What it is
           about to do is spelled out before it does it, because the rows
@@ -282,9 +377,18 @@ export default function AssetsPage() {
               : `${picked.length} rows → one line of ${plan?.edits.quantity ?? '—'}.`}
             {plan?.warnings.length > 0 && (
               <strong>
-                {' '}They do not agree on {plan.warnings.join(' or ')} — check that
+                {' '}They do not agree on {listOf(plan.warnings)} — check that
                 these really are the same thing.
               </strong>
+            )}
+            {outNow.length > 0 && (
+              <>
+                {' '}{outNow.length} item{outNow.length === 1 ? ' is' : 's are'} out with{' '}
+                {holders} {holders === 1 ? 'person' : 'people'}, and stay
+                {outNow.length === 1 ? 's' : ''} out — the same{' '}
+                {holders === 1 ? 'person keeps' : 'people keep'} the same{' '}
+                {outNow.length === 1 ? 'thing' : 'things'}, as items on the one line.
+              </>
             )}
             {blockers.map((blocker) => <strong key={blocker}> {blocker}</strong>)}
           </span>
@@ -323,10 +427,17 @@ export default function AssetsPage() {
             {shown.length} of {assets.length} row{assets.length === 1 ? '' : 's'}
           </p>
           <AssetTable
-            assets={shown}
+            assets={paged.rows}
             picking={picking}
             picked={picked}
             onPick={togglePick}
+          />
+          <Pager
+            page={paged}
+            onPage={setPage}
+            size={pageSize}
+            onSize={setPageSize}
+            label="rows"
           />
         </>
       )}
@@ -341,12 +452,14 @@ export default function AssetsPage() {
                   {batchTitle(batch)}
                 </Link>
                 <span className="as-sub">{batch.drafts?.length ?? 0} items</span>
-                <Button variant="ghost" size="sm" onClick={() => discard(batch.id)}>Discard</Button>
+                <Button variant="ghost" size="sm" onClick={() => discardBatch(batch)}>Discard</Button>
               </li>
             ))}
           </ul>
         </details>
       )}
+
+      {dialog}
     </AppShell>
   );
 }

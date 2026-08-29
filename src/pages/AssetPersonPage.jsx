@@ -8,7 +8,7 @@ import {
   ArrowLeft, Check, AlertTriangle, Clock, Package, Users, Pencil,
 } from '../components/ui/Icons';
 import { useHandovers } from '../features/assets/useHandovers';
-import { SHAREPOINT_SITE_URL } from '../features/assets/useAssets';
+import { useAssets, SHAREPOINT_SITE_URL } from '../features/assets/useAssets';
 import { useSharePointToken } from '../hooks/useRequests';
 import { commitReturn, commitPersonEdit } from '../features/assets/sharepoint/writeHandover';
 import SignatureField from '../features/assets/ui/SignatureField';
@@ -16,9 +16,10 @@ import SignatureShot from '../features/assets/ui/SignatureShot';
 import PersonEditor from '../features/assets/ui/PersonEditor';
 import { returnEverything } from '../features/assets/handover/planReturn';
 import {
-  heldBy, outstanding, isOverdue, isOpen, HANDOVER_KIND,
+  heldBy, outstanding, isOverdue, isOpen, nameOfItem, HANDOVER_KIND,
 } from '../features/assets/handover/availability';
 import { CONDITIONS } from '../features/assets/assetKinds';
+import { unitsOf } from '../features/assets/units';
 import { formatMYT } from '../utils/malaysiaTime';
 import { initialsOf } from '../utils/initials';
 
@@ -35,6 +36,8 @@ export default function AssetPersonPage() {
   const { instance } = useMsal();
   const getToken = useSharePointToken();
   const { handovers, loading, error, reload } = useHandovers();
+  // Only so a handover pointing at item 4 of a line can say which one that is.
+  const { assets } = useAssets();
 
   const [condition, setCondition] = useState(CONDITIONS[1] ?? 'Good');
   // Signed for on the way back in, the same as on the way out. Cleared after
@@ -58,6 +61,20 @@ export default function AssetPersonPage() {
 
   const address = decodeURIComponent(email ?? '');
   const held = useMemo(() => heldBy(handovers, address), [handovers, address]);
+
+  /**
+   * WHICH one of a line each row names.
+   *
+   * The register is read here for one reason: a handover against a bulk line
+   * points at an item NUMBER, and only the line's own item records know that
+   * item 4 is 0XXXHNAL200446. "Chee How has item 4" is not an answer anybody
+   * can carry to a desk. Falls back to the number while the read is in flight,
+   * and for a line whose items nobody has written on yet.
+   */
+  const nameHeld = useMemo(() => {
+    const byId = new Map(assets.map((asset) => [asset.id, asset]));
+    return (row) => nameOfItem(row, unitsOf(byId.get(row.assetId) ?? {}));
+  }, [assets]);
   const past = useMemo(
     () => handovers
       .filter((row) => String(row.personEmail ?? '').toLowerCase() === address.toLowerCase())
@@ -285,7 +302,10 @@ export default function AssetPersonPage() {
                     <Link to={`/assets/${row.assetId}`} className="as-link">{row.itemTitle}</Link>
                     <span className="as-sub">
                       {row.category}
-                      {row.serialNumber && ` · ${row.serialNumber}`}
+                      {/* WHICH one of the line. A serial when the handover
+                          carries one; otherwise the item number, which is what
+                          a line of ten identical monitors has instead. */}
+                      {nameHeld(row) && ` · ${nameHeld(row)}`}
                     </span>
                   </td>
                   <td className="as-qty">{outstanding(row)}</td>

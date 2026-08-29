@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import AppShell from '../components/AppShell';
 import Button from '../components/ui/Button';
 import { Card, ErrorBanner, EmptyState } from '../components/ui/Surfaces';
+import { useConfirm } from '../components/ui/useConfirm';
 import {
   Save, Plus, Trash2, WifiOff, AlertTriangle, Check, Truck,
 } from '../components/ui/Icons';
@@ -19,6 +20,7 @@ import { newDraft, draftIssues } from '../features/assets/draft/draftAsset';
 import { indexByTag, normaliseCode } from '../features/assets/identity';
 import { saveBatchToSharePoint, remainingDrafts } from '../features/assets/sharepoint/saveBatch';
 import DraftCard from '../features/assets/ui/DraftCard';
+import { categoriesIn } from '../features/assets/categories';
 
 /**
  * Reviewing a delivery and committing it.
@@ -44,6 +46,10 @@ export default function AssetBatchPage() {
   const { instance } = useMsal();
   const getToken = useSharePointToken();
   const { assets, loading: loadingRegister, reload } = useAssets();
+  const { ask, dialog } = useConfirm();
+  // The built-in kinds plus whatever the register is already using, so a
+  // category added on one delivery is offered on the next.
+  const categories = useMemo(() => categoriesIn(assets), [assets]);
 
   const [batch, setBatch] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -146,6 +152,21 @@ export default function AssetBatchPage() {
   };
 
   const discard = async () => {
+    // A delivery lives on this phone until it is saved, so discarding one is
+    // the only deletion here with no copy anywhere to go back to.
+    const held = batch?.drafts?.length ?? 0;
+    if (!await ask({
+      title: 'Discard this delivery?',
+      body: (held
+        ? `${held} item${held === 1 ? '' : 's'} scanned or typed into it ${held === 1 ? 'has' : 'have'} `
+          + 'never been saved. Nobody else can see '
+          + `${held === 1 ? 'it' : 'them'}, so there is nothing left once this goes.`
+        : 'Nothing has been scanned or typed into it yet, so nothing is lost — the '
+          + 'delivery details themselves go.'),
+      confirmLabel: 'Discard it',
+      cancelLabel: 'Keep it',
+    })) return;
+
     await deleteBatch(id);
     navigate('/assets');
   };
@@ -259,12 +280,23 @@ export default function AssetBatchPage() {
           <div className="as-review">
             {resolved.map((draft, index) => (
               <DraftCard
+                categories={categories}
                 key={draft.localId}
                 index={index + 1}
                 draft={batch.drafts[index]}
                 issues={issuesByRow.get(draft.localId) ?? []}
                 onChange={(next) => update(replaceDraft(batch, next))}
-                onRemove={() => update(removeDraft(batch, draft.localId))}
+                onRemove={async () => {
+                  const named = [draft.manufacturer, draft.model].filter(Boolean).join(' ')
+                    || draft.serialNumber || 'this row';
+                  if (!await ask({
+                    title: `Remove ${named} from the delivery?`,
+                    body: 'Everything scanned or typed on this row goes with it.',
+                    confirmLabel: 'Remove the row',
+                    cancelLabel: 'Keep it',
+                  })) return;
+                  update(removeDraft(batch, draft.localId));
+                }}
               />
             ))}
           </div>
@@ -282,6 +314,8 @@ export default function AssetBatchPage() {
           </div>
         </>
       )}
+
+      {dialog}
     </AppShell>
   );
 }

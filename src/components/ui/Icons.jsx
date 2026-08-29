@@ -88,6 +88,8 @@ export const Moon = make('Moon', <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 
 
 export const ChevronRight = make('ChevronRight', <polyline points="9 18 15 12 9 6" />);
 
+export const ChevronDown = make('ChevronDown', <polyline points="6 9 12 15 18 9" />);
+
 export const ArrowLeft = make('ArrowLeft', (
   <>
     <path d="M19 12H5" />

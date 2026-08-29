@@ -215,13 +215,15 @@
 
 /* --- the register --------------------------------------------------- */
 
+/* Inside a folding panel now, which brings its own padding and its own
+   bottom margin. */
 .as-filters {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 12px;
-  margin-bottom: 12px;
 }
+
+.as-filters select { flex: 1 1 160px; }
 
 .as-filters select {
   padding: 7px 9px;
@@ -233,21 +235,56 @@
   font-family: inherit;
 }
 
+/* The table scrolls inside its own box — both ways — rather than pushing the
+   page around it.
+
+   Sideways was always the case: a body that scrolls horizontally on a phone
+   feels broken. Up and down is the newer half, and the reason is the scrollbar
+   rather than the rows: a box as tall as two hundred rows parks its horizontal
+   bar two hundred rows below the fold, so reaching the columns on the right
+   meant first scrolling to the very bottom of the page. Capping the box to the
+   height left on screen keeps that bar in view and scrolls the rows within it,
+   with the header staying put above them. */
 .as-table-wrap {
-  /* The table scrolls inside its own box rather than pushing the page
-     sideways — a body that scrolls horizontally on a phone feels broken. */
   overflow-x: auto;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--surface);
 }
 
+/* Not on a short landscape phone, where a capped box would be four rows tall
+   and worse than the page scroll it replaces. */
+@media (min-height: 480px) {
+  .as-table-wrap {
+    max-height: calc(100vh - 240px);
+    min-height: 240px;
+    overflow-y: auto;
+  }
+}
+
+/* Riding along at the top of that box. The background is opaque on purpose:
+   rows scrolling underneath a transparent header show through it. */
+.as-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--it-thead);
+}
+
 .as-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
-  min-width: 720px;
+  /* Wide enough that eight columns each get a usable share. Squeezing them
+     into 720px did not save anybody the sideways scroll — it just wrapped
+     "Samsung S3 Essential Monitor — 0XXXHNAL200474" into a four-line block, so
+     three rows filled the whole box. */
+  min-width: 880px;
 }
+
+/* The name of the thing, which is what the eye goes to first and what every
+   other column is read against. */
+.as-table .as-item { min-width: 220px; }
 
 .as-table th {
   text-align: left;
@@ -1689,4 +1726,72 @@
   gap: 3px;
   font-size: 11px;
   color: var(--text-secondary);
+}
+
+/* --- a category the built-in list never had --------------------------- */
+
+.as-addcat {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 8px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  background: var(--it-brand-wash);
+}
+
+.as-addcat input {
+  flex: 1 1 140px;
+  min-width: 0;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.as-addcat-note,
+.as-addcat-problem {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--it-ink-soft);
+}
+
+.as-addcat-problem { color: var(--it-danger); }
+
+/* --- panels that fold ------------------------------------------------- */
+
+/* A folding panel wears `.as-panel` so it sits in the column like the cards
+   around it, but the padding belongs to the fold's own header and body — the
+   header has to reach the panel's edges to be worth tapping at. */
+.as-panel.ui-fold { padding: 0; }
+
+.as-fold-panel .ui-fold-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.as-fold-panel .ui-fold-head { padding: 4px 8px 4px 4px; }
+.as-fold-panel .ui-fold-body { padding: 14px 16px 16px; }
+
+/* A phone is operated with a thumb, not a mouse pointer. The paging arrows sit
+   at the bottom of a long list where a mis-tap costs a whole page of reading,
+   so they get a target worth aiming at. */
+@media (pointer: coarse) {
+  .ui-pager-step {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/* How many of a line one person has, beside their name. */
+.as-count {
+  font-weight: 600;
+  color: var(--it-ink-soft);
 }

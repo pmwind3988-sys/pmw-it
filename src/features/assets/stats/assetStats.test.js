@@ -177,3 +177,52 @@ describe('rows still waiting for their paperwork', () => {
     expect(stats.pending).toBe(1);
   });
 });
+
+describe('what is waiting for a label, across a combine', () => {
+  const monitor = (extra = {}) => ({
+    category: 'Monitor', trackingMode: 'Tracked', quantity: 1, ...extra,
+  });
+
+  /**
+   * The figure has to mean the same thing before and after the register is
+   * tidied. Ten monitor rows and one line of ten monitors are the same ten
+   * stickers to go and stick on.
+   */
+  it('reads the same for ten rows and for the one line they become', () => {
+    const asRows = Array.from({ length: 10 }, () => monitor());
+    const asOneLine = [{
+      category: 'Monitor', trackingMode: 'Bulk', quantity: 10, units: '',
+    }];
+
+    expect(assetStats(asRows).unlabelled).toBe(10);
+    expect(assetStats(asOneLine).unlabelled).toBe(10);
+  });
+
+  it('still says nothing about a bag of cables nobody labels', () => {
+    const cables = [{ category: 'Cable', trackingMode: 'Bulk', quantity: 20 }];
+
+    expect(assetStats(cables).unlabelled).toBe(0);
+  });
+
+  it('counts the rest of a bag once somebody starts labelling it', () => {
+    const cables = [{
+      category: 'Cable',
+      trackingMode: 'Bulk',
+      quantity: 20,
+      units: JSON.stringify([{ index: 0, assetTag: 'PMW-C1' }]),
+    }];
+
+    expect(assetStats(cables).unlabelled).toBe(19);
+  });
+
+  it('counts only the unlabelled ones on a part-labelled line of monitors', () => {
+    const line = [{
+      category: 'Monitor',
+      trackingMode: 'Bulk',
+      quantity: 10,
+      units: JSON.stringify([{ index: 0, assetTag: 'PMW-1' }, { index: 3, assetTag: 'PMW-4' }]),
+    }];
+
+    expect(assetStats(line).unlabelled).toBe(8);
+  });
+});

@@ -75,7 +75,7 @@ export default function AssetTable({
         <thead>
           <tr>
             {picking && <th className="as-pick" aria-label="Combine" />}
-            <th>Item</th>
+            <th className="as-item">Item</th>
             <th>Category</th>
             <th>Serial / label</th>
             <th>Qty</th>
@@ -98,7 +98,7 @@ export default function AssetTable({
                   />
                 </td>
               )}
-              <td>
+              <td className="as-item">
                 <Link to={`/assets/${asset.id}`} className="as-link">
                   {asset.title || asset.model || 'Untitled item'}
                 </Link>

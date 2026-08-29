@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   owned, out, available, isOut, outstanding, isOpen, isOverdue, statusFor,
-  holdersOf, heldBy, peopleWithItems, HANDOVER_KIND, HANDOVER_STATUS,
+  holdersOf, heldBy, peopleWithItems, groupHolders, HANDOVER_KIND, HANDOVER_STATUS,
 } from './availability.js';
 
 const box = (overrides = {}) => ({
@@ -147,5 +147,69 @@ describe('peopleWithItems', () => {
 
   it('leaves out everything already returned', () => {
     expect(peopleWithItems([line({ quantity: 2, returnedQuantity: 2 })])).toEqual([]);
+  });
+});
+
+describe('groupHolders', () => {
+  const line = (extra) => ({
+    personEmail: 'aisyah@pmw', personName: 'Aisyah', quantity: 1, returnedQuantity: 0,
+    kind: 'Issued', ...extra,
+  });
+
+  it('puts one person on one line, however many times they took something', () => {
+    const grouped = groupHolders([
+      line({ id: 1, quantity: 5 }),
+      line({ id: 2, quantity: 1 }),
+    ]);
+
+    expect(grouped).toHaveLength(1);
+    expect(grouped[0].units).toBe(6);
+    expect(grouped[0].lines).toBe(2);
+  });
+
+  it('keeps the serials of the ones that have them', () => {
+    const grouped = groupHolders([
+      line({ id: 1, serialNumber: 'SN-1' }),
+      line({ id: 2 }),
+      line({ id: 3, serialNumber: 'SN-3' }),
+    ]);
+
+    expect(grouped[0].serials).toEqual(['SN-1', 'SN-3']);
+  });
+
+  it('counts what is left rather than what went out', () => {
+    expect(groupHolders([line({ id: 1, quantity: 5, returnedQuantity: 3 })])[0].units).toBe(2);
+  });
+
+  it('is one person per email, not per spelling of their name', () => {
+    const grouped = groupHolders([
+      line({ id: 1, personName: 'Aisyah' }),
+      line({ id: 2, personName: 'aisyah binti a.' }),
+    ]);
+
+    expect(grouped).toHaveLength(1);
+  });
+
+  it('shows the soonest deadline, and calls the person overdue for any of them', () => {
+    const now = Date.now();
+    const grouped = groupHolders([
+      line({ id: 1, kind: 'Borrowed', dueOn: now + 90000000, dueOnMYT: 'later' }),
+      line({ id: 2, kind: 'Borrowed', dueOn: now - 1000, dueOnMYT: 'yesterday' }),
+    ]);
+
+    expect(grouped[0].overdue).toBe(true);
+    expect(grouped[0].dueOnMYT).toBe('yesterday');
+  });
+
+  it('puts the overdue people first, then whoever holds the most', () => {
+    const now = Date.now();
+    const grouped = groupHolders([
+      line({ id: 1, personEmail: 'amir@pmw', personName: 'Amir', quantity: 9 }),
+      line({
+        id: 2, personEmail: 'siti@pmw', personName: 'Siti', kind: 'Borrowed', dueOn: now - 1000,
+      }),
+    ]);
+
+    expect(grouped.map((entry) => entry.name)).toEqual(['Siti', 'Amir']);
   });
 });

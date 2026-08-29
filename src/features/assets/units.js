@@ -268,17 +268,27 @@ export function trimUnits(stored) {
  * `at` is where to put it. A position already taken is stepped over instead of
  * being written on, because the row it would overwrite describes a real object
  * somebody has already recorded.
+ *
+ * Answers with the position it chose as well as the units, because a caller
+ * folding a row away has to be able to say WHICH item the thing became — a
+ * handover pointing at that row needs the new number, and working it out from
+ * the offset would be wrong the moment a taken position was stepped over.
  */
-export function appendUnit(stored, source, at = 0, fields = PER_UNIT_ONLY) {
+export function placeUnit(stored, source, at = 0, fields = PER_UNIT_ONLY) {
   const units = parseUnits(stored);
   const candidate = legacyUnit(source, fields);
-  if (!candidate) return serialiseUnits(units);
+  if (!candidate) return { units: serialiseUnits(units), index: null };
 
   const taken = new Set(units.map((unit) => unit.index));
   let index = Math.max(0, Math.trunc(Number(at) || 0));
   while (taken.has(index)) index += 1;
 
-  return serialiseUnits([...units, { ...candidate, index }]);
+  return { units: serialiseUnits([...units, { ...candidate, index }]), index };
+}
+
+/** The same, for the callers that only want the units back. */
+export function appendUnit(stored, source, at = 0, fields = PER_UNIT_ONLY) {
+  return placeUnit(stored, source, at, fields).units;
 }
 
 /**

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import AppShell from '../components/AppShell';
 import Button from '../components/ui/Button';
 import { Card } from '../components/ui/Surfaces';
+import { useConfirm } from '../components/ui/useConfirm';
 import {
   Camera, ScanLine, Boxes, Check, X, AlertTriangle, Package,
 } from '../components/ui/Icons';
@@ -38,6 +39,7 @@ function toLocalInput(epochMs) {
 }
 
 export default function AssetScanPage() {
+  const { ask, dialog } = useConfirm();
   const navigate = useNavigate();
   const [step, setStep] = useState(STEP.PURCHASE);
   const [batch, setBatch] = useState(() => newBatch());
@@ -367,7 +369,19 @@ export default function AssetScanPage() {
                 {session.pool.length > 0 && (
                   <Button
                     variant="ghost"
-                    onClick={() => setSession((current) => discardPool(current))}
+                    onClick={async () => {
+                      // Every barcode read off this box so far. A mistap here
+                      // means walking back to the shelf and reading them again.
+                      if (!await ask({
+                        title: 'Discard the codes on this box?',
+                        body: `${session.pool.length} code`
+                          + `${session.pool.length === 1 ? '' : 's'} read off this box `
+                          + 'would have to be scanned again.',
+                        confirmLabel: 'Discard them',
+                        cancelLabel: 'Keep them',
+                      })) return;
+                      setSession((current) => discardPool(current));
+                    }}
                   >
                     Discard
                   </Button>
@@ -400,7 +414,18 @@ export default function AssetScanPage() {
                 <button
                   type="button"
                   className="as-iconbtn"
-                  onClick={() => setSession((current) => removeDraft(current, draft.localId))}
+                  onClick={async () => {
+                    const named = draft.serialNumber || draft.partNumber
+                      || draft.assetTag || 'this item';
+                    if (!await ask({
+                      title: `Remove ${named} from the scan?`,
+                      body: 'It goes off the list, and the box it was read from would have '
+                        + 'to be scanned again.',
+                      confirmLabel: 'Remove it',
+                      cancelLabel: 'Keep it',
+                    })) return;
+                    setSession((current) => removeDraft(current, draft.localId));
+                  }}
                   aria-label="Remove"
                 >
                   <X size={12} />
@@ -410,6 +435,8 @@ export default function AssetScanPage() {
           </ul>
         </div>
       )}
+
+      {dialog}
     </AppShell>
   );
 }

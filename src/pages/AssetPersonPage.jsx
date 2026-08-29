@@ -1,18 +1,19 @@
 import { useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMsal } from '@azure/msal-react';
 import AppShell from '../components/AppShell';
 import Button from '../components/ui/Button';
 import { Card, ErrorBanner, EmptyState } from '../components/ui/Surfaces';
 import {
-  ArrowLeft, Check, AlertTriangle, Clock, Package, Users,
+  ArrowLeft, Check, AlertTriangle, Clock, Package, Users, Pencil,
 } from '../components/ui/Icons';
 import { useHandovers } from '../features/assets/useHandovers';
 import { SHAREPOINT_SITE_URL } from '../features/assets/useAssets';
 import { useSharePointToken } from '../hooks/useRequests';
-import { commitReturn } from '../features/assets/sharepoint/writeHandover';
+import { commitReturn, commitPersonEdit } from '../features/assets/sharepoint/writeHandover';
 import SignatureField from '../features/assets/ui/SignatureField';
 import SignatureShot from '../features/assets/ui/SignatureShot';
+import PersonEditor from '../features/assets/ui/PersonEditor';
 import { returnEverything } from '../features/assets/handover/planReturn';
 import {
   heldBy, outstanding, isOverdue, isOpen, HANDOVER_KIND,
@@ -43,6 +44,17 @@ export default function AssetPersonPage() {
   const [busy, setBusy] = useState(false);
   const [report, setReport] = useState(null);
   const [failure, setFailure] = useState('');
+
+  // Correcting who this person is. Kept apart from the return above: they are
+  // two different actions with two different risks, and one saying "4 lines
+  // returned" while the other says "renamed" in the same box would be a
+  // sentence nobody could act on.
+  // Opened straight into the form when the people list sent us here to fix a
+  // name, and closed by ordinary use afterwards — the query says how the page
+  // was arrived at, not what state it must stay in.
+  const [params] = useSearchParams();
+  const [editing, setEditing] = useState(params.get('edit') === '1');
+  const [renamed, setRenamed] = useState(null);
 
   const address = decodeURIComponent(email ?? '');
   const held = useMemo(() => heldBy(handovers, address), [handovers, address]);
@@ -86,6 +98,43 @@ export default function AssetPersonPage() {
     }
   };
 
+  const doRename = async (draft) => {
+    setBusy(true);
+    setFailure('');
+    setRenamed(null);
+    setReport(null);
+    try {
+      const tokenRes = await getToken();
+      const person = {
+        name: draft.name.trim(),
+        email: draft.email.trim().toLowerCase(),
+        login: '',
+      };
+
+      const result = await commitPersonEdit({
+        siteUrl: SHAREPOINT_SITE_URL,
+        token: tokenRes.accessToken,
+        from: address,
+        person,
+      });
+
+      setRenamed({ ...result, ...person });
+      setEditing(false);
+      reload();
+
+      // The page is keyed on the email, so a changed one leaves this URL
+      // pointing at somebody who no longer exists. Replaced rather than
+      // pushed: going Back should reach the people list, not a dead address.
+      if (person.email !== address.toLowerCase()) {
+        navigate(`/assets/people/${encodeURIComponent(person.email)}`, { replace: true });
+      }
+    } catch (thrown) {
+      setFailure(thrown.message || 'The details could not be changed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (loading) return <AppShell title="Person"><div className="spinner" /></AppShell>;
 
   return (
@@ -97,6 +146,16 @@ export default function AssetPersonPage() {
           <Button variant="ghost" icon={ArrowLeft} onClick={() => navigate('/assets/people')}>
             Everyone
           </Button>
+          {!editing && (
+            <Button
+              variant="secondary"
+              icon={Pencil}
+              disabled={busy}
+              onClick={() => { setEditing(true); setRenamed(null); }}
+            >
+              Edit details
+            </Button>
+          )}
           {held.length > 0 && (
             <Button
               icon={Check}
@@ -127,6 +186,24 @@ export default function AssetPersonPage() {
         </Card>
       )}
 
+      {renamed && (
+        <Card className={`as-notice ${renamed.staleRows.length ? 'as-notice-warn' : 'as-notice-ok'}`}>
+          {renamed.staleRows.length ? <AlertTriangle size={16} /> : <Check size={16} />}
+          <span>
+            Now {renamed.name} · {renamed.email}, across {renamed.changed} handover
+            {renamed.changed === 1 ? '' : 's'}.
+            {renamed.openLines > 0
+              && ` The ${renamed.openLines} item${renamed.openLines === 1 ? '' : 's'} still out `
+                + 'stayed exactly where they were.'}
+            {renamed.writeFailures.length > 0
+              && ` ${renamed.writeFailures.length} row${renamed.writeFailures.length === 1 ? '' : 's'} `
+                + 'could not be changed and still read the old details. Try again.'}
+            {renamed.staleRows.length > 0
+              && ' Some register rows still show the old name; the handovers themselves are correct.'}
+          </span>
+        </Card>
+      )}
+
       <div className="as-personhead">
         <span className="as-avatar as-avatar-lg">{initialsOf(name)}</span>
         <div className="as-facts as-facts-inline">
@@ -138,6 +215,19 @@ export default function AssetPersonPage() {
           )}
         </div>
       </div>
+
+      {editing && (
+        <Card className="as-panel">
+          <h2 className="as-h2">Who this is</h2>
+          <PersonEditor
+            current={{ name, email: address }}
+            handovers={handovers}
+            busy={busy}
+            onSave={doRename}
+            onCancel={() => setEditing(false)}
+          />
+        </Card>
+      )}
 
       {held.length > 0 && (
         <Card className="as-panel">

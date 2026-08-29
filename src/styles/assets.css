@@ -183,9 +183,28 @@
   line-height: 1.45;
 }
 
-.as-notice-warn { border-left: 3px solid #F59E0B; }
-.as-notice-bad { border-left: 3px solid var(--error, #EF4444); }
-.as-notice-ok { border-left: 3px solid var(--success, #10B981); }
+/* Tinted rather than tabbed. A thick bar down one edge shouts the colour and
+   says nothing else -- and every notice on the page shouting a different one
+   turns a screen somebody is trying to read into a set of traffic lights. The
+   whole card carries a faint wash of its colour and its border picks it up, so
+   how it went is legible at a glance and the words stay the loudest thing in
+   it. The icon each notice already carries does the rest, which is what keeps
+   this readable for anybody who cannot tell the three tints apart.
+   Low-alpha, so one set of values is right on a light card and a dark one. */
+.as-notice-warn {
+  border-color: rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.07);
+}
+
+.as-notice-bad {
+  border-color: rgba(239, 68, 68, 0.45);
+  background: rgba(239, 68, 68, 0.07);
+}
+
+.as-notice-ok {
+  border-color: rgba(16, 185, 129, 0.4);
+  background: rgba(16, 185, 129, 0.07);
+}
 
 .as-notice-links {
   display: flex;
@@ -1118,10 +1137,11 @@
   align-items: baseline;
   gap: 6px;
   padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-left: 3px solid #F59E0B;
+  /* The same wash as a warning notice rather than a bar down the side: these
+     sit in a list of their own and a row of stripes reads as a chart. */
+  border: 1px solid rgba(245, 158, 11, 0.45);
   border-radius: 8px;
-  background: var(--surface);
+  background: rgba(245, 158, 11, 0.07);
 }
 
 .as-heldback-label { color: var(--text-secondary); }
@@ -1599,6 +1619,29 @@
 }
 
 .as-signed:hover { text-decoration: underline; }
+
+/* ---- Correcting who somebody is --------------------------------------- */
+
+/* The pencil rides on the card rather than inside it — a button within a link
+   is unreachable by keyboard — so the card leaves room for it and the tile
+   itself still goes to the person. */
+.as-people-grid li { position: relative; }
+
+.as-people-grid .as-person { padding-right: 42px; }
+
+.as-person-edit {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  text-decoration: none;
+}
+
+.as-personedit {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
 
 /* ---- A signature against the handover it belongs to -------------------- */
 

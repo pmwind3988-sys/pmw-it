@@ -10,6 +10,7 @@ import {
 import { uploadSignature } from './uploadSignature.js';
 import { planHandover } from '../handover/planHandover.js';
 import { planReturn } from '../handover/planReturn.js';
+import { planPersonEdit } from '../handover/planPersonEdit.js';
 
 const itemPath = (listName) => `${listPath(listName)}/items`;
 
@@ -187,6 +188,76 @@ export async function commitReturn({
     signatureFailed,
     blocked: plan.blocked,
     writeFailures: written.filter((result) => result.error).length,
+    staleRows: updated
+      .map((result, index) => (result.error ? plan.assetUpdates[index].assetKey : null))
+      .filter(Boolean),
+  };
+}
+
+/**
+ * Correcting who somebody is.
+ *
+ * Both lists are re-read first, for the same reason the other two do it: the
+ * rows being renamed may have changed since the page was opened, and a plan
+ * built from a stale screen would rename a handover that has since been
+ * returned by somebody else.
+ *
+ * Nothing here can move an item. The plan writes three fields on the handover
+ * rows and two on the register rows that name this person, and nothing else —
+ * so a correction cannot cost somebody the record of what they are holding.
+ */
+export async function commitPersonEdit({
+  siteUrl, token, from, person, onProgress,
+}) {
+  const report = (phase, done = 0, total = 0) => onProgress?.({ phase, done, total });
+
+  report('reading');
+  const [register, handovers] = await Promise.all([
+    readAllAssets(siteUrl, token),
+    readAllHandovers(siteUrl, token),
+  ]);
+
+  const digest = await provisionAssets(siteUrl, token);
+
+  const plan = planPersonEdit(handovers, register, {
+    from,
+    name: person.name,
+    email: person.email,
+    login: person.login,
+  });
+
+  report('writing', 0, plan.handoverUpdates.length);
+  const written = await runPool(plan.handoverUpdates, async (update) => {
+    const response = await merge(
+      siteUrl, token, digest, HANDOVER_LIST_NAME, update.id, handoverPatch(update.body),
+    );
+    if (!response.ok) throw new Error(`${response.status}: ${await response.text()}`);
+    return update.id;
+  }, { concurrency: 4, onProgress: (done, total) => report('writing', done, total) });
+
+  /**
+   * The register copies go second and only where the handover row landed —
+   * the handover list is the truth (§4.2), so a register copy left reading the
+   * old name is stale rather than wrong, and recoverable by saving again.
+   */
+  report('updating', 0, plan.assetUpdates.length);
+  const updated = await runPool(plan.assetUpdates, async (update) => {
+    const response = await merge(
+      siteUrl, token, digest, ASSET_LIST_NAME, update.id, assetPatch(update.body),
+    );
+    if (!response.ok) throw new Error(`${response.status}: ${await response.text()}`);
+    return update.assetKey;
+  }, { concurrency: 4, onProgress: (done, total) => report('updating', done, total) });
+
+  return {
+    rows: plan.rows,
+    openLines: plan.openLines,
+    changed: written.filter((result) => !result.error).length,
+    writeFailures: written
+      .map((result, index) => (result.error
+        ? { id: plan.handoverUpdates[index].id, error: result.error.message }
+        : null))
+      .filter(Boolean),
     staleRows: updated
       .map((result, index) => (result.error ? plan.assetUpdates[index].assetKey : null))
       .filter(Boolean),

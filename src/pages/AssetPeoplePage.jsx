@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import AppShell from '../components/AppShell';
 import Button from '../components/ui/Button';
 import { ErrorBanner, EmptyState } from '../components/ui/Surfaces';
-import { Users, Clock, ScanLine } from '../components/ui/Icons';
+import { Users, Clock, ScanLine, Pencil } from '../components/ui/Icons';
 import { useHandovers } from '../features/assets/useHandovers';
 import { peopleWithItems } from '../features/assets/handover/availability';
 import { initialsOf } from '../utils/initials';
@@ -67,6 +67,20 @@ export default function AssetPeoplePage() {
                   <Clock size={12} /> {person.overdue}
                 </span>
               )}
+            </Link>
+            {/* Beside the card rather than inside it: a button within a link
+                is a control nobody can reach by keyboard and a tap that lands
+                on whichever of the two the browser felt like. A misspelt name
+                is usually spotted HERE, staring at the list, so the correction
+                starts here too — and opens on the person's own page, where
+                what they hold is visible while it is made. */}
+            <Link
+              to={`/assets/people/${encodeURIComponent(person.email)}?edit=1`}
+              className="as-iconbtn as-person-edit"
+              aria-label={`Correct ${person.name}'s name or email`}
+              title="Correct the name or email"
+            >
+              <Pencil size={13} />
             </Link>
           </li>
         ))}

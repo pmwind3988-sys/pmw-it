@@ -1009,3 +1009,21 @@
 .sa-headerpick[open] > summary {
   margin-bottom: 6px;
 }
+
+/* Which way an answer points, beside how strongly it is put. Deliberately
+   quiet: it is a rough lexicon signal and a loud badge would read as a
+   verdict the measure cannot support. */
+.sa-tone-bad,
+.sa-tone-good,
+.sa-tone-flat {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.sa-tone-bad { background: var(--it-danger-wash); color: var(--it-danger); }
+.sa-tone-good { background: var(--it-good-wash); color: var(--it-good); }
+.sa-tone-flat { background: var(--it-brand-wash); color: var(--it-ink-soft); }

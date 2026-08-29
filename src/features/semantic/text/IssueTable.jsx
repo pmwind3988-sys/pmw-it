@@ -1,6 +1,7 @@
 import { Card, EmptyState } from '../../../components/ui/Surfaces';
 import { useSemantic } from '../useSemantic';
 import { UNSORTED_ID, UNSORTED_LABEL } from './buckets';
+import { SENTIMENT } from './sentiment';
 
 /**
  * Every separated issue, with the category it was given and a dropdown
@@ -9,7 +10,18 @@ import { UNSORTED_ID, UNSORTED_LABEL } from './buckets';
  * An excluded row stays on screen, struck through, rather than
  * disappearing. Removing it outright would leave someone unable to undo
  * a misclick and unable to see how much they had excluded.
+ *
+ * Severity and Tone are two different questions and both columns are here.
+ * Severity is how strongly it is put; tone is which way it points. A survey
+ * asking what is wrong still collects "the new laptops are excellent", and a
+ * high-severity compliment reads exactly like a complaint without this.
  */
+
+const TONE_CLASS = {
+  [SENTIMENT.NEGATIVE]: 'sa-tone-bad',
+  [SENTIMENT.POSITIVE]: 'sa-tone-good',
+  [SENTIMENT.NEUTRAL]: 'sa-tone-flat',
+};
 export default function IssueTable() {
   const { analysis, buckets, retagFragment, toggleNoise } = useSemantic();
 
@@ -29,6 +41,7 @@ export default function IssueTable() {
               <th>Issue</th>
               <th>Category</th>
               <th className="sa-num">Severity</th>
+              <th>Tone</th>
               <th>Use</th>
             </tr>
           </thead>
@@ -48,6 +61,14 @@ export default function IssueTable() {
                   </select>
                 </td>
                 <td className="sa-num">{Math.round((fragment.severity ?? 0) * 100)}</td>
+                <td>
+                  {/* A signal, not a verdict — the same caveat severity
+                      carries. Nothing here knows that "it works, but only if
+                      you restart it twice" is a complaint. */}
+                  <span className={TONE_CLASS[fragment.sentiment?.sentiment] ?? 'sa-tone-flat'}>
+                    {fragment.sentiment?.sentiment ?? SENTIMENT.NEUTRAL}
+                  </span>
+                </td>
                 <td>
                   <label className="sa-field">
                     <input

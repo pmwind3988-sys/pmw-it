@@ -370,6 +370,23 @@ signature that will not upload is reported and the handover is still recorded,
 because the laptop changed hands either way. A blank means nobody signed and is
 never written over an existing one.
 
+**An answer's TONE is scored beside its severity.** `text/sentiment.js` (pure,
+tested) labels a fragment Positive / Neutral / Negative from a lexicon and
+keeps the margin, and `buildFragments` hangs it on every fragment next to
+`severityOf`. The two answer different questions: severity is how strongly
+something is put, tone is which way it points -- a long emphatic "the new
+scanner saved us an hour a day" scores high on severity and is not a problem.
+Matched on WORD BOUNDARIES, which is the whole reason the lexicon is compiled
+rather than scanned with `includes`: "hardware" contains "hard", "another"
+contains "not", "badge" contains "bad". Contractions are a separate suffix
+list, because `n't` can never match -- there is no boundary between the s and
+the n in "doesn't". "hard" and "critical" are deliberately absent: in this data
+they are a hard disk and a critical path, not opinions. Shown as a Tone column
+in `IssueTable`, and it is a SIGNAL not a verdict, the same caveat severity
+carries. Lifted from an abandoned Forms Insights branch, which duplicated most
+of this feature with a hardcoded seven-category keyword list; only the
+sentiment was worth keeping.
+
 **Rows that are one thing bought ten times can be put back together.**
 `combine.js` (pure) plans it and `sharepoint/combineAssets.js` writes it: the
 oldest row survives, every other row's serial, label, condition and status

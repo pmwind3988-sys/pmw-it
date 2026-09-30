@@ -11,7 +11,6 @@ import Button from './ui/Button';
 import {
   LayoutDashboard,
   ClipboardList,
-  FilePlus,
   CheckSquare,
   Menu,
   X,
@@ -27,23 +26,18 @@ import {
 } from './ui/Icons';
 
 /**
- * Two layouts from one tree, switched at 1024px:
+ * The brand column is an off-canvas drawer behind the menu button at every
+ * width. On a desktop it used to be a permanent column; it is now opened when
+ * wanted, so the page gets the whole width the rest of the time.
  *
- *   < lg  — the brand column is an off-canvas drawer behind a hamburger. As a
- *           permanent column it left a 360px phone with about 130px for the
- *           actual screen, which made every page unusable.
- *   >= lg — the same column is sticky, exactly as the SI shell has it.
- *
- * The switch is pure CSS (a transform plus the 1024px overrides in shell.css)
- * rather than a JS width check, so there is no flash of the wrong layout on
- * first paint.
+ * "New request" is not in the list: it is reached from the Requests screen,
+ * and that entry stays highlighted while a request is open. The asset
+ * checklist is a button in the bar at the top instead of a nav entry.
  */
 
 const NAV_ITEMS = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/requests', label: 'Requests', icon: ClipboardList },
-  { to: '/it-boarding-form', label: 'New request', icon: FilePlus },
-  { to: '/asset-checklist', label: 'Asset checklist', icon: CheckSquare },
+  { to: '/requests', label: 'Requests', icon: ClipboardList, also: ['/it-boarding-form'] },
   { to: '/devices', label: 'Device list', icon: Laptop },
   { to: '/assets', label: 'Asset inventory', icon: Package },
   { to: '/assets/people', label: 'Who has what', icon: Users },
@@ -147,7 +141,8 @@ export default function AppShell({
     );
   }
 
-  const isActive = (to) => location.pathname === to || location.pathname.startsWith(`${to}/`);
+  const onPath = (to) => location.pathname === to || location.pathname.startsWith(`${to}/`);
+  const isActive = (item) => onPath(item.to) || (item.also || []).some(onPath);
 
   // Without a `search` prop the bar still carries a box, and it takes you to the
   // records with the query applied — the same box on every screen, one job.
@@ -202,8 +197,8 @@ export default function AppShell({
             <Link
               key={item.to}
               to={item.to}
-              className={`shell-navitem${isActive(item.to) ? ' active' : ''}`}
-              aria-current={isActive(item.to) ? 'page' : undefined}
+              className={`shell-navitem${isActive(item) ? ' active' : ''}`}
+              aria-current={isActive(item) ? 'page' : undefined}
               onClick={closeNav}
             >
               <item.icon size={16} />
@@ -258,6 +253,15 @@ export default function AppShell({
             </form>
 
             <div className="shell-headeractions">
+              <Link
+                to="/asset-checklist"
+                className={`shell-headerlink${onPath('/asset-checklist') ? ' active' : ''}`}
+                aria-current={onPath('/asset-checklist') ? 'page' : undefined}
+                title="Asset checklist"
+              >
+                <CheckSquare size={16} />
+                <span className="hide-below-sm">Asset checklist</span>
+              </Link>
               <button
                 type="button"
                 className="shell-iconbtn"

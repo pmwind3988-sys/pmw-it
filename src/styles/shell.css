@@ -193,10 +193,8 @@
 /* ---------------------------------------------------------------------------
    Shell frame.
 
-   Two layouts from one tree, switched at 1024px. Below it the nav is an
-   off-canvas drawer behind a hamburger; at and above it the same element is a
-   sticky column. The switch is pure CSS so there is no flash of the wrong
-   layout on first paint.
+   The nav is an off-canvas drawer behind the menu button at every width --
+   on a desktop too, so it only takes room while somebody wants it.
 --------------------------------------------------------------------------- */
 .shell {
   min-height: 100dvh;
@@ -597,24 +595,72 @@
   }
 }
 
+/* The asset checklist sits in the bar rather than in the nav column. Below
+   640px only its icon shows, so the bar still fits a phone. */
+.shell-headerlink {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 9px;
+  border-radius: 8px;
+  border: 1px solid var(--it-line);
+  background: var(--it-panel);
+  color: var(--it-ink-soft);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.shell-headerlink:hover {
+  background: var(--it-canvas);
+  color: var(--it-ink);
+}
+
+.shell-headerlink.active {
+  border-color: var(--it-brand);
+  color: var(--it-brand);
+}
+
+.hide-below-sm {
+  display: none;
+}
+
+/* The dashboard while it is being rebuilt: one card, one label. */
+.dash-dev {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 28px 24px;
+}
+
+.dash-dev-label {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--it-accent);
+  color: #1f1300;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.dash-dev p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--it-ink-soft);
+}
+
+@media (min-width: 640px) {
+  .hide-below-sm {
+    display: inline;
+  }
+}
+
 @media (min-width: 1024px) {
-  .shell-nav {
-    position: sticky;
-    bottom: auto;
-    z-index: auto;
-    height: 100dvh;
-    width: 232px;
-    max-width: none;
-    flex-shrink: 0;
-    transform: translateX(0);
-    box-shadow: none;
-  }
-  .shell-backdrop,
-  .shell-hamburger,
-  .shell-navclose,
-  .shell-headerbrand {
-    display: none;
-  }
   .shell-headerrow {
     padding: 12px 24px;
   }

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
+import { useIsAuthenticated } from '@azure/msal-react';
 import AppShell from '../components/AppShell';
 import Button from '../components/ui/Button';
 import { Card, ErrorBanner } from '../components/ui/Surfaces';
-import { Check, AlertTriangle, Pencil } from '../components/ui/Icons';
+import { Check, AlertTriangle, Pencil, UserPlus, UserMinus, Package } from '../components/ui/Icons';
 import Field from '../components/form/Field';
 import {
   TextInput, TextArea, NumberInput, DateInput, SelectInput,
@@ -18,6 +19,10 @@ import {
 } from '../features/forms/checklistForm';
 import { validateChecklist, hasErrors } from '../features/forms/validate';
 import { submitChecklist } from '../features/forms/sharepoint/submitChecklist';
+import { loadOrgDirectory } from '../features/forms/sharepoint/loadOrgDirectory';
+import {
+  companyOptions, departmentOptions, departmentStillOffered,
+} from '../features/forms/orgDirectory';
 
 const SHAREPOINT_SITE_URL =
   import.meta.env.VITE_SHAREPOINT_SITE_URL || 'https://pmwgroupcom.sharepoint.com/sites/IThelpdesk';
@@ -35,6 +40,13 @@ const SHAREPOINT_SITE_URL =
  * `features/forms/` and are tested there. This file only draws them.
  */
 
+/** One glyph per stored mode value, for the menu on step one. */
+const MODE_ICONS = {
+  In: UserPlus,
+  Out: UserMinus,
+  'Individual Request': Package,
+};
+
 const PHASE_LABEL = {
   provisioning: 'Preparing SharePoint',
   signature: 'Saving your signature',
@@ -43,6 +55,12 @@ const PHASE_LABEL = {
 
 export default function AssetChecklistPage() {
   const getToken = useSharePointToken();
+  const isAuthenticated = useIsAuthenticated();
+
+  // HR's company and department lists. `null` until they arrive; `false` if
+  // they could not be read, in which case the form falls back to the short
+  // built-in entity list and a typed department rather than refusing to open.
+  const [directory, setDirectory] = useState(null);
 
   const [values, setValues] = useState(emptyChecklist);
   const [step, setStep] = useState(0);
@@ -56,7 +74,25 @@ export default function AssetChecklistPage() {
     document.title = 'PMW IT — Asset checklist';
   }, []);
 
-  const set = (field) => (value) => setValues((current) => ({ ...current, [field]: value }));
+  useEffect(() => {
+    if (!isAuthenticated) return undefined;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const tokenRes = await getToken();
+        const loaded = await loadOrgDirectory(tokenRes.accessToken);
+        if (!cancelled) setDirectory(companyOptions(loaded.companies).length ? loaded : false);
+      } catch {
+        if (!cancelled) setDirectory(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [isAuthenticated, getToken]);
+
+  const entityOptions = directory ? companyOptions(directory.companies) : ENTITIES;
+  const departmentChoices = directory ? departmentOptions(directory.departments, values.entity) : [];
 
   /**
    * Errors are recomputed as soon as one is showing, so a field stops being
@@ -64,9 +100,19 @@ export default function AssetChecklistPage() {
    * time Submit is pressed.
    */
   const update = (field) => (value) => {
-    set(field)(value);
+    const next = { ...values, [field]: value };
+
+    // A department belongs to a company. Changing the entity drops a
+    // department the new one does not have, rather than leaving a pick on
+    // screen that could be signed for under the wrong company.
+    if (field === 'entity' && directory && next.department
+      && !departmentStillOffered(directory.departments, value, next.department)) {
+      next.department = '';
+    }
+
+    setValues(next);
     if (hasErrors(errors)) {
-      setErrors(validateChecklist({ ...values, [field]: value }, { step }));
+      setErrors(validateChecklist(next, { step }));
     }
   };
 
@@ -95,6 +141,7 @@ export default function AssetChecklistPage() {
         siteUrl: SHAREPOINT_SITE_URL,
         token: tokenRes.accessToken,
         values,
+        entities: directory ? companyOptions(directory.companies).map((option) => option.value) : [],
         onProgress: setPhase,
       });
       setDone(true);
@@ -168,6 +215,7 @@ export default function AssetChecklistPage() {
                 value={values.formMode}
                 onChange={update('formMode')}
                 options={FORM_MODES}
+                icons={MODE_ICONS}
                 error={errors.formMode}
               />
             </Field>
@@ -209,9 +257,35 @@ export default function AssetChecklistPage() {
                     id="entity"
                     value={values.entity}
                     onChange={update('entity')}
-                    options={ENTITIES}
+                    options={entityOptions}
                     error={errors.entity}
                   />
+                </Field>
+
+                <Field
+                  label="Department"
+                  htmlFor="department"
+                  required
+                  error={errors.department}
+                  help={directory && !values.entity ? 'Choose the entity first.' : undefined}
+                >
+                  {directory ? (
+                    <SelectInput
+                      id="department"
+                      value={values.department}
+                      onChange={update('department')}
+                      options={departmentChoices}
+                      error={errors.department}
+                      disabled={!values.entity}
+                    />
+                  ) : (
+                    <TextInput
+                      id="department"
+                      value={values.department}
+                      onChange={update('department')}
+                      error={errors.department}
+                    />
+                  )}
                 </Field>
 
                 <Field label="Date" htmlFor="formDate" required error={errors.formDate}>

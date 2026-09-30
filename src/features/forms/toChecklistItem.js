@@ -55,6 +55,7 @@ export function toChecklistItem(values, { submittedAt = Date.now(), signatureUrl
   };
 
   if (values.entity) item.Entity = values.entity;
+  if (text(values.department)) item.Department = text(values.department);
 
   // A date-only input is a local day, and `new Date('2026-08-23')` reads it as
   // UTC midnight — which in Malaysia is the previous day at 8am. Parsed as

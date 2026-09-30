@@ -17,11 +17,12 @@ const LABELS = {
   employeeNo: 'Employee no',
   position: 'Position',
   entity: 'Entity',
+  department: 'Department',
   formDate: 'Date',
   signature: 'Signature',
 };
 
-const REQUIRED = ['employeeName', 'employeeNo', 'position', 'entity', 'formDate'];
+const REQUIRED = ['employeeName', 'employeeNo', 'position', 'entity', 'department', 'formDate'];
 
 export function validateChecklist(values, { step } = {}) {
   const errors = {};

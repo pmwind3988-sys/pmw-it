@@ -6,7 +6,15 @@
  * a colour of its own.
  */
 
-.ff-panel { padding: 18px; margin-bottom: 14px; }
+.ff-panel { padding: 20px; margin-bottom: 16px; }
+@media (max-width: 480px) { .ff-panel { padding: 16px; } }
+
+/* Local tokens: fall back to shell tokens, so a theme change still lands. */
+.ff-panel, .ff-steps, .ff-field, .ff-done {
+  --ff-bad: var(--it-danger, #dc2626);
+  --ff-good: var(--it-good, #12a150);
+  --ff-ring: var(--it-brand, var(--text-primary));
+}
 
 .ff-panel-head {
   display: flex;
@@ -16,23 +24,22 @@
   margin-bottom: 14px;
 }
 
-.ff-panel-title { font-size: 15px; font-weight: 600; margin: 0; color: var(--text-primary); }
+.ff-panel-title { font-size: 16px; font-weight: 600; margin: 0; color: var(--text-primary); text-wrap: balance; line-height: 1.3; }
 
 .ff-section {
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-  margin: 20px 0 10px;
-  padding-bottom: 6px;
+  color: var(--text-primary);
+  text-wrap: balance;
+  margin: 26px 0 12px;
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--border);
 }
 
 .ff-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 14px;
+  gap: 16px;
 }
 
 @media (min-width: 640px) {
@@ -46,19 +53,20 @@
   flex-direction: column;
   gap: 6px;
   min-width: 0;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 
 .ff-grid .ff-field { margin-bottom: 0; }
 .ff-field-wide { grid-column: 1 / -1; }
 
 .ff-label {
-  font-size: 12.5px;
+  font-size: 13.5px;
   font-weight: 500;
   color: var(--text-primary);
+  line-height: 1.35;
 }
 
-.ff-req { color: var(--error, #EF4444); margin-left: 3px; }
+.ff-req { color: var(--ff-bad, var(--it-danger)); margin-left: 3px; }
 
 /* Visible to a screen reader, not on screen — the asterisk alone announces as
    nothing, so "required" is said in words as well. */
@@ -75,11 +83,12 @@
   border: 0;
 }
 
-.ff-help { font-size: 12px; color: var(--text-secondary); margin: 0; line-height: 1.45; }
+.ff-help { font-size: 13px; color: var(--text-secondary); margin: 0; line-height: 1.5; max-width: 62ch; }
 
 .ff-input {
   width: 100%;
-  padding: 10px 11px;
+  min-height: 44px;
+  padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface);
@@ -88,31 +97,46 @@
      anything under it, and these forms are filled in on phones. */
   font-size: 16px;
   font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  transition: border-color 120ms ease-out, box-shadow 120ms ease-out, background-color 120ms ease-out;
 }
+
+.ff-input::placeholder { color: var(--text-secondary); opacity: 0.75; }
+.ff-input:hover:not(:disabled):not(:focus) { border-color: var(--text-secondary); }
+.ff-input:disabled { opacity: 0.6; cursor: not-allowed; background: var(--bg); }
 
 .ff-textarea { resize: vertical; line-height: 1.5; }
 .ff-number { max-width: 110px; }
 
-.ff-input:focus {
-  outline: 2px solid var(--text-primary);
-  outline-offset: -1px;
+.ff-input:focus,
+.ff-input:focus-visible {
+  outline: none;
+  border-color: var(--ff-ring);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ff-ring) 28%, transparent);
 }
 
-.ff-field-bad .ff-input { border-color: var(--error, #EF4444); }
+.ff-field-bad .ff-input { border-color: var(--ff-bad); }
+.ff-field-bad .ff-input:focus {
+  border-color: var(--ff-bad);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ff-bad) 25%, transparent);
+}
 
 .ff-error {
-  font-size: 12px;
-  color: var(--error, #EF4444);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ff-bad, var(--it-danger));
   margin: 0;
+  line-height: 1.4;
 }
 
 .ff-summary {
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 13px;
-  color: var(--error, #EF4444);
-  margin: 12px 0 0;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--it-danger, #dc2626);
+  margin: 14px 0 0;
 }
 
 /* --- radio cards ---------------------------------------------------- */
@@ -120,7 +144,7 @@
 .ff-cards {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 10px;
+  gap: 12px;
 }
 
 @media (min-width: 720px) {
@@ -136,7 +160,7 @@
   border-radius: 12px;
   background: var(--surface);
   cursor: pointer;
-  transition: border-color 150ms ease-out;
+  transition: border-color 150ms ease-out, background-color 150ms ease-out;
 }
 
 .ff-card:hover { border-color: var(--text-secondary); }
@@ -144,19 +168,20 @@
 /* Two ways of showing the choice, not one: the ring survives a high-contrast
    mode or a forced-colours setting that flattens the border. */
 .ff-card-on {
-  border-color: var(--text-primary);
-  box-shadow: inset 0 0 0 1px var(--text-primary);
+  border-color: var(--ff-ring, var(--text-primary));
+  box-shadow: inset 0 0 0 1px var(--ff-ring, var(--text-primary));
+  background: var(--it-brand-wash, var(--surface));
 }
 
 /* The real radio is hidden, so the focus ring has to be put back by hand or
    keyboard users cannot see where they are. */
 .ff-card:focus-within {
-  outline: 2px solid var(--text-primary);
+  outline: 2px solid var(--it-brand, var(--text-primary));
   outline-offset: 2px;
 }
 
 .ff-card-label { font-size: 15px; font-weight: 600; color: var(--text-primary); }
-.ff-card-desc { font-size: 12.5px; color: var(--text-secondary); line-height: 1.45; }
+.ff-card-desc { font-size: 13px; color: var(--text-secondary); line-height: 1.45; }
 
 /* --- tick list ------------------------------------------------------ */
 
@@ -174,18 +199,20 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  min-height: 44px;
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: 9px;
   background: var(--surface);
-  font-size: 13.5px;
+  font-size: 14px;
+  transition: border-color 120ms ease-out;
   color: var(--text-primary);
   cursor: pointer;
 }
 
 .ff-check:hover { border-color: var(--text-secondary); }
-.ff-check-on { border-color: var(--text-primary); }
-.ff-check:focus-within { outline: 2px solid var(--text-primary); outline-offset: 2px; }
+.ff-check-on { border-color: var(--it-brand, var(--text-primary)); background: var(--it-brand-wash, var(--surface)); }
+.ff-check:focus-within { outline: 2px solid var(--it-brand, var(--text-primary)); outline-offset: 2px; }
 
 .ff-check-box {
   display: inline-flex;
@@ -201,8 +228,9 @@
 }
 
 .ff-check-on .ff-check-box {
-  background: var(--text-primary);
-  border-color: var(--text-primary);
+  background: var(--it-brand, var(--text-primary));
+  border-color: var(--it-brand, var(--text-primary));
+  color: var(--it-on-brand, var(--bg));
 }
 
 /* --- repeating rows ------------------------------------------------- */
@@ -224,9 +252,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
-  margin-top: 8px;
+  width: 24px;
+  height: 24px;
+  margin-top: 10px;
+  font-variant-numeric: tabular-nums;
   border-radius: 50%;
   border: 1px solid var(--border);
   font-size: 11px;
@@ -249,9 +278,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  margin-top: 4px;
+  width: 44px;
+  height: 44px;
+  margin-top: 0;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface);
@@ -260,7 +289,11 @@
   flex-shrink: 0;
 }
 
-.ff-row-remove:hover:not(:disabled) { color: var(--error, #EF4444); }
+.ff-row-remove { transition: color 120ms ease-out, border-color 120ms ease-out; }
+.ff-row-remove:hover:not(:disabled) { color: var(--ff-bad, var(--it-danger)); border-color: var(--ff-bad, var(--it-danger)); }
+.ff-row-remove:focus-visible,
+.ff-add:focus-visible,
+.ff-signbtn:focus-visible { outline: 2px solid var(--it-brand, var(--text-primary)); outline-offset: 2px; }
 
 /* Disabled rather than hidden on the last row: a list that can empty itself
    leaves nothing to type into and no obvious way back. */
@@ -271,14 +304,16 @@
   align-items: center;
   gap: 7px;
   align-self: flex-start;
-  padding: 9px 14px;
+  min-height: 44px;
+  padding: 9px 16px;
   border: 1px dashed var(--border);
   border-radius: 9px;
   background: none;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: 14px;
   font-family: inherit;
   cursor: pointer;
+  transition: color 120ms ease-out, border-color 120ms ease-out;
 }
 
 .ff-add:hover { color: var(--text-primary); border-color: var(--text-primary); }
@@ -288,7 +323,8 @@
 .ff-steps {
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 8px 20px;
+  flex-wrap: wrap;
   list-style: none;
   padding: 0 0 16px;
   margin: 0 0 18px;
@@ -299,28 +335,38 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
 }
 
-.ff-step-on { color: var(--text-primary); font-weight: 500; }
+.ff-step-on { color: var(--text-primary); font-weight: 600; }
+.ff-step-done { color: var(--text-primary); }
 
 .ff-step-dot {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   border: 1px solid var(--border);
-  font-size: 11px;
+  font-size: 12px;
+  font-weight: 600;
   flex-shrink: 0;
+  transition: background-color 150ms ease-out, border-color 150ms ease-out;
 }
 
-.ff-step-on .ff-step-dot,
+.ff-step-on .ff-step-dot {
+  background: var(--it-brand, var(--text-primary));
+  border-color: var(--it-brand, var(--text-primary));
+  color: var(--it-on-brand, var(--bg));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--it-brand, var(--text-primary)) 22%, transparent);
+}
+
 .ff-step-done .ff-step-dot {
-  background: var(--text-primary);
-  border-color: var(--text-primary);
+  background: var(--ff-good);
+  border-color: var(--ff-good);
   color: var(--bg);
 }
 
@@ -329,8 +375,8 @@
   flex-wrap: wrap;
   gap: 8px;
   justify-content: flex-end;
-  margin-top: 20px;
-  padding-top: 16px;
+  margin-top: 24px;
+  padding-top: 18px;
   border-top: 1px solid var(--border);
 }
 
@@ -350,6 +396,7 @@
   justify-content: center;
   gap: 8px;
   width: 100%;
+  min-height: 64px;
   padding: 22px;
   border: 2px dashed var(--border);
   border-radius: 10px;
@@ -360,6 +407,7 @@
   cursor: pointer;
 }
 
+.ff-signbtn { transition: color 120ms ease-out, border-color 120ms ease-out; }
 .ff-signbtn:hover { border-color: var(--text-primary); color: var(--text-primary); }
 
 .ff-signed {
@@ -400,6 +448,26 @@
   color: var(--text-primary);
 }
 
-.ff-done h2 { font-size: 18px; margin: 0; }
-.ff-done p { color: var(--text-secondary); margin: 0; font-size: 13.5px; }
+.ff-done h2 { font-size: 20px; margin: 0; text-wrap: balance; }
+.ff-done p { color: var(--text-secondary); margin: 0; font-size: 14px; max-width: 52ch; text-wrap: pretty; }
 .ff-done-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+
+/* --- refinement: mobile, scrollbars, motion ------------------------------ */
+
+@media (max-width: 480px) {
+  .ff-number { max-width: none; }
+  .ff-wizard-foot > *, .ff-actions > * { flex: 1 1 auto; min-height: 44px; }
+  .ff-row { padding: 8px; gap: 8px; }
+}
+
+.ff-panel, .ff-row-body, .ff-checks { min-width: 0; overflow-wrap: anywhere; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ff-input, .ff-card, .ff-check, .ff-row-remove, .ff-add, .ff-signbtn, .ff-step-dot {
+    transition: none;
+  }
+}
+
+@media (pointer: coarse) {
+  .ff-select { min-height: 44px; }
+}

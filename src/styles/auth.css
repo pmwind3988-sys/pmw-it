@@ -532,3 +532,33 @@
     opacity: 0.35;
   }
 }
+
+/* Refinement: keyboard focus, press feedback and a comfortable note size. */
+.auth-ms-btn:focus-visible {
+  outline: 2px solid var(--auth-accent);
+  outline-offset: 3px;
+}
+
+.auth-ms-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.auth-card .auth-sub {
+  text-wrap: pretty;
+}
+
+.auth-note {
+  font-size: 12.5px;
+}
+
+.auth-note a:focus-visible {
+  outline: 2px solid var(--auth-accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-ms-btn {
+    transition: none;
+  }
+}

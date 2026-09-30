@@ -1106,3 +1106,555 @@
   font-weight: 400;
   line-height: 1.5;
 }
+
+/* ── Refinement pass ─────────────────────────────────────────────────────────
+   Later in the cascade on purpose: it tunes what is above without renaming it.
+--------------------------------------------------------------------------- */
+.dz-card,
+.rg-card,
+.dd-group,
+.lb-card {
+  --dt-hover: color-mix(in srgb, var(--it-brand) 7%, var(--it-panel));
+  --dt-scroll-thumb: color-mix(in srgb, var(--it-ink-soft) 45%, transparent);
+}
+
+.rg,
+.lb-list,
+.dv-heat-index,
+.dd-fields,
+.dd-fit-facts,
+.review-summary,
+.sp-detail {
+  font-variant-numeric: tabular-nums;
+}
+
+.review-summary,
+.dd-group-title,
+.dz-title,
+.sp-headline {
+  text-wrap: balance;
+}
+
+.dz-hint,
+.dd-fit-reasons,
+.dd-fit-note {
+  text-wrap: pretty;
+}
+
+/* Themed scrollbars for the table box and the raw report */
+.rg-scroll,
+.dd-raw-text {
+  scrollbar-width: thin;
+  scrollbar-color: var(--dt-scroll-thumb, #8a94a3) transparent;
+}
+
+.rg-scroll::-webkit-scrollbar,
+.dd-raw-text::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.rg-scroll::-webkit-scrollbar-thumb,
+.dd-raw-text::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: var(--dt-scroll-thumb, #8a94a3) padding-box;
+}
+
+/* Drop zone */
+.dz {
+  padding: 44px 24px;
+}
+
+.dz-title {
+  font-size: 1rem;
+}
+
+.dz-hint {
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+
+/* Table: calmer body, clearer header, row hover that reaches frozen cells */
+.rg td {
+  padding: 9px 12px;
+  color: var(--it-ink);
+}
+
+.rg th {
+  padding: 10px 12px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--it-ink);
+}
+
+.rg th:first-child,
+.rg td:first-child {
+  padding-left: 16px;
+}
+
+.rg th:last-child,
+.rg td:last-child {
+  padding-right: 16px;
+}
+
+.rg tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.rg tbody tr {
+  transition: background-color 100ms ease;
+}
+
+.rg tbody tr:hover,
+.rg tbody tr:hover .dt-identity,
+.rg tbody tr:hover .dt-actions {
+  background: var(--dt-hover, var(--it-brand-wash));
+}
+
+/* Row states outrank hover, and repeat on the frozen cells (opaque). */
+.rg tbody tr.dt-editing,
+.rg tbody tr.dt-selected,
+.rg tbody tr.dt-editing:hover,
+.rg tbody tr.dt-selected:hover,
+.rg tbody tr.dt-editing:hover .dt-identity,
+.rg tbody tr.dt-editing:hover .dt-actions,
+.rg tbody tr.dt-selected:hover .dt-identity,
+.rg tbody tr.dt-selected:hover .dt-actions {
+  background: var(--it-brand-wash);
+}
+
+.rg-editable input,
+.rg-editable select {
+  min-height: 32px;
+  padding: 4px 8px;
+  font-size: 0.82rem;
+}
+
+.rg-editable input:focus-visible,
+.rg-editable select:focus-visible,
+.dt-search input:focus-visible {
+  outline: 2px solid var(--it-brand);
+  outline-offset: 1px;
+}
+
+.rg-issues {
+  font-size: 0.82rem;
+}
+
+/* Tabs */
+.dv-tabs {
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-bottom: 20px;
+}
+
+.dv-tab {
+  min-height: 44px;
+  padding: 10px 14px;
+  margin-bottom: -1px;
+  border-radius: 6px 6px 0 0;
+  transition: color 120ms ease, background-color 120ms ease;
+}
+
+.dv-tab:hover {
+  background: color-mix(in srgb, var(--it-brand) 6%, transparent);
+}
+
+.dv-tab:focus-visible,
+.dt-sort:focus-visible,
+.dt-chip:focus-visible,
+.dt-icon:focus-visible,
+.dt-tick:focus-visible,
+.dd-raw-toggle:focus-visible,
+.dt-link:focus-visible {
+  outline: 2px solid var(--it-brand);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.dv-scope {
+  margin-bottom: 4px;
+}
+
+.dv-scope select {
+  min-height: 36px;
+  padding: 6px 10px;
+}
+
+/* Toolbar */
+.dt-head {
+  gap: 10px 12px;
+  margin-bottom: 14px;
+}
+
+.dt-search {
+  min-height: 40px;
+  padding: 6px 12px;
+  background: var(--it-canvas);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.dt-search:hover {
+  border-color: var(--it-brand-line);
+}
+
+.dt-search:focus-within {
+  border-color: var(--it-brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--it-brand) 18%, transparent);
+}
+
+.dt-search input {
+  font-size: 0.9rem;
+}
+
+.dt-search input:focus-visible {
+  outline: none;
+}
+
+.dt-search input::placeholder {
+  color: var(--it-ink-soft);
+}
+
+.dt-chips {
+  gap: 6px 8px;
+}
+
+.dt-chip {
+  min-height: 28px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  transition: background-color 100ms ease;
+}
+
+.dt-chip:hover {
+  background: color-mix(in srgb, var(--it-brand) 14%, var(--it-panel));
+}
+
+.dt-sort:hover {
+  color: var(--it-brand);
+}
+
+/* Row and bulk actions */
+.dt-icon {
+  min-height: 30px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  transition: color 100ms ease, border-color 100ms ease, background-color 100ms ease;
+}
+
+.dt-icon:hover:not(:disabled) {
+  background: var(--it-brand-wash);
+}
+
+.dt-icon-bad:hover:not(:disabled) {
+  background: var(--it-danger-wash);
+  color: var(--it-danger);
+  border-color: var(--it-danger);
+}
+
+.dt-icon-go:hover:not(:disabled) {
+  background: var(--it-good-wash);
+  color: var(--it-good);
+  border-color: var(--it-good);
+}
+
+.dt-icon:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dt-tick {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--it-brand);
+}
+
+.dt-bulk {
+  padding: 10px 14px;
+  font-size: 0.85rem;
+}
+
+.dt-confirm {
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.dt-manual {
+  font-weight: 600;
+}
+
+/* Fleet dashboard: leaderboards and department bars */
+.lb-grid {
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.lb-list li {
+  align-items: center;
+  padding: 8px 0;
+  font-size: 0.85rem;
+}
+
+.lb-figure {
+  font-weight: 600;
+  color: var(--it-ink);
+}
+
+.lb-owner {
+  font-size: 0.8rem;
+}
+
+.lb-list a:hover {
+  color: var(--it-brand);
+}
+
+.dv-heat-rows {
+  gap: 8px;
+}
+
+.dv-heat-bar {
+  height: 26px;
+}
+
+.dv-heat-cell {
+  line-height: 26px;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
+}
+
+.dv-heat-cell:hover {
+  filter: brightness(1.1);
+}
+
+.dv-heat-cell:focus-visible {
+  outline: 2px solid var(--it-ink);
+  outline-offset: -2px;
+}
+
+.dv-heat-name {
+  font-size: 0.82rem;
+  color: var(--it-ink);
+}
+
+.dv-legend {
+  gap: 6px 16px;
+  font-size: 0.78rem;
+}
+
+.dv-legend-dot {
+  width: 10px;
+  height: 10px;
+}
+
+/* Device page */
+.dd-summary {
+  gap: 12px 20px;
+  margin-bottom: 20px;
+}
+
+.dd-toggle {
+  min-height: 32px;
+  font-size: 0.82rem;
+}
+
+.dd-groups {
+  gap: 20px;
+}
+
+.dd-group-title {
+  margin-bottom: 12px;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.dd-group-hint {
+  font-size: 0.78rem;
+}
+
+.dd-fields {
+  gap: 0;
+}
+
+.dd-field {
+  align-items: baseline;
+  padding: 9px 0;
+}
+
+.dd-field:first-child {
+  padding-top: 0;
+}
+
+.dd-field:last-child {
+  padding-bottom: 0;
+}
+
+.dd-field dt {
+  font-size: 0.8rem;
+}
+
+.dd-field dd {
+  font-size: 0.875rem;
+  color: var(--it-ink);
+}
+
+.dd-fit {
+  margin-bottom: 20px;
+}
+
+.dd-fit-reasons {
+  font-size: 0.875rem;
+}
+
+.dd-fit-facts dt {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.78rem;
+}
+
+.dd-fit-facts dd {
+  font-size: 0.9rem;
+}
+
+.dd-raw {
+  margin-top: 20px;
+}
+
+.dd-raw-toggle {
+  min-height: 32px;
+  font-weight: 500;
+}
+
+.dd-raw-text {
+  font-size: 0.78rem;
+}
+
+.mv-item {
+  font-size: 0.78rem;
+}
+
+.mv-detail {
+  font-size: 0.74rem;
+}
+
+.dt-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Save / status */
+.sp-status {
+  padding: 32px 20px;
+}
+
+.sp-detail {
+  font-size: 0.875rem;
+}
+
+.sp-bar {
+  height: 8px;
+}
+
+/* Small screens: no page-level sideways scroll, 44px targets, 16px inputs */
+@media (max-width: 640px) {
+  .dt-head {
+    align-items: stretch;
+  }
+
+  .dt-search {
+    flex-basis: 100%;
+    min-height: 44px;
+  }
+
+  .dt-search input,
+  .rg-editable input,
+  .rg-editable select,
+  .dv-scope select {
+    font-size: 16px;
+  }
+
+  .dv-scope {
+    flex: 1 1 100%;
+    margin: 0 0 8px;
+  }
+
+  .dv-scope select {
+    flex: 1;
+    min-height: 44px;
+  }
+
+  .dv-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .dv-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .dv-tab {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .dt-chip,
+  .dt-icon,
+  .dd-toggle,
+  .dd-raw-toggle {
+    min-height: 44px;
+  }
+
+  .dt-chip {
+    padding: 4px 14px;
+  }
+
+  .dt-tick {
+    width: 22px;
+    height: 22px;
+    margin-right: 10px;
+  }
+
+  .dt-bulk {
+    align-items: stretch;
+  }
+
+  .dd-groups {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rg-card,
+  .dd-group,
+  .dd-fit,
+  .dd-raw,
+  .lb-card {
+    padding: 14px;
+  }
+
+  .rg-scroll {
+    margin-inline: -14px;
+  }
+
+  .dv-heat-row {
+    grid-template-columns: minmax(64px, 96px) 1fr 36px;
+    gap: 8px;
+  }
+
+  .rg-editable input,
+  .rg-editable select {
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rg tbody tr,
+  .dv-tab,
+  .dt-search,
+  .dt-chip,
+  .dt-icon,
+  .dv-heat-cell {
+    transition: none;
+  }
+}

@@ -23,7 +23,7 @@
   --it-canvas: #f4f7fb;
   --it-panel: #ffffff;
   --it-ink: #101828;
-  --it-ink-soft: #64748b;
+  --it-ink-soft: #566479;
   --it-line: #e3e9f0;
 
   /* The band behind a table's header row. Its own token rather than
@@ -75,7 +75,7 @@
   --surface: #ffffff;
   --border: #e3e9f0;
   --text-primary: #101828;
-  --text-secondary: #64748b;
+  --text-secondary: #566479;
 }
 
 [data-theme='dark'] {
@@ -1791,3 +1791,405 @@ button.stat-card:hover .stat-card-chevron {
   border: 1px solid var(--it-line);
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.6);
 }
+
+/* ---------------------------------------------------------------------------
+   Refinement layer. Loaded last on purpose: it only adds states, rhythm and
+   legibility on top of the rules above and renames nothing.
+--------------------------------------------------------------------------- */
+:root {
+  /* One spacing scale, one motion curve. */
+  --it-s1: 4px;
+  --it-s2: 8px;
+  --it-s3: 12px;
+  --it-s4: 16px;
+  --it-s5: 24px;
+  --it-s6: 32px;
+  --it-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  color-scheme: light;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--it-brand) 30%, transparent);
+  color: inherit;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--it-ink-soft) 45%, transparent) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--it-ink-soft) 40%, transparent);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--it-ink-soft) 65%, transparent);
+  background-clip: content-box;
+}
+
+/* Keyboard focus, everywhere, one look. Mouse clicks show nothing. */
+:where(a, button, [role='button'], summary, select, input, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--it-brand);
+  outline-offset: 2px;
+}
+
+.shell-nav :focus-visible,
+.auth-poster :focus-visible {
+  outline-color: #fff;
+}
+
+.shell-search input:focus-visible {
+  outline: none;
+}
+
+.shell-search:focus-within {
+  border-color: var(--it-brand);
+  background: var(--it-panel);
+}
+
+/* Headings and figures. */
+.shell-pagehead h1,
+.chart-head h3,
+.shell-gate h2,
+.auth-card h1 {
+  text-wrap: balance;
+}
+
+.shell-pagehead p,
+.ui-empty,
+.shell-gate p {
+  text-wrap: pretty;
+}
+
+.shell-pagehead h1 {
+  font-size: 22px;
+  letter-spacing: -0.01em;
+}
+
+.shell-pagehead p {
+  line-height: 1.5;
+}
+
+.bar-value,
+.column-count,
+.stat-card-number,
+.activity-meta,
+.list-table td,
+.list-table th {
+  font-variant-numeric: tabular-nums;
+}
+
+.shell-navsection {
+  font-size: 10.5px;
+  opacity: 0.85;
+}
+
+.shell-brand-sub {
+  font-size: 10px;
+}
+
+.shell-navuser-mail {
+  font-size: 11.5px;
+}
+
+/* Nav rows and bar controls: 44px targets, eased state changes. */
+.shell-navitem,
+.shell-navclose,
+.shell-hamburger,
+.shell-signout,
+.shell-iconbtn,
+.shell-headerlink,
+.ui-btn,
+.activity-row,
+.stat-card {
+  transition-property: background-color, color, border-color, box-shadow, transform;
+  transition-duration: 150ms;
+  transition-timing-function: var(--it-ease);
+}
+
+.shell-navitem {
+  min-height: 44px;
+}
+
+.shell-navclose,
+.shell-hamburger {
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 8px;
+}
+
+.shell-hamburger {
+  margin-left: -10px;
+}
+
+.shell-hamburger:hover {
+  background: var(--it-canvas);
+  color: var(--it-ink);
+}
+
+.shell-navclose:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.shell-signout {
+  min-height: 44px;
+  padding: 0 10px;
+  margin-left: -10px;
+  border-radius: 8px;
+}
+
+.shell-signout:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.shell-iconbtn {
+  width: 44px;
+  height: 44px;
+}
+
+.shell-headerlink {
+  height: 44px;
+  padding: 0 12px;
+}
+
+.shell-iconbtn:active,
+.shell-headerlink:active,
+.ui-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+@media (min-width: 1024px) {
+  .shell-iconbtn {
+    width: 38px;
+    height: 38px;
+  }
+  .shell-headerlink {
+    height: 38px;
+  }
+}
+
+.shell-header {
+  box-shadow: 0 6px 16px -12px rgba(15, 23, 42, 0.25);
+}
+
+.shell-headerrow {
+  min-height: 56px;
+}
+
+.shell-nav {
+  transition: transform 240ms var(--it-ease), box-shadow 240ms var(--it-ease);
+}
+
+.shell-backdrop {
+  animation: itFadeIn 200ms ease-out;
+}
+
+@keyframes itFadeIn {
+  from {
+    opacity: 0;
+  }
+}
+
+.shell-pagehead {
+  margin-bottom: var(--it-s5);
+}
+
+@media (min-width: 1024px) {
+  .shell-body {
+    padding: var(--it-s5) var(--it-s6);
+  }
+}
+
+/* Buttons. */
+.ui-btn {
+  min-height: 40px;
+  line-height: 1.2;
+}
+
+.ui-btn-sm {
+  min-height: 34px;
+}
+
+@media (pointer: coarse) {
+  .ui-btn,
+  .ui-btn-sm {
+    min-height: 44px;
+  }
+}
+
+.ui-btn-primary:active:not(:disabled) {
+  background: var(--it-nav-bottom);
+}
+
+.ui-btn-ghost:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--it-ink-soft) 45%, var(--it-line));
+}
+
+.ui-btn-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--it-danger) 18%, var(--it-danger-wash));
+}
+
+.ui-btn:disabled {
+  opacity: 0.55;
+}
+
+.ui-btn[aria-busy='true'] {
+  cursor: progress;
+}
+
+/* Cards and stat cards. */
+button.stat-card:hover {
+  border-color: color-mix(in srgb, var(--it-brand) 40%, var(--it-line));
+  background: var(--it-panel);
+}
+
+button.stat-card:active {
+  transform: translateY(1px);
+}
+
+.stat-card {
+  padding: var(--it-s4);
+}
+
+.stat-card-label {
+  font-size: 12px;
+}
+
+.stat-card-number {
+  font-size: 24px;
+  letter-spacing: -0.01em;
+}
+
+.stat-grid {
+  gap: var(--it-s3);
+  margin-bottom: var(--it-s5);
+}
+
+.chart-grid {
+  gap: var(--it-s4);
+}
+
+.chart-head p,
+.bar-label {
+  font-size: 12.5px;
+}
+
+.bar-row-btn {
+  min-height: 32px;
+}
+
+.bar-fill,
+.column-bar {
+  animation-timing-function: var(--it-ease);
+}
+
+.activity-row {
+  min-height: 48px;
+  border-radius: 8px;
+}
+
+.activity-row:focus-visible {
+  outline-offset: -2px;
+}
+
+.activity-title {
+  font-size: 13.5px;
+}
+
+.activity-meta {
+  font-size: 12px;
+}
+
+/* States: empty, error, loading. */
+.ui-empty {
+  padding: 48px var(--it-s4);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.ui-error {
+  align-items: center;
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+
+.ui-error button {
+  min-height: 36px;
+  padding: 0 10px;
+  border-radius: 6px;
+}
+
+.ui-error button:hover {
+  background: color-mix(in srgb, var(--it-danger) 12%, transparent);
+}
+
+.ui-skeleton {
+  background: color-mix(in srgb, var(--it-ink-soft) 16%, var(--it-canvas));
+}
+
+.rise,
+.rise-slow {
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Phones: no sideways page, inputs that do not trigger iOS zoom. */
+html,
+body {
+  overflow-x: clip;
+}
+
+@media (max-width: 639px) {
+  .shell-body input,
+  .shell-body select,
+  .shell-body textarea,
+  .shell-search input {
+    font-size: 16px;
+  }
+  .shell-headerbrand span {
+    max-width: 40vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .shell-pagehead h1 {
+    font-size: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell-backdrop {
+    animation: none;
+  }
+  .shell-nav,
+  .shell-navitem,
+  .ui-btn,
+  .stat-card,
+  .stat-card-chevron {
+    transition-duration: 0.01ms;
+  }
+  button.stat-card:hover .stat-card-chevron,
+  .ui-btn:active,
+  .stat-card:active {
+    transform: none;
+  }
+}
+
+/* Touch targets: brand link in the bar */
+@media (pointer: coarse) {
+  .shell-brand-link, .shell-headerbrand { min-height: 44px; display: inline-flex; align-items: center; }
+}
+.ui-fold-toggle { min-height: 44px; }

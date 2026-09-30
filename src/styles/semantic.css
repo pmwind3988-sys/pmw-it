@@ -555,7 +555,7 @@
 }
 
 .sa-text-notice {
-  border-left: 3px solid var(--it-accent);
+  border-left: 1px solid var(--it-accent);
   background: var(--it-accent-wash);
 }
 
@@ -640,7 +640,7 @@
   flex-direction: column;
   gap: 12px;
   margin-bottom: 14px;
-  border-left: 3px solid var(--it-brand);
+  border-left: 1px solid var(--it-brand);
 }
 
 .sa-brief-head {
@@ -1027,3 +1027,104 @@
 .sa-tone-bad { background: var(--it-danger-wash); color: var(--it-danger); }
 .sa-tone-good { background: var(--it-good-wash); color: var(--it-good); }
 .sa-tone-flat { background: var(--it-brand-wash); color: var(--it-ink-soft); }
+
+/* ---------- refinement pass ----------
+   Later rules win on equal specificity, so this block only overrides. */
+
+.sa-field > span {
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--it-ink-soft);
+}
+
+.sa-select {
+  min-height: 44px;
+  padding: 8px 10px;
+  font-size: 16px;
+  transition: border-color 120ms ease-out, box-shadow 120ms ease-out;
+}
+.sa-select:hover:not(:disabled) { border-color: var(--it-ink-soft); }
+.sa-select:disabled { opacity: 0.6; cursor: not-allowed; }
+.sa-select:focus-visible {
+  outline: none;
+  border-color: var(--it-brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--it-brand) 28%, transparent);
+}
+@media (min-width: 640px) {
+  .sa-select { min-height: 36px; font-size: 13px; }
+}
+
+.sa-summary { font-size: 13px; font-variant-numeric: tabular-nums; }
+
+/* Table headers: sentence-scale, not shouting. */
+.sa-table th {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-transform: none;
+}
+.sa-table tbody tr { transition: background-color 100ms ease-out; }
+.sa-table tbody tr:hover td { background: var(--it-brand-wash); }
+.sa-table td { font-variant-numeric: tabular-nums; }
+
+.sa-badge {
+  font-size: 11px;
+  letter-spacing: 0;
+  text-transform: none;
+  padding: 2px 8px;
+}
+
+/* One-pixel edges only: the tint and the icon carry the meaning. */
+.sa-text-notice {
+  border-left: 0;
+  border: 1px solid var(--it-accent);
+}
+.sa-brief {
+  border-left: 0;
+  border: 1px solid var(--it-brand-line, var(--it-line));
+}
+.sa-brief-titles, .sa-tile-title, .sa-records-head { text-wrap: balance; }
+
+.sa-tone-bad, .sa-tone-good, .sa-tone-flat { font-size: 12px; }
+
+/* Themed scrollbars on every box that scrolls. */
+.sa-table-scroll,
+.sa-records-scroll,
+.sa-tile-body,
+.sa-record-card,
+.sa-brief,
+.sa-canvas {
+  scrollbar-width: thin;
+  scrollbar-color: var(--it-line) transparent;
+}
+.sa-table-scroll::-webkit-scrollbar,
+.sa-records-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
+.sa-table-scroll::-webkit-scrollbar-thumb,
+.sa-records-scroll::-webkit-scrollbar-thumb {
+  background: var(--it-line);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.sa-table-scroll::-webkit-scrollbar-thumb:hover,
+.sa-records-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--it-ink-soft);
+  background-clip: content-box;
+}
+
+/* Buttons in tiles and the brief: a real tap target on touch screens. */
+@media (pointer: coarse) {
+  .sa-tile-actions button,
+  .sa-brief button,
+  .sa-text-tab { min-height: 44px; min-width: 44px; }
+}
+
+@media (max-width: 640px) {
+  .sa-table-scroll { max-width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sa-select, .sa-table tbody tr { transition: none; }
+}

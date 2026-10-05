@@ -118,3 +118,21 @@ describe('deriveDevice — the awkward machines', () => {
     expect(device.archiveCount).toBe(6);
   });
 });
+
+describe('deriveDevice — serial number', () => {
+  it('reads the serial line the scan script writes', () => {
+    const report = load('ASHRAF-PC_.txt');
+    const device = deriveDevice({ ...report, text: `Serial Number: 5cg8241kqz\n${report.text}` });
+    expect(device.serialNumber).toBe('5CG8241KQZ');
+  });
+
+  it('has no serial on a report written before the line existed', () => {
+    expect(deriveDevice(load('ASHRAF-PC_.txt')).serialNumber).toBeNull();
+  });
+
+  it('drops a placeholder serial from a home-built desktop', () => {
+    const report = load('ASHRAF-PC_.txt');
+    const device = deriveDevice({ ...report, text: `Serial Number: Default string\n${report.text}` });
+    expect(device.serialNumber).toBeNull();
+  });
+});

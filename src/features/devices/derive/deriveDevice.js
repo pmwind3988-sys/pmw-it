@@ -1,5 +1,5 @@
 import { parseReport } from '../parse/parseReport.js';
-import { cleanValue } from '../parse/placeholders.js';
+import { cleanValue, cleanSerial } from '../parse/placeholders.js';
 import {
   parsePairs, parseNetwork, parseOffice, parseGpus, parseMonitors, parseMailFiles,
 } from '../parse/parseValues.js';
@@ -39,6 +39,7 @@ export function deriveDevice({ text, fileName, lastModified }) {
     motherboardVendor: motherboard?.left ?? null,
     motherboardModel: motherboard?.right ?? null,
     anydeskId: firstOrNull(fields.Anydesk),
+    serialNumber: cleanSerial(fields['Serial Number']?.[0]),
     remarks: joinLines(fields.Remarks),
 
     scannedOn: lastModified,

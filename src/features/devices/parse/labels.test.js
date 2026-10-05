@@ -41,10 +41,14 @@ describe('cleanValue', () => {
 });
 
 describe('KNOWN_LABELS', () => {
-  it('has the 21 labels the scan writes', () => {
-    expect(KNOWN_LABELS).toHaveLength(21);
+  it('has the 22 labels the scan writes', () => {
+    expect(KNOWN_LABELS).toHaveLength(22);
     expect(KNOWN_LABELS[0]).toBe('Name');
     expect(KNOWN_LABELS).toContain('Email data files found Active or Inactive account');
+  });
+
+  it('knows the serial number line', () => {
+    expect(KNOWN_LABELS).toContain('Serial Number');
   });
 });
 

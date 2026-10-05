@@ -28,6 +28,9 @@ export const KNOWN_LABELS = [
   'Microsoft Office',
   'Adobe',
   'Email data files found Active or Inactive account',
+  // Added 2026-10-05 so a machine keeps its history through a rename. The scan
+  // script writes it as `Serial Number: $((Get-CimInstance Win32_BIOS).SerialNumber)`.
+  'Serial Number',
 ];
 
 const normalise = (s) => s.replace(/\s+/g, ' ').trim().toLowerCase();

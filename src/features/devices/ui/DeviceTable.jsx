@@ -280,8 +280,10 @@ export default function DeviceTable({
           type="button"
           className="dt-icon dt-icon-bad"
           disabled={busy}
+          aria-busy={busy || undefined}
           onClick={removeChosen}
         >
+          {busy && <Spinner size={12} />}
           Yes, remove {chosen.length}
         </button>
         <button type="button" className="dt-icon" onClick={() => setConfirmingMany(false)}>
@@ -546,6 +548,7 @@ export default function DeviceTable({
                             aria-busy={busy || undefined}
                             onClick={async () => { await onDelete(device); cancelEdit(); }}
                           >
+                            {busy && <Spinner size={12} />}
                             Yes, remove
                           </button>
                           <button type="button" className="dt-icon" onClick={() => setConfirming(null)}>

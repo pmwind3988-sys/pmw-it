@@ -297,7 +297,7 @@ always shows the whole fleet.
   - owner, or "In stash" / "Retired 3 Mar 2026"
   - computer name
   - laptop or desktop glyph
-  - three short bars, for CPU generation, RAM and storage, filled relative to the department's persona floor and coloured by the fit verdict
+  - three short bars, for CPU generation, RAM and storage, filled against fixed full scales (15th-gen CPU, 32 GB, 1 TB) so cards compare at a glance, and coloured by the fit verdict
 - **A card opens the machine page.**
 
 **A department name at two locations is two separate tiles.** Finance at F1 and
@@ -350,7 +350,7 @@ Finance at PML are separate tiles, each with its own counts.
 - heatmap
 - leaderboards
 
-**IT Stash count.** The dashboard gains a stat card for spare machines, which links to the IT Stash. The dashboard's department charts gain a location split, and every count of machines also shows laptops vs desktops.
+**IT Stash count.** The dashboard gains a stat card for spare machines, which links to the IT Stash.
 
 ## 4. Where the code goes
 

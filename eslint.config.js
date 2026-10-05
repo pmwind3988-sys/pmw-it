@@ -21,4 +21,10 @@ export default defineConfig([
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
   },
+  {
+    // The functions behind the shared checklist links run on Node, not in a
+    // browser, and use Buffer and process.
+    files: ['server/**/*.js', 'api/**/*.js'],
+    languageOptions: { globals: { ...globals.node } },
+  },
 ])

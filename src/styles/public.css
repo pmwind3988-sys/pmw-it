@@ -185,7 +185,7 @@ body { background: var(--it-canvas, var(--bg)); color: var(--text-primary); }
 @page { size: A4; margin: 14mm; }
 
 @media print {
-  body { background: #fff !important; }
+  html, body, .pc-page { background: #fff !important; }
   .pc-bar, .pc-foot, .pc-signed-bar { display: none !important; }
   .pc-main { max-width: none; padding: 0; }
   .cr-doc { border: 0; box-shadow: none; padding: 0; border-radius: 0; }

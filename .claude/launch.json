@@ -21,6 +21,15 @@
         "4173"
       ],
       "port": 4173
+    },
+    {
+      "name": "pmw-it-links-demo",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev:links"
+      ],
+      "port": 5174
     }
   ]
 }

@@ -40,6 +40,8 @@
   display: grid;
   grid-template-columns: 1fr;
   gap: 16px;
+  /* Same rhythm as a lone field, or the field after a grid sits on it. */
+  margin-bottom: 16px;
 }
 
 @media (min-width: 640px) {

@@ -1,7 +1,7 @@
 # PROJECT KNOWLEDGE BASE
 
 **Generated:** 2026-05-04
-**Updated:** 2026-08-23
+**Updated:** 2026-10-05
 **Project:** PMW IT Service Portal (formerly "IT Onboarding Portal")
 
 ## OVERVIEW
@@ -55,9 +55,13 @@ pmw-it/
 │   ├── services/             # sharePointService.js
 │   ├── utils/                # timeout.js, initials.js, authErrors.js,
 │   │                         # sessionKeys.js
+│   ├── public/               # the no-sign-in page a shared checklist link opens
 │   ├── App.jsx               # Router setup
 │   ├── main.jsx              # MSAL bootstrap + providers + stylesheet order
 │   └── authConfig.js         # Azure AD + SharePoint scopes
+├── api/c/[code].js           # Vercel function: open / submit a shared checklist link
+├── server/                   # what that function does (Graph, rules, a fake for tests)
+├── checklist.html            # second HTML entry, for /c/<code>
 ├── public/                   # Static assets
 ├── vite.config.js
 ├── eslint.config.js
@@ -74,6 +78,9 @@ pmw-it/
 | `/list` | Legacy alias, redirects to `/requests` (keeps the query) |
 | `/it-boarding-form` | HR/manager raises an onboarding or offboarding event; several employees per submission, `?edit=<id>` opens a record |
 | `/asset-checklist` | The EMPLOYEE's own signed record of what they received or handed back — IN / OUT / INDIVIDUAL REQUEST, following the supplied reference form |
+| `/asset-checklist/share` | IT pre-fills a checklist, chooses per field what the employee may change, and copies a short link |
+| `/asset-checklist/links` | Every shared link: waiting / signed / expired / cancelled; copy, open, cancel |
+| `/c/:code` | **Public, no sign-in.** A separate page (`checklist.html`), not a portal route: the employee fills and signs; afterwards the same link is the locked, printable copy |
 | `/devices` | Device list: fleet dashboard, register and scan-report import (`?view=`) |
 | `/assets` | Asset inventory: what IT owns, its figures, and the deliveries still unsaved on this device (`?category=`, `?status=`, `?condition=`, `?location=`, `?unlabelled=1`) |
 | `/assets/scan` | Purchase details, then the camera. Scans become a batch on this device — nothing reaches SharePoint here |
@@ -106,6 +113,14 @@ pmw-it/
 | A form's fields, branching and validation | `src/features/forms/` |
 | The form controls themselves | `src/components/form/` |
 | What the checklist writes to SharePoint | `src/features/forms/toChecklistItem.js` |
+| What an employee may change on a shared link, and what the server believes | `src/features/forms/links/linkRules.js` |
+| The link code | `src/features/forms/links/linkCode.js` |
+| The shared-link list's columns | `src/features/forms/links/linkSchema.js` |
+| Creating / listing / cancelling links (portal side) | `src/features/forms/sharepoint/checklistLinks.js` |
+| Opening and submitting a link (server side) | `server/checklistLinkApi.js`, `server/graph.js`, `api/c/[code].js` |
+| The public page | `checklist.html`, `src/public/`, `src/styles/public.css` |
+| The checklist form body, shared by all three pages | `src/components/checklist/` |
+| The Azure / Vercel setup the links need | `docs/checklist-links-setup.md` |
 | Adding options to an existing choice column | `mergeChoices` in `src/features/sharepoint/provision.js` |
 | Which values on a device page read red or green | `src/features/devices/fieldTone.js` |
 | Any SharePoint list/column/view provisioning | `src/features/sharepoint/provision.js` |
@@ -542,6 +557,34 @@ SharePoint row. All three are pure and tested, which is the point: "an OUT
 checklist needs a signature" and "an individual request needs at least one
 item" are exactly the rules that can be wrong without looking wrong.
 
+**A shared checklist link is the one thing in the portal with no sign-in.**
+`/c/<code>` is its own HTML entry (`checklist.html` → `src/public/`), not a
+route in `App.jsx`: it loads the form kit and nothing else — no MSAL, no
+router, no portal page — so there is nothing on it to walk back into the
+portal with, and every other address still hits the sign-in gate. Keep it
+that way: importing anything from `AppShell`, `hooks/useRequests` or a page
+into `src/public/` drags the portal into the anonymous bundle.
+
+The anonymous visitor holds nothing SharePoint accepts, so two Vercel
+functions (`api/c/[code].js` → `server/`) read and write under the portal's
+OWN identity, through Graph with `Sites.Selected` and a client secret.
+Graph and not SharePoint REST: SharePoint REST refuses an app-only token got
+with a secret. The server is the part that has to be right — it re-applies
+every locked value itself (`mergeSubmission`), so what the browser sends for
+a field IT fixed is simply ignored; it claims the link with `If-Match` before
+writing, so two taps cannot sign it twice; and it hands the link back only if
+no checklist row was written. Unknown, expired and cancelled links all answer
+the same 404, so trying codes tells a stranger nothing.
+
+The signed row goes to `Asset Checklist Form` through the same
+`toChecklistItem` as a portal-signed one; the link's own bookkeeping lives in
+`Asset Checklist Links`. That list and everything the server writes to are
+provisioned by the PORTAL when IT creates a link, because the server's
+identity is granted write on the site and nothing more.
+
+`npm run dev:links` runs both against an in-memory SharePoint with three demo
+links (`server/devApi.js`), for trying it without the app secret.
+
 **What the checklist READS and what it STORES are deliberately different.** The
 form says IN / OUT / INDIVIDUAL REQUEST, as the reference form does; the list
 keeps `In` / `Out` / `Individual Request`, which is what every checklist ever
@@ -882,6 +925,7 @@ No icon package is installed — add a glyph there rather than a dependency.
 ## COMMANDS
 ```bash
 npm run dev      # Start dev server on port 5173
+npm run dev:links # Port 5174, shared checklist links against fake SharePoint
 npm run build    # Build for production (outputs to dist/)
 npm run lint     # Run ESLint
 npm run preview  # Preview production build

@@ -2,6 +2,24 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import AppShell from '../components/AppShell';
 import { Card, EmptyState, ErrorBanner } from '../components/ui/Surfaces';
+import Button from '../components/ui/Button';
+import { ArrowLeft, RefreshCw } from '../components/ui/Icons';
+import { useDevices } from '../features/devices/useDevices';
+import { groupsFor, RAW_REPORT_KEY } from '../features/devices/fieldGroups';
+import { formatScalar } from '../features/devices/formatValue';
+import ValueCell from '../features/devices/ui/ValueCell';
+import { toneForField, toneForEntry, hasEntryTones } from '../features/devices/fieldTone';
+import { formatMYT } from '../utils/malaysiaTime';
+import { useSharePointToken } from '../hooks/useRequests';
+import { useDeviceHistory } from '../features/devices/useDeviceHistory';
+import LifecycleActions from '../features/devices/ui/LifecycleActions';
+import OwnerHistory from '../features/devices/ui/OwnerHistory';
+import SpecHistory from '../features/devices/ui/SpecHistory';
+import { performLifecycle, retryStints } from '../features/devices/sharepoint/writeLifecycle';
+import { statusOf } from '../features/devices/lifecycle/status';
+import { locationsIn } from '../features/devices/map/locations';
+import { labelOf } from '../features/devices/deviceFilters';
+import { mapHref } from '../features/devices/map/mapLinks';
 
 /**
  * The verdict shares the risk palette rather than a second one: red is "go and
@@ -12,14 +30,6 @@ const FIT_TONE = {
   'Needs Attention': 'watch',
   Optimal: 'ok',
 };
-import Button from '../components/ui/Button';
-import { ArrowLeft, RefreshCw } from '../components/ui/Icons';
-import { useDevices } from '../features/devices/useDevices';
-import { groupsFor, RAW_REPORT_KEY } from '../features/devices/fieldGroups';
-import { formatScalar } from '../features/devices/formatValue';
-import ValueCell from '../features/devices/ui/ValueCell';
-import { toneForField, toneForEntry, hasEntryTones } from '../features/devices/fieldTone';
-import { formatMYT } from '../utils/malaysiaTime';
 
 /** Remembered per browser: somebody who turns the colouring off is not asked
  *  to turn it off again on the next machine they open. */
@@ -41,6 +51,10 @@ export default function DeviceDetailPage() {
   const [showEmpty, setShowEmpty] = useState(false);
   const [showRaw, setShowRaw] = useState(false);
   const [showTones, setShowTones] = useState(readTonePreference);
+  const getToken = useSharePointToken();
+  const [acting, setActing] = useState(false);
+  const [actionError, setActionError] = useState('');
+  const [pending, setPending] = useState([]);
 
   useEffect(() => {
     try {
@@ -50,10 +64,47 @@ export default function DeviceDetailPage() {
     }
   }, [showTones]);
 
+  const act = async (action, input) => {
+    setActing(true);
+    setActionError('');
+    try {
+      const tokenRes = await getToken();
+      const outcome = await performLifecycle({
+        siteUrl: SITE, token: tokenRes.accessToken, deviceId: device.id, action, input,
+        expectedStatus: statusOf(device), recordedBy: tokenRes.account?.username ?? '',
+      });
+      setPending(outcome.pendingStints);
+      if (outcome.pendingStints.length) setActionError('The machine moved, but its owner history could not be written.');
+    } catch (failure) {
+      setActionError(failure.message);
+    } finally {
+      setActing(false);
+      reload();
+      history.reload();
+    }
+  };
+
+  const retry = async () => {
+    setActing(true);
+    try {
+      const tokenRes = await getToken();
+      await retryStints({ siteUrl: SITE, token: tokenRes.accessToken, writes: pending });
+      setPending([]);
+      setActionError('');
+    } catch (failure) {
+      setActionError(failure.message);
+    } finally {
+      setActing(false);
+      history.reload();
+    }
+  };
+
   const device = useMemo(
     () => devices.find((row) => String(row.id) === String(id)),
     [devices, id],
   );
+
+  const history = useDeviceHistory(device);
 
   const groups = useMemo(
     () => (device ? groupsFor(device, { includeEmpty: showEmpty }) : []),
@@ -61,6 +112,12 @@ export default function DeviceDetailPage() {
   );
 
   const manual = new Set(device?.manualFields ?? []);
+
+  const owners = useMemo(() => [...new Set(devices.map((d) => d.owner).filter(Boolean))].sort(), [devices]);
+  const departments = useMemo(() => [...new Set(devices.map((d) => d.department).filter(Boolean))].sort(), [devices]);
+  const locations = useMemo(() => locationsIn(devices), [devices]);
+
+  const SITE = import.meta.env.VITE_SHAREPOINT_SITE_URL || 'https://pmwgroupcom.sharepoint.com/sites/IThelpdesk';
 
   return (
     <AppShell
@@ -90,13 +147,40 @@ export default function DeviceDetailPage() {
             {!loading && (
               <>
                 {' '}
-                <Link to="/devices?view=register">Back to the register</Link>
+                <Link to="/devices">Back to the map</Link>
               </>
             )}
           </EmptyState>
         </Card>
       ) : (
         <>
+          <nav className="dm-crumbs" aria-label="Breadcrumb">
+            <Link to={mapHref()}>Map</Link>
+            {device.location && (<><span aria-hidden="true">›</span><Link to={mapHref({ location: device.location })}>{device.location}</Link></>)}
+            {device.location && (<><span aria-hidden="true">›</span><Link to={mapHref({ location: device.location, department: labelOf(device.department) })}>{labelOf(device.department)}</Link></>)}
+            <span aria-hidden="true">›</span><span aria-current="page">{device.computerName}</span>
+          </nav>
+
+          <Card className="dd-life">
+            <div className="dd-life-head">
+              <span className={`dd-status dd-status-${statusOf(device).replace(' ', '-').toLowerCase()}`}>{statusOf(device)}</span>
+              <span className="dd-life-who">
+                {device.owner
+                  ? <>With <strong>{device.owner}</strong>{[device.location, device.department].filter(Boolean).map((v) => ` · ${v}`).join('')}</>
+                  : 'Nobody has it'}
+                {device.serialNumber && <span className="dd-life-serial">Serial {device.serialNumber}</span>}
+              </span>
+              <LifecycleActions device={device} owners={owners} locations={locations} departments={departments} onAction={act} busy={acting} />
+            </div>
+            {actionError && <ErrorBanner message={actionError} busy={acting} onRetry={pending.length ? retry : () => setActionError('')} />}
+          </Card>
+
+          <div className="dd-histories">
+            <OwnerHistory device={device} stints={history.stints} loading={history.loading} />
+            <SpecHistory changes={history.changes} loading={history.loading} />
+          </div>
+          {history.error && <ErrorBanner message={history.error} onRetry={history.reload} />}
+
           <div className="dd-summary">
             <span className={`dd-risk rg-risk-${String(device.riskLevel).toLowerCase()}`}>
               {device.riskLevel ?? 'Unknown'}

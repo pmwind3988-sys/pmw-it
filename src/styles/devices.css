@@ -1793,3 +1793,50 @@ a.mt:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--it-brand-line); 
     transition: none;
   }
 }
+
+/* --- Machine page: lifecycle and history -------------------------------- */
+.dm-crumbs { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; padding: 0; list-style: none; font-size: 14px; }
+.dm-crumbs a { color: var(--it-brand); text-decoration: none; }
+.dm-crumbs a:hover { text-decoration: underline; }
+.dm-empty { margin: 0; padding: 16px; text-align: center; color: var(--it-ink-soft); }
+.dd-life-head { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
+.dd-life-who { display: flex; flex-direction: column; gap: 2px; flex: 1 1 260px; font-size: 15px; }
+.dd-life-serial { font-size: 13px; color: var(--it-ink-soft); font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace; }
+.dd-status { font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; }
+.dd-status-in-use { background: var(--it-good-wash); color: var(--it-good); }
+.dd-status-in-repair { background: var(--it-accent-wash); color: var(--it-ink); }
+.dd-status-spare { background: var(--it-brand-wash); color: var(--it-brand); }
+.dd-status-retired { background: var(--it-thead); color: var(--it-ink-soft); }
+.la { display: flex; flex-wrap: wrap; gap: 8px; }
+.la .ui-btn { min-height: 44px; }
+.la-danger { color: var(--it-danger) !important; }
+.dd-histories { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; align-items: start; }
+.oh-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.oh-item { display: grid; grid-template-columns: 18px 1fr; gap: 10px; }
+.oh-item > span:last-child { display: flex; flex-direction: column; gap: 2px; }
+.oh-dot { width: 12px; height: 12px; margin-top: 4px; border-radius: 50%; background: var(--it-ink-soft); }
+.oh-current .oh-dot { background: var(--it-brand); box-shadow: 0 0 0 4px var(--it-brand-wash); }
+.oh-dot-approx { background: transparent; border: 2px dashed var(--it-ink-soft); }
+.oh-gap .oh-dot { border-radius: 3px; background: transparent; border: 2px solid var(--it-ink-soft); }
+.oh-where, .oh-when { font-size: 13px; color: var(--it-ink-soft); }
+.oh-why { font-size: 13px; }
+.oh-now { align-self: flex-start; font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 999px; background: var(--it-brand-wash); color: var(--it-brand); }
+.sh-day { display: flex; flex-direction: column; gap: 6px; padding: 10px 0; border-top: 1px solid var(--it-line); }
+.sh-day:first-of-type { border-top: 0; }
+.sh-date { font-size: 12px; font-weight: 700; letter-spacing: .1em; color: var(--it-ink-soft); }
+.sh-rows { margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.sh-rows > div { display: grid; grid-template-columns: 160px 1fr; gap: 12px; font-size: 14px; }
+.sh-rows dt { color: var(--it-ink-soft); }
+.sh-rows dd { margin: 0; }
+.sh-rows s { color: var(--it-ink-soft); }
+.sh-rename dd { font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace; }
+.ad { display: flex; flex-direction: column; gap: 12px; max-width: 520px; width: 100%; }
+.ad-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; }
+.ad-field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; }
+.ad-field input, .ad-field textarea {
+  font: inherit; font-size: 16px; font-weight: 400; min-height: 44px; padding: 0 12px;
+  border: 1px solid var(--it-line); border-radius: 10px; background: var(--it-panel); color: var(--it-ink);
+}
+.ad-field textarea { padding: 10px 12px; resize: vertical; }
+.ad-now, .ad-summary { margin: 0; font-size: 14px; color: var(--it-ink-soft); }
+.ad-summary { background: var(--it-canvas); padding: 10px 12px; border-radius: 10px; }

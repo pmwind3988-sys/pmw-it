@@ -14,7 +14,13 @@ const GROUPS = [
     id: 'identity',
     title: 'Identity',
     hint: 'Who has it and where it lives',
-    keys: ['computerName', 'owner', 'ownerSource', 'department', 'deviceType', 'anydeskId'],
+    keys: ['computerName', 'owner', 'ownerSource', 'department', 'location', 'deviceType', 'serialNumber', 'anydeskId'],
+  },
+  {
+    id: 'lifecycle',
+    title: 'Lifecycle',
+    hint: 'Where the machine is in its life',
+    keys: ['status', 'statusChangedOn'],
   },
   {
     id: 'risk',

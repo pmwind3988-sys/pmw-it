@@ -1,4 +1,5 @@
 import { formatMYT } from '../../../utils/malaysiaTime.js';
+import { STATUSES } from '../lifecycle/status.js';
 
 export const DEVICE_LIST_NAME = 'IT Device List';
 export const CHANGE_LIST_NAME = 'IT Device Changes';
@@ -18,11 +19,15 @@ export const DEVICE_COLUMNS = [
   choice('OwnerSource', 'Owner Source',
     ['Name field', 'Filename', 'Server credential', 'Email', 'Manual']),
   text('Department', 'Department'),
+  text('Location', 'Location'),
   choice('DeviceType', 'Device Type', ['Laptop', 'Desktop', 'Unknown']),
   text('ComputerModel', 'Model'),
   text('MotherboardVendor', 'Motherboard Vendor'),
   text('MotherboardModel', 'Motherboard Model'),
   text('AnydeskId', 'AnyDesk ID'),
+  text('SerialNumber', 'Serial Number'),
+  choice('Status', 'Status', STATUSES),
+  date('StatusChangedOn', 'Status Changed On'),
 
   date('ScannedOn', 'Scanned On'),
   date('ImportedOn', 'Imported On'),
@@ -94,6 +99,7 @@ export const DEVICE_COLUMNS = [
 ];
 
 export const CHANGE_COLUMNS = [
+  num('DeviceId', 'Device ID'),
   text('FieldName', 'Field'),
   note('OldValue', 'Old Value'),
   note('NewValue', 'New Value'),
@@ -110,8 +116,11 @@ export const CHANGE_COLUMNS = [
  *
  * `manualFields` is absent for a different reason: it records how a value was
  * set, not that the machine changed.
+ *
+ * computerName, serialNumber and status joined when machines got an identity beyond their name: a rename, a first serial and a move to the stash are exactly what the history is for.
  */
 export const TRACKED_FIELDS = [
+  'computerName', 'location', 'serialNumber', 'status',
   'owner', 'department', 'deviceType', 'computerModel',
   'windowsVersion', 'osSupported',
   'cpuModel', 'cpuAgeBand',
@@ -142,7 +151,9 @@ export function toListItem(device) {
     const key = keyFor(column.StaticName);
     let value = device[key];
 
-    if (column.StaticName === 'ScannedOnMYT') value = formatMYT(device.scannedOn, 'datetime12');
+    if (column.StaticName === 'ScannedOnMYT') {
+      value = device.scannedOn ? formatMYT(device.scannedOn, 'datetime12') : null;
+    }
     if (column.StaticName === 'ExtraFields') {
       value = device.unknownLabels?.length ? JSON.stringify(device.unknownLabels) : null;
     }
@@ -198,6 +209,10 @@ export function fromListItem(row) {
     else if (ARRAY_COLUMNS.has(column.StaticName)) record[key] = String(raw).split('\n');
     else record[key] = raw;
   }
+
+  // SharePoint's own creation stamp: the earliest this register knew of the
+  // machine, which is what "since at least" means on a pre-history owner.
+  record.createdOn = row.Created ? new Date(row.Created).getTime() : null;
 
   return record;
 }

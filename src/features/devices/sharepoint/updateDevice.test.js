@@ -14,7 +14,7 @@ const row = (overrides) => ({
 
 describe('EDITABLE_FIELDS', () => {
   it('covers only the values the import guessed', () => {
-    expect(EDITABLE_FIELDS).toEqual(['owner', 'department', 'deviceType']);
+    expect(EDITABLE_FIELDS).toEqual(['owner', 'department', 'deviceType', 'location']);
   });
 
   it('does not let anything read out of the scan file be retyped', () => {
@@ -158,6 +158,19 @@ describe('updateDevice', () => {
     await expect(updateDevice({
       siteUrl: SITE, token: 't', existing: row(), edits: { owner: 'X' },
     })).rejects.toThrow(/Could not save/);
+  });
+
+  it('ties every change row to the machine id', async () => {
+    const sp = fakeSharePoint();
+    vi.stubGlobal('fetch', sp.fetch);
+
+    await updateDevice({
+      siteUrl: SITE, token: 't', existing: row(), edits: { location: 'F3' }, changedBy: 'me',
+    });
+
+    const logged = writes(sp.calls).find((c) => c.url.includes('IT%20Device%20Changes'));
+    expect(logged.body.DeviceId).toBe(7);
+    expect(logged.body.FieldName).toBe('location');
   });
 });
 

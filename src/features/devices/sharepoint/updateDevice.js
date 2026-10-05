@@ -11,9 +11,9 @@ import { formatMYT } from '../../../utils/malaysiaTime.js';
  * file verbatim, and editing it here would put the register out of step with
  * the report that produced it.
  */
-export const EDITABLE_FIELDS = ['owner', 'department', 'deviceType'];
+export const EDITABLE_FIELDS = ['owner', 'department', 'deviceType', 'location'];
 
-const COLUMN_FOR = { owner: 'Owner', department: 'Department', deviceType: 'DeviceType' };
+const COLUMN_FOR = { owner: 'Owner', department: 'Department', deviceType: 'DeviceType', location: 'Location' };
 
 const asText = (value) => (value === null || value === undefined ? '' : String(value));
 
@@ -62,7 +62,7 @@ function itemBody(edits, manualFields) {
   return body;
 }
 
-async function logChanges(siteUrl, token, digest, computerName, changes, changedBy) {
+export async function logChanges(siteUrl, token, digest, device, changes, changedBy) {
   const changedOn = Date.now();
 
   for (const change of changes) {
@@ -73,7 +73,8 @@ async function logChanges(siteUrl, token, digest, computerName, changes, changed
         method: 'POST',
         accept: ITEM_ACCEPT,
         body: {
-          Title: computerName,
+          Title: device.computerName ?? '',
+          DeviceId: device.id,
           FieldName: change.fieldName,
           OldValue: change.oldValue,
           NewValue: change.newValue,
@@ -114,7 +115,7 @@ export async function updateDevice({
     throw new Error(`Could not save the change (${response.status}): ${await response.text()}`);
   }
 
-  await logChanges(siteUrl, token, digest, existing.computerName, changes, changedBy);
+  await logChanges(siteUrl, token, digest, existing, changes, changedBy);
   return { changes };
 }
 
@@ -145,7 +146,7 @@ async function removeOne({
   }
 
   // A machine leaving the register is never silent.
-  await logChanges(siteUrl, token, digest, device.computerName, [{
+  await logChanges(siteUrl, token, digest, device, [{
     fieldName: 'device',
     oldValue: device.computerName,
     newValue: '',

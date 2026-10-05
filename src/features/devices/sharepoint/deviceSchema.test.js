@@ -117,3 +117,40 @@ describe('TRACKED_FIELDS', () => {
     expect(TRACKED_FIELDS).not.toContain('mappedDrives');
   });
 });
+
+describe('lifecycle columns', () => {
+  const names = DEVICE_COLUMNS.map((column) => column.StaticName);
+
+  it('adds location, serial, status and when the status changed', () => {
+    expect(names).toEqual(expect.arrayContaining(['Location', 'SerialNumber', 'Status', 'StatusChangedOn']));
+  });
+
+  it('stores location as text so a new site needs no column change', () => {
+    expect(DEVICE_COLUMNS.find((c) => c.StaticName === 'Location').kind).toBe('text');
+  });
+
+  it('offers exactly the four statuses', () => {
+    expect(DEVICE_COLUMNS.find((c) => c.StaticName === 'Status').choices)
+      .toEqual(['In use', 'In repair', 'Spare', 'Retired']);
+  });
+
+  it('ties change rows to the machine, not only its name', () => {
+    expect(CHANGE_COLUMNS.find((c) => c.StaticName === 'DeviceId').kind).toBe('number');
+  });
+
+  it('logs renames, location, serial and status changes', () => {
+    expect(TRACKED_FIELDS).toEqual(expect.arrayContaining(['computerName', 'location', 'serialNumber', 'status']));
+  });
+
+  it('reads when the row was first created', () => {
+    const record = fromListItem({ Id: 3, Title: 'PC1', Created: '2026-08-21T02:00:00Z' });
+    expect(record.createdOn).toBe(Date.parse('2026-08-21T02:00:00Z'));
+    expect(fromListItem({ Id: 3, Title: 'PC1' }).createdOn).toBeNull();
+  });
+
+  it('round-trips a status and a location', () => {
+    const item = toListItem({ computerName: 'PC1', status: 'Spare', location: 'F1' });
+    expect(item.Status).toBe('Spare');
+    expect(item.Location).toBe('F1');
+  });
+});

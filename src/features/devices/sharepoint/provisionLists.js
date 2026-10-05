@@ -2,6 +2,7 @@ import { provisionSchema, fieldBody, renameBody } from '../../sharepoint/provisi
 import {
   DEVICE_COLUMNS, CHANGE_COLUMNS, DEVICE_LIST_NAME, CHANGE_LIST_NAME,
 } from './deviceSchema.js';
+import { ASSIGNMENT_LIST_NAME, ASSIGNMENT_COLUMNS } from './assignmentSchema.js';
 import { DEVICE_VIEWS } from './deviceViews.js';
 
 /**
@@ -16,7 +17,7 @@ import { DEVICE_VIEWS } from './deviceViews.js';
 export { fieldBody, renameBody };
 
 /**
- * `onProgress(done, total)` counts columns checked across both lists. On a
+ * `onProgress(done, total)` counts columns checked across all three lists. On a
  * first run this is around 70 sequential round trips and takes over a minute,
  * which looks identical to a hang unless something says otherwise.
  */
@@ -32,6 +33,11 @@ export function provisionLists(siteUrl, token, { onProgress } = {}) {
         title: CHANGE_LIST_NAME,
         description: 'Field-level change history for the device list',
         columns: CHANGE_COLUMNS,
+      },
+      {
+        title: ASSIGNMENT_LIST_NAME,
+        description: 'Who had each machine, from when to when',
+        columns: ASSIGNMENT_COLUMNS,
       },
     ],
     views: DEVICE_VIEWS,

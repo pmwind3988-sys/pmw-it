@@ -33,3 +33,16 @@ export async function readAllDevices(siteUrl, token) {
   // that disk as its own storage without waiting to be scanned again.
   return rows.map(fromListItem).map(refixStored);
 }
+
+/**
+ * One machine as SharePoint holds it NOW. A lifecycle action re-reads before
+ * it plans, the same rule as a handover: two people moving the same laptop
+ * from two screens must not both succeed.
+ */
+export async function readDevice(siteUrl, token, id) {
+  const response = await spFetch(siteUrl, `${listPath(DEVICE_LIST_NAME)}/items(${Number(id)})`, { token });
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error(`Could not read that machine (${response.status})`);
+  const data = await response.json();
+  return refixStored(fromListItem(data.d ?? data));
+}

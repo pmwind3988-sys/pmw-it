@@ -3,6 +3,7 @@ import {
 } from 'vitest';
 import { fieldBody, renameBody, provisionLists } from './provisionLists.js';
 import { DEVICE_COLUMNS, CHANGE_COLUMNS } from './deviceSchema.js';
+import { ASSIGNMENT_COLUMNS } from './assignmentSchema.js';
 
 describe('fieldBody', () => {
   it('creates a text column as a plain SP.Field', () => {
@@ -238,9 +239,9 @@ describe('provisionLists progress', () => {
     vi.unstubAllGlobals();
   });
 
-  const TOTAL = DEVICE_COLUMNS.length + CHANGE_COLUMNS.length;
+  const TOTAL = DEVICE_COLUMNS.length + CHANGE_COLUMNS.length + ASSIGNMENT_COLUMNS.length;
 
-  it('reports one tick per column across both lists', async () => {
+  it('reports one tick per column across all three lists', async () => {
     const sp = fakeSharePoint();
     vi.stubGlobal('fetch', sp.fetch);
 
@@ -256,7 +257,7 @@ describe('provisionLists progress', () => {
     // Everything already correct: no creates, no renames, but the caller still
     // needs to see the work being checked off.
     const sp = fakeSharePoint({
-      existingFields: [...DEVICE_COLUMNS, ...CHANGE_COLUMNS].map((column) => ({
+      existingFields: [...DEVICE_COLUMNS, ...CHANGE_COLUMNS, ...ASSIGNMENT_COLUMNS].map((column) => ({
         internalName: column.StaticName, title: column.Title,
       })),
     });

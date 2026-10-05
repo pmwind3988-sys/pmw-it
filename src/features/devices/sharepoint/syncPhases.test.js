@@ -3,6 +3,7 @@ import {
 } from 'vitest';
 import { syncDevices } from './syncDevices.js';
 import { DEVICE_COLUMNS, CHANGE_COLUMNS } from './deviceSchema.js';
+import { ASSIGNMENT_COLUMNS } from './assignmentSchema.js';
 
 const SITE = 'https://contoso.sharepoint.com/sites/it';
 
@@ -29,7 +30,7 @@ function fakeSharePoint({ items = [] } = {}) {
     headers: { get: () => null },
   });
 
-  const fields = [...DEVICE_COLUMNS, ...CHANGE_COLUMNS].map((column) => ({
+  const fields = [...DEVICE_COLUMNS, ...CHANGE_COLUMNS, ...ASSIGNMENT_COLUMNS].map((column) => ({
     InternalName: column.StaticName, Title: column.Title,
   }));
 
@@ -86,7 +87,7 @@ describe('syncDevices progress phases', () => {
     });
 
     const provisioning = updates.filter((u) => u.phase === 'provisioning');
-    const total = DEVICE_COLUMNS.length + CHANGE_COLUMNS.length;
+    const total = DEVICE_COLUMNS.length + CHANGE_COLUMNS.length + ASSIGNMENT_COLUMNS.length;
     expect(provisioning.at(-1)).toEqual({ phase: 'provisioning', done: total, total });
   });
 

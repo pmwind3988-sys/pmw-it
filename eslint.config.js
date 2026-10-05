@@ -23,8 +23,8 @@ export default defineConfig([
   },
   {
     // The functions behind the shared checklist links run on Node, not in a
-    // browser, and use Buffer and process.
-    files: ['server/**/*.js', 'api/**/*.js'],
+    // browser, and use Buffer and process. So does the Vite config.
+    files: ['server/**/*.js', 'api/**/*.js', 'vite.config.js'],
     languageOptions: { globals: { ...globals.node } },
   },
 ])

@@ -36,15 +36,19 @@ export function configFromEnv(env = process.env) {
 
 let shared = null;
 
-function defaultApi() {
-  const { config, missing } = configFromEnv();
+/**
+ * The API for these settings, or null with the missing ones logged. Kept
+ * between requests on a warm instance, so the token and the list ids are
+ * looked up once rather than on every visit.
+ */
+export function apiFromEnv(env = process.env) {
+  if (shared) return shared;
+  const { config, missing } = configFromEnv(env);
   if (missing.length) {
     console.error(`[checklist-link] not configured — missing ${missing.join(', ')}`);
     return null;
   }
-  // Kept between requests on a warm instance, so the token and the list ids
-  // are looked up once rather than on every visit.
-  shared ??= createLinkApi({ graph: createGraph(config) });
+  shared = createLinkApi({ graph: createGraph(config) });
   return shared;
 }
 
@@ -68,7 +72,7 @@ async function readBody(req) {
   return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
 }
 
-export async function handleLinkRequest(req, res, code, { api = defaultApi() } = {}) {
+export async function handleLinkRequest(req, res, code, { api = apiFromEnv() } = {}) {
   if (!api) {
     send(res, 503, { error: 'This form cannot be opened right now. Please let IT know.' });
     return;

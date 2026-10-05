@@ -546,3 +546,57 @@
 @media (prefers-reduced-motion: reduce) {
   .ff-switch-track, .ff-switch-track::after { transition: none; }
 }
+
+/* Builder: the hint above the fields, and the "link ready" card. */
+.cl-hint { margin: 18px 0 14px; }
+
+.cl-ready { display: grid; gap: 18px; }
+.cl-ready-head { display: flex; gap: 12px; align-items: flex-start; color: var(--it-brand, var(--text-primary)); }
+.cl-ready-head > div { color: var(--text-primary); display: grid; gap: 6px; }
+
+.cl-copy { display: flex; flex-wrap: wrap; gap: 8px; }
+.cl-copy-url {
+  flex: 1 1 260px;
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 16px;
+}
+
+.cl-qr { margin: 0; display: grid; justify-items: start; gap: 6px; }
+.cl-qr img { border-radius: 8px; background: #fff; padding: 6px; border: 1px solid var(--border); }
+.cl-qr figcaption { font-size: 13px; color: var(--text-secondary); }
+
+/* Shared checklists list: one card per link, wrapping on a phone. */
+.cl-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+
+.cl-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 16px;
+  align-items: center;
+  padding: 14px 16px;
+}
+
+.cl-row-main { display: grid; gap: 3px; min-width: 0; }
+.cl-row-name { font-size: 15px; font-weight: 600; color: var(--text-primary); overflow-wrap: anywhere; }
+.cl-row-meta { font-size: 13px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.cl-row-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
+
+@media (min-width: 900px) {
+  .cl-row { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .cl-row-actions { grid-column: auto; justify-content: flex-end; }
+}
+
+.cl-state {
+  justify-self: end;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.cl-state-open, .cl-state-busy { background: var(--it-accent-wash); color: var(--it-accent); border-color: color-mix(in srgb, var(--it-accent) 30%, transparent); }
+.cl-state-signed { background: var(--it-good-wash); color: var(--it-good); border-color: color-mix(in srgb, var(--it-good) 30%, transparent); }
+.cl-state-expired, .cl-state-cancelled { background: var(--it-canvas, var(--bg)); color: var(--text-secondary); border-color: var(--border); }

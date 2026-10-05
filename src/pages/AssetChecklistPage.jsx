@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import AppShell from '../components/AppShell';
 import Button from '../components/ui/Button';
 import { Card, ErrorBanner } from '../components/ui/Surfaces';
-import { Check, AlertTriangle } from '../components/ui/Icons';
+import { Check, AlertTriangle, Link2, ClipboardList } from '../components/ui/Icons';
 import Field from '../components/form/Field';
 import { RadioCards } from '../components/form/Choices';
 import ChecklistFields from '../components/checklist/ChecklistFields';
@@ -38,6 +39,7 @@ const PHASE_LABEL = {
 };
 
 export default function AssetChecklistPage() {
+  const navigate = useNavigate();
   const getToken = useSharePointToken();
 
   const [values, setValues] = useState(emptyChecklist);
@@ -129,6 +131,16 @@ export default function AssetChecklistPage() {
   return (
     <AppShell
       title="IT asset tracking form"
+      actions={(
+        <>
+          <Button variant="ghost" icon={ClipboardList} onClick={() => navigate('/asset-checklist/links')}>
+            Shared checklists
+          </Button>
+          <Button variant="ghost" icon={Link2} onClick={() => navigate('/asset-checklist/share')}>
+            Share as a link
+          </Button>
+        </>
+      )}
       subtitle={step === 0
         ? 'What is this checklist for?'
         : `${modeLabel(values.formMode)} — your details and what you are signing for`}

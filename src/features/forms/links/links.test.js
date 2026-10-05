@@ -6,6 +6,7 @@ import {
   mergeSubmission, cleanPreset, STALE_SIGNING_MS, MAX_SIGNATURE_CHARS,
 } from './linkRules.js';
 import { toLinkItem, fromLinkItem, LINK_STATUS } from './linkSchema.js';
+import { draftLink, linkUrl } from '../sharepoint/checklistLinks.js';
 
 const NOW = Date.parse('2026-10-05T04:00:00Z');
 const DAY = 86400000;
@@ -209,5 +210,38 @@ describe('the link row', () => {
     const back = fromLinkItem({ Title: 'Ab3dE5gH9k', Preset: '{oops', Editable: 'nope' });
     expect(back.preset).toEqual({});
     expect(back.editable).toEqual([]);
+  });
+});
+
+describe('drafting a link from what IT filled in', () => {
+  const values = {
+    ...emptyChecklist(),
+    employeeName: ' Siti ',
+    entity: 'PCI',
+    checkedItems: ['Laptop'],
+    items: [{ item: 'Mouse', quantity: 2 }],
+  };
+
+  it('keeps an opened field only if it is filled and on this form type', () => {
+    const link = draftLink({
+      formMode: OUT,
+      values,
+      editable: ['employeeName', 'position', 'items', 'checkedItems'],
+      now: NOW,
+      code: 'Ab3dE5gH9k',
+    });
+    // position is blank (the employee's anyway); items is not on an OUT form.
+    expect(link.editable).toEqual(['employeeName', 'checkedItems']);
+    expect(link.preset.employeeName).toBe('Siti');
+    expect(link.status).toBe(LINK_STATUS.WAITING);
+  });
+
+  it('expires the number of days asked for', () => {
+    const link = draftLink({ formMode: IN, values, expiresInDays: 7, now: NOW });
+    expect(Date.parse(link.expiresOn) - NOW).toBe(7 * DAY);
+  });
+
+  it('builds the address the employee opens', () => {
+    expect(linkUrl('https://it.example.com/', 'Ab3dE5gH9k')).toBe('https://it.example.com/c/Ab3dE5gH9k');
   });
 });

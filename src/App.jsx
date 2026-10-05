@@ -4,6 +4,8 @@ import Homepage from './pages/Homepage';
 import DashboardPage from './pages/DashboardPage';
 import FormPage from './pages/FormPage';
 import AssetChecklistPage from './pages/AssetChecklistPage';
+import ChecklistSharePage from './pages/ChecklistSharePage';
+import ChecklistLinksPage from './pages/ChecklistLinksPage';
 import LoginPage from './pages/LoginPage';
 import ListPage from './pages/ListPage';
 import DevicesPage from './pages/DevicesPage';
@@ -39,6 +41,8 @@ function App() {
         <Route path="/list" element={<LegacyListRedirect />} />
         <Route path="/it-boarding-form" element={<FormPage />} />
         <Route path="/asset-checklist" element={<AssetChecklistPage />} />
+        <Route path="/asset-checklist/share" element={<ChecklistSharePage />} />
+        <Route path="/asset-checklist/links" element={<ChecklistLinksPage />} />
         <Route path="/devices" element={<DevicesPage />} />
         <Route path="/devices/:id" element={<DeviceDetailPage />} />
         {/* `scan` and `batch` are declared above `:id` so they are not read as

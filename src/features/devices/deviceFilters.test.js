@@ -181,3 +181,21 @@ describe('the persona filters', () => {
     expect(names({ formfit: '1' })).toEqual(['B']);
   });
 });
+
+describe('status and location filters', () => {
+  const rows = [
+    { computerName: 'A', status: null, location: 'F1' },
+    { computerName: 'B', status: 'Retired', location: 'f1' },
+    { computerName: 'C', status: 'Spare', location: null },
+  ];
+
+  it('filters by status, reading a blank as In use', () => {
+    expect(applyFilters(rows, { status: 'In use' }).map((r) => r.computerName)).toEqual(['A']);
+    expect(applyFilters(rows, { status: 'Retired' }).map((r) => r.computerName)).toEqual(['B']);
+  });
+
+  it('filters by location code, and by Unassigned for none', () => {
+    expect(applyFilters(rows, { location: 'F1' }).map((r) => r.computerName)).toEqual(['A', 'B']);
+    expect(applyFilters(rows, { location: 'Unassigned' }).map((r) => r.computerName)).toEqual(['C']);
+  });
+});

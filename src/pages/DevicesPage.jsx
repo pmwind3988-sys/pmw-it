@@ -1,11 +1,11 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import AppShell from '../components/AppShell';
 import StatCard from '../components/ui/StatCard';
 import { Card, EmptyState, ErrorBanner } from '../components/ui/Surfaces';
 import Button from '../components/ui/Button';
 import {
-  Laptop, AlertTriangle, ShieldCheck, MemoryStick, Clock, RefreshCw, Tag, WifiOff,
+  Laptop, AlertTriangle, ShieldCheck, MemoryStick, Clock, RefreshCw, Tag, WifiOff, Archive,
 } from '../components/ui/Icons';
 import { useSharePointToken } from '../hooks/useRequests';
 import DropZone from '../features/devices/ui/DropZone';
@@ -27,6 +27,11 @@ import { provisionLists } from '../features/devices/sharepoint/provisionLists';
 import { matchIncoming, noticeFor } from '../features/devices/lifecycle/matchIncoming';
 import { replacementsFor, unanswered } from '../features/devices/lifecycle/replacements';
 import { locationsIn } from '../features/devices/map/locations';
+import { inFleet, statusOf, STATUSES, RETIRED, SPARE } from '../features/devices/lifecycle/status';
+import { performLifecycle } from '../features/devices/sharepoint/writeLifecycle';
+import { ACTIONS } from '../features/devices/lifecycle/planLifecycle';
+import { mapHref } from '../features/devices/map/mapLinks';
+import { PLACES } from '../features/devices/map/zones';
 
 const SHAREPOINT_SITE_URL =
   import.meta.env.VITE_SHAREPOINT_SITE_URL || 'https://pmwgroupcom.sharepoint.com/sites/IThelpdesk';
@@ -40,7 +45,7 @@ const IDLE_SAVE = {
 const FILTER_KEYS = [
   'risk', 'attention', 'type', 'department', 'os', 'av',
   'storage', 'ram', 'cpu', 'windows', 'stale', 'q',
-  'fit', 'persona', 'license', 'server', 'formfit',
+  'fit', 'persona', 'license', 'server', 'formfit', 'status', 'location',
 ];
 
 export default function DevicesPage() {
@@ -83,21 +88,33 @@ export default function DevicesPage() {
     [params],
   );
 
+  const navigate = useNavigate();
+  // Figures count the machines people are working on. A retired laptop
+  // reported as a critical risk would be a figure lying about the fleet.
+  const fleet = useMemo(() => saved.filter(inFleet), [saved]);
+  const spareCount = useMemo(() => saved.filter((d) => statusOf(d) === SPARE).length, [saved]);
+  // The register hides retired machines unless a status filter asks for them.
+  const registerRows = useMemo(
+    () => (filters.status ? saved : saved.filter((d) => statusOf(d) !== RETIRED)),
+    [saved, filters.status],
+  );
+  const locationOptions = useMemo(() => locationsIn(saved), [saved]);
+
   // The dashboard reads one department at a time when asked to. It shares the
   // register's `department` key, so a scope chosen here survives the jump into
   // the rows behind any card.
   const department = params.get('department') ?? '';
 
   const departments = useMemo(() => {
-    const names = new Set(saved.map((device) => labelOf(device.department)));
+    const names = new Set(fleet.map((device) => labelOf(device.department)));
     return [...names].sort((a, b) => a.localeCompare(b));
-  }, [saved]);
+  }, [fleet]);
 
   const scoped = useMemo(
     () => (department
-      ? saved.filter((device) => labelOf(device.department) === department)
-      : saved),
-    [saved, department],
+      ? fleet.filter((device) => labelOf(device.department) === department)
+      : fleet),
+    [fleet, department],
   );
 
   const summary = useMemo(() => fleetSummary(scoped), [scoped]);
@@ -234,13 +251,54 @@ export default function DevicesPage() {
     }
   };
 
-  const handleRowSave = (device, edits) => runRowAction((tokenRes) => updateDevice({
-    siteUrl: SHAREPOINT_SITE_URL,
-    token: tokenRes.accessToken,
-    existing: device,
-    edits,
-    changedBy: tokenRes.account?.username ?? '',
-  }));
+  const OWNERSHIP = ['owner', 'location', 'department'];
+  const trimmed = (value) => String(value ?? '').trim();
+
+  /**
+   * An owner, location or department typed into the register is a change of
+   * hands, so it goes through the same write as the machine page's Change
+   * owner -- the register and the owner history cannot disagree. Clearing the
+   * owner still goes the old way: a blank hands the field back to the scan.
+   */
+  const handleRowSave = (device, edits) => runRowAction(async (tokenRes) => {
+    const moved = OWNERSHIP.some((key) => key in edits && trimmed(edits[key]) !== trimmed(device[key]));
+    const owner = trimmed('owner' in edits ? edits.owner : device.owner);
+    let existing = device;
+    let rest = edits;
+
+    if (moved && owner && inFleet(device)) {
+      const { plan, pendingStints } = await performLifecycle({
+        siteUrl: SHAREPOINT_SITE_URL,
+        token: tokenRes.accessToken,
+        deviceId: device.id,
+        action: ACTIONS.CHANGE_OWNER,
+        input: {
+          owner,
+          location: 'location' in edits ? edits.location : device.location,
+          department: 'department' in edits ? edits.department : device.department,
+        },
+        expectedStatus: statusOf(device),
+        recordedBy: tokenRes.account?.username ?? '',
+      });
+      // The remaining edit must start from the manual list the change just
+      // wrote, or saving the device type would drop owner from it again.
+      existing = { ...device, ...plan.fields };
+      rest = Object.fromEntries(Object.entries(edits).filter(([key]) => !OWNERSHIP.includes(key)));
+      if (pendingStints.length) {
+        throw new Error('The owner changed, but its history could not be written. Open the machine to retry.');
+      }
+    }
+
+    if (Object.keys(rest).length) {
+      await updateDevice({
+        siteUrl: SHAREPOINT_SITE_URL,
+        token: tokenRes.accessToken,
+        existing,
+        edits: rest,
+        changedBy: tokenRes.account?.username ?? '',
+      });
+    }
+  });
 
   const handleRowDelete = (device) => runRowAction((tokenRes) => deleteDevice({
     siteUrl: SHAREPOINT_SITE_URL,
@@ -413,6 +471,13 @@ export default function DevicesPage() {
               onClick={() => openRegister('license', 'Unlicensed')}
             />
             <StatCard
+              icon={Archive}
+              label="In IT Stash"
+              value={spareCount}
+              loading={loading}
+              onClick={() => navigate(mapHref({ place: PLACES.STASH }))}
+            />
+            <StatCard
               icon={WifiOff}
               label="Server over Wi-Fi"
               value={compliance.networkBottlenecks}
@@ -456,8 +521,30 @@ export default function DevicesPage() {
       {view === 'register' && (
         <>
           {rowError && <ErrorBanner message={rowError} onRetry={() => setRowError('')} />}
+          <div className="dv-register-scope">
+            <label className="dv-scope">
+              <span>Location</span>
+              <select value={filters.location} onChange={(event) => setParam('location', event.target.value)}>
+                <option value="">All locations</option>
+                {locationOptions.map((code) => <option key={code} value={code}>{code}</option>)}
+                <option value="Unassigned">No location yet</option>
+              </select>
+            </label>
+            <label className="dv-scope">
+              <span>Status</span>
+              <select value={filters.status} onChange={(event) => setParam('status', event.target.value)}>
+                <option value="">All but retired</option>
+                {STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
+              </select>
+            </label>
+            {!filters.status && (
+              <button type="button" className="dv-linkish" onClick={() => setParam('status', RETIRED)}>
+                Retired machines are hidden. Show them
+              </button>
+            )}
+          </div>
           <DeviceTable
-            devices={saved}
+            devices={registerRows}
             filters={filters}
             onFilterChange={setParam}
             onSave={handleRowSave}

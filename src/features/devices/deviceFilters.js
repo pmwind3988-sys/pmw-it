@@ -1,3 +1,6 @@
+import { statusOf } from './lifecycle/status.js';
+import { cleanLocation } from './map/locations.js';
+
 const STALE_MS = 180 * 86_400_000;
 
 export function ramBucket(installedRamGB) {
@@ -46,6 +49,8 @@ const MATCHERS = {
     : device.serverDependent === true),
   formfit: (device) => device.formFactorMatches === false,
   stale: (device) => isStale(device),
+  status: (device, value) => statusOf(device) === value,
+  location: (device, value) => labelOf(cleanLocation(device.location)) === value,
   q: (device, value) => {
     const needle = value.toLowerCase();
     return `${device.computerName ?? ''} ${device.owner ?? ''}`.toLowerCase().includes(needle);

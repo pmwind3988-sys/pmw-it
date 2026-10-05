@@ -27,7 +27,7 @@ import {
  * hidden here is a field nobody knows was collected.
  */
 const LEAD_KEYS = [
-  'computerName', 'owner', 'department', 'personaLabel', 'fitStatus', 'actionRequired',
+  'computerName', 'status', 'owner', 'location', 'department', 'personaLabel', 'fitStatus', 'actionRequired',
   'suggestedFormFactor', 'deviceType', 'licenseStatus', 'computerModel', 'cpuModel',
   'installedRamGB', 'storageTotalGB', 'storageType', 'windowsVersion',
   'antivirusStatus', 'riskScore', 'riskLevel',

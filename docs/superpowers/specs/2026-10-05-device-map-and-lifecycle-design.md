@@ -30,14 +30,18 @@ previous owner.
 | What identifies a physical machine | Its **serial number**, read from the scan. The computer name is the fallback. |
 | Where ownership lives | Inside `/devices`. It is not linked to the asset register's handovers. |
 | A person shows up on a new machine | The import review **asks**: old one to stash, retire it, or keep both. |
-| How browsing looks | An **auto-arranged world map**: department zones around a central IT Stash hub, with a Graveyard at the edge. |
+| How browsing looks | An **auto-arranged world map**: locations around a central IT Stash hub, with a Graveyard at the edge. Enter a location to see its departments, enter a department to see its machines. |
+| What the top level is | **Location** (F1, F3, PML, …), then department. |
+| Where a machine's location comes from | The scan **file name** when it carries one, otherwise **set by hand**. A hand-set location beats the file. |
+| Counting | Every level (location, department, IT Stash, Graveyard) shows its **laptop and desktop counts**. |
 
 ## 1. Data
 
-### 1.1 `IT Device List` — three new columns
+### 1.1 `IT Device List` — four new columns
 
 | Column | Kind | Meaning |
 |---|---|---|
+| `Location` | text | Site code: `F1`, `F3`, `PML`, … Blank means "no location yet". |
 | `SerialNumber` | text | Manufacturer serial from the scan. Blank when the report has none, or when the value is a placeholder. |
 | `Status` | choice | `In use`, `In repair`, `Spare`, `Retired`. |
 | `StatusChangedOn` | datetime (`DisplayFormat: 1`) | When the status last changed. |
@@ -45,6 +49,10 @@ previous owner.
 - **No migration:** a blank `Status` reads as `In use`, so every existing row is correct the moment the column exists.
 - **`Owner` and `Department` mean "who has it NOW".** A `Spare` or `Retired` machine has both blank. Its last holder lives in the owner history.
 - **Adding to `Status` later:** the column is reconciled through `mergeChoices`, which only ever adds options, the same as every other choice column.
+- **`Location` is text, not a choice column, on purpose.** A new site must not need a column change before a machine can be put there.
+- **Which locations exist** is worked out the same way `assets/categories.js` works out categories: a short built-in list (`F1`, `F3`, `PML`) plus every location a row is actually using. There is no second list to disagree with the rows. Adding one is typing a new code in the location field.
+- **A location shows by its code.** Full names (such as "Factory 1") can be added to the built-in list later without touching any row.
+- **`location` joins the hand-editable fields.** It sits beside owner, department and device type in `EDITABLE_FIELDS`, so it gets the same `ManualFields` protection against re-import.
 
 ### 1.2 `IT Device Assignments` — new list, one row per stint
 
@@ -53,6 +61,7 @@ previous owner.
 | `Title` | built in | Computer name at the time (readable in SharePoint without a join). |
 | `DeviceId` | number | The `IT Device List` row id. This, not the name, ties the stint to the machine. |
 | `Owner` | text | Who had it. |
+| `Location` | text | Their location during this stint. |
 | `Department` | text | Their department during this stint. |
 | `AssignedOn` | datetime | Start. |
 | `AssignedOnApprox` | boolean | True when the start is only known as "since at least" (see 1.4). |
@@ -70,7 +79,7 @@ the status history in the change log, not from a separate stint.
 
 - **`DeviceId` (number)** is added, so the spec history follows the machine through a rename.
 - **Older rows have no `DeviceId`.** They are matched by `Title`, the old behaviour, as a fallback.
-- **New change types are logged:** `computerName` (a rename), `serialNumber` (first seen) and `status`. `status` also lands in the change log, so "when was it in repair" can be answered.
+- **New change types are logged:** `computerName` (a rename), `serialNumber` (first seen), `location` and `status`. `status` also lands in the change log, so "when was it in repair" can be answered.
 
 ### 1.4 Machines that predate this feature
 
@@ -108,6 +117,36 @@ The list lives beside `isPlaceholder`, as `isPlaceholderSerial` in
 
 **Normalising.** Serials are compared upper-cased with whitespace removed, the same
 rule as `normaliseCode` in assets.
+
+### 2.1a Reading the location from the file name
+
+**The convention.** IT already puts the department in a bracket:
+`[ENGINEERING] AMIR-HP.txt`. The location goes first inside the same bracket:
+
+- `[F1 ENGINEERING] AMIR-HP.txt` → location `F1`, department `Engineering`
+- `[PML FINANCE] EVONNE-HP.txt` → location `PML`, department `Finance`
+
+**How it is matched (`derive/deriveLocation.js`, pure).**
+
+- The first word of the bracket is checked against the known locations (see 1.1), ignoring case. A match is the location, and the rest is the department as it is parsed today.
+- No match: there is no location, and the whole bracket is the department, exactly as today. So `[ENGINEERING] X.txt` keeps working.
+
+**The two names the importer already knows** are split the same way:
+
+| Today's department | Location | Department |
+|---|---|---|
+| `STOCKYARDF1` | `F1` | `Stockyard` |
+| `PML GUARDHOUSE` | `PML` | `Guardhouse` |
+
+A location code glued onto the end of a known department name (`STOCKYARDF1`) is split off only when the code is on the known list. That stops a department that happens to end in a code-like suffix from being cut.
+
+**On re-import:**
+
+- A file with no location never clears one that is set.
+- A hand-set location (in `ManualFields`) is never overwritten.
+- A file location that differs from a non-manual one updates it, logged as a change.
+
+**Rows already in SharePoint** keep their old department text until the reports are imported again or the location is set by hand. Their location stays blank until then, and the map shows them under **No location yet**.
 
 ### 2.2 Matching an incoming report — `lifecycle/matchIncoming.js` (pure)
 
@@ -180,60 +219,80 @@ stints written and stints failed.
 **Tabs.** The tab bar becomes **Map · Dashboard · Register · Import**. A bare
 `/devices` opens the Map.
 
-**Zones.**
+**Three levels, one address each.** Back and shared links work at every level.
 
-| Zone | Holds |
+| Level | Address | Shows |
+|---|---|---|
+| World | `?view=map` | Locations, the IT Stash, the Graveyard |
+| Location | `?view=map&location=F1` | That location's departments |
+| Department | `?view=map&location=F1&department=Engineering` | That department's machines |
+
+**Tiles on the world map.**
+
+| Tile | Holds |
 |---|---|
-| Each department | That department's `In use` and `In repair` machines |
-| **Unassigned** | In-use machines with no department. Shown only when non-empty. |
-| **IT Stash** (centre hub) | `Spare` machines |
+| Each location | Its `In use` and `In repair` machines |
+| **No location yet** (dashed) | In-use machines with a blank location. Shown only when non-empty. |
+| **IT Stash** (centre hub) | `Spare` machines, wherever they last were |
 | **Graveyard** (bottom edge) | `Retired` machines |
 
-**What a zone shows:**
+**Tiles inside a location.**
 
-- its name
+- One tile per department.
+- A centre tile for the location itself, with its totals.
+- An **Unassigned** tile for its machines with no department, shown only when non-empty.
+
+**What every tile shows, at every level:**
+
+- its name (a location shows its code large, e.g. **F1**)
 - the machine count
-- a warning badge: Critical + Needs attention, from `deviceFit`, with the colour of the worst
-- a small strip of laptop and desktop icons, capped, with "+n"
+- **laptops and desktops counted separately**, each with its glyph. `Unknown` device types are counted as "other" only when there are any.
+- a health bar: Critical / Needs attention / Moderate / Optimal, as proportions
+- a badge for the critical count, or "All clear"
+- on a location tile only: its biggest departments as chips (*Engineering 14 · Logistics 12 · +4 more*)
 
-**Layout (`map/mapLayout.js`, pure and tested).** Given the zones, it returns grid
-positions:
+The IT Stash and Graveyard tiles carry the same laptop and desktop split.
 
-- The hub sits in the middle.
-- Departments ring it, largest headcount nearest the hub's row.
-- The Graveyard spans the bottom.
+**Layout (`map/mapLayout.js`, pure and tested).** The same function lays out both
+levels. Given the tiles, it returns grid positions:
 
-Paths between zones are drawn as decoration only. A ring that would exceed the
-grid adds a row, so any number of departments fits.
+- The centre tile (the IT Stash, or the location's own tile) sits in the middle.
+- The other tiles ring it, largest headcount first.
+- On the world map, the Graveyard spans the bottom.
 
-**Responsive.** Below 768px the map renders as a vertical list of the same zone
-tiles, with the hub first and the Graveyard last.
+Paths between tiles are drawn as decoration only. A ring that would exceed the
+grid adds a row, so any number of locations or departments fits.
+
+**Responsive.** Below 768px each level renders as a vertical list of the same
+tiles. On the world map the IT Stash comes first, then the locations, then the
+Graveyard, then No location yet.
 
 **Keyboard and screen readers:**
 
-- Arrow keys move focus between zones, by grid position.
-- Enter or a click enters the zone.
+- Arrow keys move focus between tiles, by grid position.
+- Enter or a click goes one level in.
+- Esc goes one level out.
 - Focus is visible.
-- Each zone is a button labelled e.g. *"Engineering, 14 machines, 2 critical"*.
+- Each tile is a link labelled in full, e.g. *"F1, 65 machines, 41 laptops, 24 desktops, 8 critical"*.
 
-**Motion.** Entering a zone plays a short zoom into it. With
-`prefers-reduced-motion`, it plays no animation.
+**Motion.** Going in plays a short zoom. With `prefers-reduced-motion`, it plays
+no animation.
 
 **Scope.** The dashboard's department scope picker does not apply here. The map
 always shows the whole fleet.
 
-### 3.2 Inside a zone — `/devices?view=map&zone=<name>`
+### 3.2 Inside a department — `?view=map&location=F1&department=Engineering`
 
 **Header:**
 
-- a level-title header: zone name, counts, and the badge again
-- a breadcrumb, *Map › Engineering*
-- Esc, or the breadcrumb, returns to the map
+- a breadcrumb, *Map › F1 › Engineering*
+- a level-title header: department name, the persona it is judged against, the health bar, and counts (machines, laptops, desktops, critical, needs attention, in repair)
+- Esc, or the breadcrumb, goes back to the location
 
 **Body:**
 
-- **Search box.** It searches owner, computer name and serial within the zone.
-- **Machine cards, grouped under *In use* and *In repair*.** IT Stash and Graveyard show a single group.
+- **Search box.** It searches owner, computer name and serial within the department.
+- **Machine cards, grouped under *In use* and *In repair*.** The IT Stash, the Graveyard and No location yet open straight to a card list with a single group, since they have no departments inside.
 - **Each card shows:**
   - owner, or "In stash" / "Retired 3 Mar 2026"
   - computer name
@@ -241,20 +300,20 @@ always shows the whole fleet.
   - three short bars, for CPU generation, RAM and storage, filled relative to the department's persona floor and coloured by the fit verdict
 - **A card opens the machine page.**
 
-**State in the address.** The zone is in the query string, so Back and shared
-links work.
+**A department name at two locations is two separate tiles.** Finance at F1 and
+Finance at PML are separate tiles, each with its own counts.
 
 ### 3.3 Machine page — `/devices/:id` (existing, extended)
 
 **Added to the top:**
 
 - a status badge
-- the current owner and department
+- the current owner, location and department
 - an action bar:
 
 | Action | Shown when | Writes |
 |---|---|---|
-| **Change owner** | In use, In repair | Closes the stint as `Reassigned`. Opens a new one for the new owner and department. |
+| **Change owner** | In use, In repair | Closes the stint as `Reassigned`. Opens a new one for the new owner, location and department. |
 | **To repair** | In use | Status → `In repair`. The stint stays open. |
 | **Back in use** | In repair | Status → `In use`. |
 | **To stash** | In use, In repair | Closes the stint as `To stash`. Status → `Spare`. Clears the owner. |
@@ -264,7 +323,8 @@ links work.
 **The assignment dialog** has:
 
 - **owner:** free text, suggesting owners already in the register
-- **department:** suggests departments already in the register
+- **location:** picks from the known locations, or takes a new code
+- **department:** suggests departments already used at that location
 - **effective date:** defaults to today, and is parsed at local noon as `parseFormDate` does
 - **an optional note**
 
@@ -279,7 +339,7 @@ links work.
 
 **Register:**
 
-- It gains a **Status** column and a status filter.
+- It gains **Location** and **Status** columns, with a filter for each.
 - **Retired is hidden by default.** The filter's header says so while it is.
 - **Owner edits write history.** Editing `owner` or `department` inline there goes through the same lifecycle write as Change owner, so the register and the history cannot disagree.
 
@@ -290,12 +350,14 @@ links work.
 - heatmap
 - leaderboards
 
-**IT Stash count.** The dashboard gains a stat card for spare machines, which links to the IT Stash zone.
+**IT Stash count.** The dashboard gains a stat card for spare machines, which links to the IT Stash. The dashboard's department charts gain a location split, and every count of machines also shows laptops vs desktops.
 
 ## 4. Where the code goes
 
 ```
 src/features/devices/
+  derive/
+    deriveLocation.js    location out of the file-name bracket (pure)
   lifecycle/
     status.js            STATUSES, statusOf(row) (blank → In use), counts-in-fleet
     matchIncoming.js     serial-then-name matching, renames, name reuse
@@ -308,10 +370,12 @@ src/features/devices/
     writeLifecycle.js    performs a planLifecycle result, writes in order
   map/
     mapLayout.js         zones → grid positions (pure)
-    zones.js             devices → zone summaries (pure)
+    zones.js             devices → tile summaries for either level, incl. laptop/desktop counts (pure)
+    locations.js         built-in locations + those in use (pure)
   ui/
     WorldMap.jsx         the map tab
-    ZoneView.jsx         inside a zone
+    LocationView.jsx     inside a location
+    DepartmentView.jsx   inside a department
     MachineCard.jsx
     LifecycleActions.jsx action bar + dialog
     OwnerHistory.jsx
@@ -319,7 +383,7 @@ src/features/devices/
     ReplacementPrompt.jsx  the choice in a review row
 ```
 
-- `deviceSchema.js` gains the three columns.
+- `deviceSchema.js` gains the four columns. `updateDevice.js` adds `location` to `EDITABLE_FIELDS`. `deriveIdentity.js` hands its bracket to `deriveLocation` before reading the department.
 - `CHANGE_COLUMNS` gains `DeviceId`.
 - `provisionLists.js` declares the third list.
 - `syncDevices.js` uses `matchIncoming` in place of `indexByName`, and performs the replacement answers and scan-revealed reassignments.
@@ -347,7 +411,10 @@ src/features/devices/
 | `replacements` | one old machine, two old machines, owner case and space differences, keep-both, a machine already spare is not prompted |
 | `planLifecycle` | every action in the table, legacy stint synthesis, close-is-idempotent, refusal on stale status |
 | `status` / fleet filter | blank → In use, Retired and Spare excluded from figures |
-| `mapLayout` | 0, 1, 5 and 20 departments, hub centred, no overlaps, deterministic order |
+| `mapLayout` | 0, 1, 5 and 20 tiles, centre tile centred, no overlaps, deterministic order, same function for both levels |
+| `zones` | No location yet and Unassigned only when non-empty, badge counts, laptop/desktop/other split, same department at two locations kept apart |
+| `deriveLocation` | `[F1 ENGINEERING]`, `[ENGINEERING]` unchanged, `STOCKYARDF1`, `PML GUARDHOUSE`, unknown first word, case |
+| `locations` | built-in plus in-use, no duplicates by case, blank ignored |
 | `zones` | Unassigned only when non-empty, badge counts |
 | `assignmentSchema` | round-trip, `DateOnly` not used, note not rich text |
 

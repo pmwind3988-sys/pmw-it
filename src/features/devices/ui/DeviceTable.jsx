@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, EmptyState } from '../../../components/ui/Surfaces';
 import Button from '../../../components/ui/Button';
+import Spinner from '../../../components/ui/Spinner';
 import Collapsible from '../../../components/ui/Collapsible';
 import Pager from '../../../components/ui/Pager';
 import { paginate } from '../../../components/ui/paginate';
@@ -279,8 +280,10 @@ export default function DeviceTable({
           type="button"
           className="dt-icon dt-icon-bad"
           disabled={busy}
+          aria-busy={busy || undefined}
           onClick={removeChosen}
         >
+          {busy && <Spinner size={12} />}
           Yes, remove {chosen.length}
         </button>
         <button type="button" className="dt-icon" onClick={() => setConfirmingMany(false)}>
@@ -296,8 +299,10 @@ export default function DeviceTable({
           type="button"
           className="dt-icon dt-icon-bad"
           disabled={busy}
+          aria-busy={busy || undefined}
           onClick={() => { cancelEdit(); setConfirmingMany(true); }}
         >
+          {busy && <Spinner size={12} />}
           <Trash2 size={14} />
           Remove {chosen.length}
         </button>
@@ -515,9 +520,11 @@ export default function DeviceTable({
                             type="button"
                             className="dt-icon dt-icon-go"
                             disabled={busy}
+                            aria-busy={busy || undefined}
                             onClick={async () => { await onSave(device, draft); cancelEdit(); }}
                             aria-label={`Save ${device.computerName}`}
                           >
+                            {busy && <Spinner size={12} />}
                             <Check size={14} />
                           </button>
                           <button type="button" className="dt-icon" onClick={cancelEdit}>
@@ -541,8 +548,10 @@ export default function DeviceTable({
                             type="button"
                             className="dt-icon dt-icon-bad"
                             disabled={busy}
+                            aria-busy={busy || undefined}
                             onClick={async () => { await onDelete(device); cancelEdit(); }}
                           >
+                            {busy && <Spinner size={12} />}
                             Yes, remove
                           </button>
                           <button type="button" className="dt-icon" onClick={() => setConfirming(null)}>

@@ -61,7 +61,7 @@ export default function DropZone({ onFiles, busy, compact = false }) {
         variant="secondary"
         size={compact ? 'sm' : undefined}
         onClick={() => inputRef.current?.click()}
-        disabled={busy}
+        loading={busy}
       >
         {compact ? 'Add more files' : 'Choose files'}
       </Button>

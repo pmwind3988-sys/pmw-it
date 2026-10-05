@@ -73,7 +73,7 @@ export default function DeviceDetailPage() {
           <Button variant="secondary" size="sm" icon={ArrowLeft} onClick={() => navigate(-1)}>
             Back
           </Button>
-          <Button variant="secondary" size="sm" icon={RefreshCw} onClick={reload} disabled={loading}>
+          <Button variant="secondary" size="sm" icon={RefreshCw} onClick={reload} loading={loading}>
             Refresh
           </Button>
         </>

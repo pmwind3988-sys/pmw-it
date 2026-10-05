@@ -2193,3 +2193,23 @@ body {
   .shell-brand-link, .shell-headerbrand { min-height: 44px; display: inline-flex; align-items: center; }
 }
 .ui-fold-toggle { min-height: 44px; }
+
+/* The universal busy mark. A ring with one side open, turning. */
+.ui-spinner {
+  display: inline-block;
+  flex: none;
+  box-sizing: border-box;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  vertical-align: -2px;
+}
+.ui-btn-loading { cursor: progress; }
+.ui-btn-loading:disabled { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  /* Still visibly working, without the spin. */
+  .ui-spinner { animation: ui-spinner-pulse 1.2s ease-in-out infinite; border-right-color: currentColor; }
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes ui-spinner-pulse { 50% { opacity: 0.35; } }

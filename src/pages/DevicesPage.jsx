@@ -310,7 +310,7 @@ export default function DevicesPage() {
         ? `${department} — what every machine has, what needs attention, and what is getting old`
         : 'What every machine has, what needs attention, and what is getting old'}
       actions={(
-        <Button variant="secondary" size="sm" icon={RefreshCw} onClick={reload} disabled={loading}>
+        <Button variant="secondary" size="sm" icon={RefreshCw} onClick={reload} loading={loading}>
           Refresh
         </Button>
       )}

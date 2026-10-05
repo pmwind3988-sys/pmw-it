@@ -1,4 +1,5 @@
-import { AlertTriangle, RefreshCw } from './Icons';
+import { AlertTriangle } from './Icons';
+import Spinner from './Spinner';
 
 export function Card({ children, className = '', ...rest }) {
   return (
@@ -13,7 +14,7 @@ export function Card({ children, className = '', ...rest }) {
  * rather than squashing, and Retry only appears when there is something to
  * retry.
  */
-export function ErrorBanner({ message, onRetry }) {
+export function ErrorBanner({ message, onRetry, busy = false }) {
   return (
     <div className="ui-error" role="alert">
       <span style={{ display: 'flex', gap: 8, alignItems: 'flex-start', minWidth: 0 }}>
@@ -21,8 +22,8 @@ export function ErrorBanner({ message, onRetry }) {
         <span style={{ minWidth: 0 }}>{message}</span>
       </span>
       {onRetry && (
-        <button type="button" onClick={onRetry}>
-          <RefreshCw size={13} /> Retry
+        <button type="button" onClick={onRetry} disabled={busy} aria-busy={busy || undefined}>
+          {busy && <Spinner size={12} />} Retry
         </button>
       )}
     </div>

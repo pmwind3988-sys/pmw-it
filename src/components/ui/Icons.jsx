@@ -360,3 +360,37 @@ export const Lock = make('Lock', (
     <path d="M7 11V7a5 5 0 0 1 10 0v4" />
   </>
 ));
+
+export const Monitor = make('Monitor', (
+  <>
+    <rect x="3" y="4" width="18" height="12" rx="2" />
+    <path d="M8 20h8M12 16v4" />
+  </>
+));
+
+export const Archive = make('Archive', (
+  <>
+    <path d="M3 7l9-4 9 4-9 4-9-4z" />
+    <path d="M3 7v10l9 4 9-4V7" />
+    <path d="M12 11v10" />
+  </>
+));
+
+export const Tombstone = make('Tombstone', (
+  <>
+    <path d="M6 21V9a6 6 0 0 1 12 0v12" />
+    <path d="M4 21h16" />
+    <path d="M12 9v6M9.5 11.5h5" />
+  </>
+));
+
+export const MapIcon = make('MapIcon', (
+  <>
+    <path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z" />
+    <path d="M9 4v14M15 6v14" />
+  </>
+));
+
+export const Wrench = make('Wrench', (
+  <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z" />
+));

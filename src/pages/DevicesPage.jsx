@@ -15,6 +15,7 @@ import DeviceTable from '../features/devices/ui/DeviceTable';
 import DeviceCharts from '../features/devices/ui/DeviceCharts';
 import DepartmentHeatmap from '../features/devices/ui/DepartmentHeatmap';
 import Leaderboards from '../features/devices/ui/Leaderboards';
+import DeviceMap from '../features/devices/ui/DeviceMap';
 import { importFiles, mergeImports } from '../features/devices/importFiles';
 import { issuesFor, sortForReview } from '../features/devices/reviewIssues';
 import { useDevices } from '../features/devices/useDevices';
@@ -47,7 +48,7 @@ export default function DevicesPage() {
   const [params, setParams] = useSearchParams();
   const { devices: saved, loading, error, reload } = useDevices();
 
-  const view = params.get('view') ?? 'dashboard';
+  const view = params.get('view') ?? 'map';
 
   const [stage, setStage] = useState('drop');
   const [parsed, setParsed] = useState([]);
@@ -301,6 +302,7 @@ export default function DevicesPage() {
   const tabs = (
     <div className="dv-tabs" role="tablist">
       {[
+        ['map', 'Map'],
         ['dashboard', 'Dashboard'],
         ['register', 'Register'],
         ['import', 'Import'],
@@ -311,7 +313,13 @@ export default function DevicesPage() {
           key={key}
           aria-selected={view === key}
           className={`dv-tab${view === key ? ' dv-tab-active' : ''}`}
-          onClick={() => setParam('view', key)}
+          onClick={() => setParams((current) => {
+            const next = new URLSearchParams(current);
+            next.set('view', key);
+            ['location', 'place'].forEach((k) => next.delete(k));
+            if (view === 'map') next.delete('department');
+            return next;
+          })}
         >
           {label}
         </button>
@@ -335,6 +343,8 @@ export default function DevicesPage() {
       {tabs}
 
       {error && <ErrorBanner message={error} onRetry={reload} />}
+
+      {view === 'map' && <DeviceMap devices={saved} loading={loading} params={params} />}
 
       {view === 'dashboard' && (
         <>

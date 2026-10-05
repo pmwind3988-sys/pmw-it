@@ -209,6 +209,19 @@ describe('deleteDevice', () => {
       .rejects.toThrow(/Could not remove/);
     expect(writes(sp.calls).some((c) => c.url.includes('Changes'))).toBe(false);
   });
+
+  it('ties the removal change-log row to the machine id', async () => {
+    const sp = fakeSharePoint();
+    vi.stubGlobal('fetch', sp.fetch);
+
+    await deleteDevice({
+      siteUrl: SITE, token: 't', device: row(), changedBy: 'me',
+    });
+
+    const logged = writes(sp.calls).find((c) => c.url.includes('Changes'));
+    expect(logged.body.DeviceId).toBe(7);
+    expect(logged.body.ChangeType).toBe('Removed');
+  });
 });
 
 describe('deleteDevices', () => {

@@ -41,6 +41,9 @@ export const checklistColumns = (entities = ENTITIES) => [
   note('SerialNumbers', 'Serial Numbers'),
   note('OtherRemarks', 'Other Remarks'),
   text('SubmissionDateMYT', 'Submitted (MYT)'),
+  // Set when IT corrects a checklist after the employee signed it, so anybody
+  // reading the list sees the signature no longer covers every value as shown.
+  text('EditedAfterSigning', 'Edited after signing'),
 ];
 
 export const CHECKLIST_COLUMNS = checklistColumns();
@@ -59,7 +62,7 @@ export const CHECKLIST_VIEWS = [
     fields: [
       NAME, 'FormMode', 'EmployeeName', 'EmployeeNo', 'Position', 'Entity', 'Department',
       'FormDate', 'AssetMatrix', 'RequestedItems', 'SerialNumbers',
-      'OtherRemarks', 'SignatureUrl', 'SubmissionDateMYT',
+      'OtherRemarks', 'SignatureUrl', 'SubmissionDateMYT', 'EditedAfterSigning',
     ],
     query: '<OrderBy><FieldRef Name="SubmissionDate" Ascending="FALSE" /></OrderBy>',
   },

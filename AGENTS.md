@@ -79,7 +79,8 @@ pmw-it/
 | `/it-boarding-form` | HR/manager raises an onboarding or offboarding event; several employees per submission, `?edit=<id>` opens a record |
 | `/asset-checklist` | The EMPLOYEE's own signed record of what they received or handed back — IN / OUT / INDIVIDUAL REQUEST, following the supplied reference form |
 | `/asset-checklist/share` | IT pre-fills a checklist, chooses per field what the employee may change, and copies a short link |
-| `/asset-checklist/links` | Every shared link: waiting / signed / expired / cancelled; copy, open, cancel |
+| `/asset-checklist/links` | Every shared link: waiting / signed / expired / cancelled; copy, open, change expiry, expire now, cancel, reopen, delete |
+| `/asset-checklist/links/:id` | IT correcting a SIGNED checklist; the record then says "Edited by … after signing" |
 | `/c/:code` | **Public, no sign-in.** A separate page (`checklist.html`), not a portal route: the employee fills and signs; afterwards the same link is the locked, printable copy |
 | `/devices` | Device list: fleet dashboard, register and scan-report import (`?view=`) |
 | `/assets` | Asset inventory: what IT owns, its figures, and the deliveries still unsaved on this device (`?category=`, `?status=`, `?condition=`, `?location=`, `?unlabelled=1`) |
@@ -120,6 +121,7 @@ pmw-it/
 | Opening and submitting a link (server side) | `server/checklistLinkApi.js`, `server/graph.js`, `api/c/[code].js` |
 | The public page | `checklist.html`, `src/public/`, `src/styles/public.css` |
 | The checklist form body, shared by all three pages | `src/components/checklist/` |
+| What IT may do to a link, and what an edit / reopen writes | `src/features/forms/links/linkChanges.js` |
 | Entity / Department choices, live or carried by a link | `src/features/forms/formOptions.js`, `src/hooks/useOrgDirectory.js` |
 | The Azure / Vercel setup the links need | `docs/checklist-links-setup.md` |
 | Adding options to an existing choice column | `mergeChoices` in `src/features/sharepoint/provision.js` |
@@ -594,8 +596,30 @@ the link is created, because the server has no right to add a choice later.
 Whoever may change the entity may change the department, and a department is
 always read against the entity that STANDS — IT's if IT fixed it.
 
-`npm run dev:links` runs both against an in-memory SharePoint with three demo
-links (`server/devApi.js`), for trying it without the app secret.
+**After sharing, IT can change a link — and nothing it changes is silent.**
+`linkChanges.js` (pure, tested) decides what each state offers and what each
+change writes; `checklistLinks.js` carries it out as the signed-in user.
+- *Edit* corrects a signed checklist in place. The row gets an
+  `EditedAfterSigning` note, the signed copy and its PDF print it, and the
+  values as FIRST signed are kept in `OriginalSubmitted` — written on the first
+  edit only, never overwritten. The signature and the form type cannot be
+  edited: those are what the employee did.
+- *Reopen* puts the link back to Waiting, pre-filled with what was signed, and
+  keeps every field the employee could change before open to them — without
+  that, their own answers would come back locked as IT's. On submit the
+  server UPDATES the row the link already made (`isReopened`: it has a
+  `ChecklistId`), one record per link, and the employee may keep the
+  signature they gave rather than draw it again. Signing again clears the
+  edit note, because the signature now covers the values as they stand.
+- *Delete* recycles the link, its checklist row and the signature, link LAST
+  so a half-finished delete leaves something to press again. The dialog
+  warns about the record whenever one EXISTS (`checklistId`), not by state:
+  a reopened or expired link can still have one.
+- *Expire now* is a new end date of now, so a link expired by mistake is one
+  "Change expiry" away from working.
+
+`npm run dev:links` runs both against an in-memory SharePoint with five demo
+links (`server/devApi.js`), including one reopened and one edited after signing, for trying it without the app secret.
 
 **What the checklist READS and what it STORES are deliberately different.** The
 form says IN / OUT / INDIVIDUAL REQUEST, as the reference form does; the list

@@ -8,11 +8,13 @@ import SignatureDialog from '../SignatureDialog';
  * The signature on an asset checklist — required, unlike the handover pages'
  * `SignatureField`: here the signature IS the record.
  */
-export default function ChecklistSignature({ value, onChange, error, label = 'Your Signature' }) {
+export default function ChecklistSignature({
+  value, onChange, error, label = 'Your Signature', help = 'Sign in the middle of the box.',
+}) {
   const [signing, setSigning] = useState(false);
 
   return (
-    <Field label={label} required error={error} help="Sign in the middle of the box." wide>
+    <Field label={label} required error={error} help={help} wide>
       {value ? (
         <div className="ff-signed">
           <img src={value} alt="Your signature" />

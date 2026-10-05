@@ -8,6 +8,8 @@ import {
   LINKS_LIST_NAME, LINK_COLUMNS, LINK_VIEWS, LINK_STATUS, toLinkItem, fromLinkItem,
 } from '../links/linkSchema.js';
 import { newLinkCode } from '../links/linkCode.js';
+import { expiryFields, reopenFields, planEdit } from '../links/linkChanges.js';
+import { fileApiPath } from '../../assets/sharepoint/fileUrl.js';
 import { cleanPreset, isBlankValue } from '../links/linkRules.js';
 import { ENTITIES, fieldsFor } from '../checklistForm.js';
 
@@ -99,14 +101,15 @@ export async function createLink({
   return { ...link, id: data.Id ?? data.ID ?? null };
 }
 
-const SELECT = [
-  'Id', 'Title', 'FormMode', 'EmployeeName', 'Editable', 'ExpiresOn', 'LinkStatus',
-  'CreatedByName', 'CreatedByEmail', 'Created', 'Modified', 'ChecklistId', 'SignedOn',
-].join(',');
-
-/** Newest first. A list nobody has created yet is an empty list, not an error. */
+/**
+ * Newest first. A list nobody has created yet is an empty list, not an error.
+ *
+ * Every column comes back rather than a `$select`: naming a column the list
+ * has not been given yet fails the whole read, and columns are added to this
+ * list over time (the edit columns arrive the first time somebody edits).
+ */
 export async function listLinks({ siteUrl, token }) {
-  const path = `${listPath(LINKS_LIST_NAME)}/items?$select=${SELECT}&$orderby=Created desc&$top=500`;
+  const path = `${listPath(LINKS_LIST_NAME)}/items?$orderby=Created desc&$top=500`;
   const response = await spFetch(siteUrl, path, { token, accept: ITEM_ACCEPT });
   if (response.status === 404) return [];
   if (!response.ok) {
@@ -116,20 +119,120 @@ export async function listLinks({ siteUrl, token }) {
   return (data.value ?? []).map(fromLinkItem);
 }
 
-export async function cancelLink({ siteUrl, token, id }) {
-  const digest = await getFormDigest(siteUrl, token);
+export async function getLink({ siteUrl, token, id }) {
+  const response = await spFetch(siteUrl, `${listPath(LINKS_LIST_NAME)}/items(${Number(id)})`, {
+    token, accept: ITEM_ACCEPT,
+  });
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    throw new Error(`Could not load the shared checklist (${response.status}): ${await response.text()}`);
+  }
+  return fromLinkItem(await response.json());
+}
 
-  const response = await withRetry(() => spFetch(siteUrl, `${listPath(LINKS_LIST_NAME)}/items(${id})`, {
+async function merge(siteUrl, token, digest, list, id, body, what) {
+  const response = await withRetry(() => spFetch(siteUrl, `${listPath(list)}/items(${Number(id)})`, {
     token,
     digest,
     method: 'POST',
     accept: ITEM_ACCEPT,
-    body: { LinkStatus: LINK_STATUS.CANCELLED },
+    body,
     headers: { 'X-HTTP-Method': 'MERGE', 'IF-MATCH': '*' },
   }));
   if (!response.ok) {
-    throw new Error(`Could not cancel the link (${response.status}): ${await response.text()}`);
+    throw new Error(`Could not ${what} (${response.status}): ${await response.text()}`);
   }
+}
+
+async function updateLinkRow({ siteUrl, token, id, fields, what }) {
+  const digest = await getFormDigest(siteUrl, token);
+  await merge(siteUrl, token, digest, LINKS_LIST_NAME, id, fields, what);
+}
+
+export function cancelLink({ siteUrl, token, id }) {
+  return updateLinkRow({
+    siteUrl, token, id, fields: { LinkStatus: LINK_STATUS.CANCELLED }, what: 'cancel the link',
+  });
+}
+
+/** A new end date — also what "Expire now" is, with the date being now. */
+export function setLinkExpiry({ siteUrl, token, id, expiresAt }) {
+  return updateLinkRow({
+    siteUrl, token, id, fields: expiryFields(expiresAt), what: 'change when the link expires',
+  });
+}
+
+/** Back to waiting. A signed record and its signature stay until signed again. */
+export function reopenLink({ siteUrl, token, link, expiresAt }) {
+  return updateLinkRow({
+    siteUrl, token, id: link.id, fields: reopenFields(link, expiresAt), what: 'reopen the link',
+  });
+}
+
+/**
+ * IT correcting a signed checklist. The row is written FIRST and the link
+ * second: if the second write fails, the record already holds the correction
+ * and says it was edited, which is the part people read.
+ *
+ * Provisioned first, because the edit columns arrive with the first edit and
+ * the entity picked may be one the Entity choice column has not heard of.
+ */
+export async function editSignedLink({
+  siteUrl, token, link, values, by, at = Date.now(),
+}) {
+  const plan = planEdit(link, values, { by, at });
+  if (Object.keys(plan.errors).length) return { errors: plan.errors };
+
+  const digest = await provisionLinks(siteUrl, token, {
+    entities: [
+      ...(link.options?.entities ?? []).map((entity) => entity.value),
+      plan.values.entity,
+    ].filter(Boolean),
+  });
+  await merge(siteUrl, token, digest, CHECKLIST_LIST_NAME, link.checklistId, plan.checklist, 'save the checklist');
+  await merge(siteUrl, token, digest, LINKS_LIST_NAME, link.id, plan.link, 'record the edit on the link');
+  return { errors: {}, values: plan.values };
+}
+
+// Recycled, not deleted: SharePoint keeps it in the site's recycle bin and it
+// can be restored. Already gone counts as done, so a delete that failed
+// halfway can simply be pressed again.
+async function recycle(siteUrl, token, digest, path, what) {
+  const response = await withRetry(() => spFetch(siteUrl, `${path}/recycle()`, {
+    token, digest, method: 'POST', accept: ITEM_ACCEPT,
+  }));
+  if (!response.ok && response.status !== 404) {
+    throw new Error(`Could not remove ${what} (${response.status}): ${await response.text()}`);
+  }
+}
+
+/**
+ * The link, the checklist it produced, and that checklist's signature — to
+ * the recycle bin. The link goes LAST, so a failure part-way leaves it on the
+ * list to be removed again rather than leaving an orphaned record nobody can
+ * find from here.
+ */
+export async function deleteLink({ siteUrl, token, link }) {
+  const digest = await getFormDigest(siteUrl, token);
+
+  if (link.checklistId) {
+    const rowPath = `${listPath(CHECKLIST_LIST_NAME)}/items(${Number(link.checklistId)})`;
+    const response = await spFetch(siteUrl, `${rowPath}?$select=SignatureUrl`, { token, accept: ITEM_ACCEPT });
+    if (response.ok) {
+      const { SignatureUrl: signature } = await response.json();
+      if (signature) {
+        // The same file path the asset photos are read through, verified
+        // against the tenant; without its `/$value` it addresses the file.
+        const file = fileApiPath(signature).replace(/\/\$value$/, '');
+        if (file) await recycle(siteUrl, token, digest, file, 'the signature');
+      }
+      await recycle(siteUrl, token, digest, rowPath, 'the signed checklist');
+    } else if (response.status !== 404) {
+      throw new Error(`Could not find the signed checklist (${response.status}): ${await response.text()}`);
+    }
+  }
+
+  await recycle(siteUrl, token, digest, `${listPath(LINKS_LIST_NAME)}/items(${Number(link.id)})`, 'the link');
 }
 
 /** The address an employee opens. */

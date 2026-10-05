@@ -1,5 +1,5 @@
 /**
- * An in-memory stand-in for `createGraph`, with the same five methods.
+ * An in-memory stand-in for `createGraph`, with the same six methods.
  *
  * Used by the handler tests, and by `npm run dev` when `CHECKLIST_FAKE=1` so
  * the public page can be driven end to end on a machine with no app secret.
@@ -48,6 +48,13 @@ export function createFakeGraph({ links = [], fail = {} } = {}) {
       nextChecklistId += 1;
       checklists.push({ id: nextChecklistId, fields });
       return { id: nextChecklistId };
+    },
+
+    async updateChecklist(id, fields) {
+      if (fail.updateChecklist) throw new Error('updateChecklist failed');
+      const row = checklists.find((entry) => entry.id === Number(id));
+      if (!row) throw new Error('No such checklist row');
+      row.fields = { ...row.fields, ...fields };
     },
 
     async uploadSignature(fileName, bytes) {

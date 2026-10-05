@@ -14,7 +14,7 @@ import {
  * `Sites.Selected` and write on the IThelpdesk site only — see
  * `docs/checklist-links-setup.md`.
  *
- * Exposes exactly the five calls the link handlers need, so the fake in
+ * Exposes exactly the six calls the link handlers need, so the fake in
  * `fakeGraph.js` can stand in for it method for method.
  */
 
@@ -127,6 +127,13 @@ export function createGraph({
         body: { fields },
       });
       return { id: (await response.json()).id };
+    },
+
+    async updateChecklist(id, fields) {
+      await call(`${await itemsPath(CHECKLIST_LIST_NAME)}/${id}/fields`, {
+        method: 'PATCH',
+        body: fields,
+      });
     },
 
     async uploadSignature(fileName, bytes) {

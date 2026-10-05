@@ -3,6 +3,7 @@ import {
   linkState, editableFields, mergeSubmission, cleanPreset,
 } from '../src/features/forms/links/linkRules.js';
 import { fromLinkItem, LINK_STATUS } from '../src/features/forms/links/linkSchema.js';
+import { isReopened } from '../src/features/forms/links/linkChanges.js';
 import { validateChecklist, hasErrors } from '../src/features/forms/validate.js';
 import { toChecklistItem, signatureFileName } from '../src/features/forms/toChecklistItem.js';
 import { dataUrlToBytes } from '../src/features/forms/sharepoint/submitChecklist.js';
@@ -32,24 +33,31 @@ export function createLinkApi({ graph, now = Date.now, log = console }) {
     return { row, link: fromLinkItem({ ...row.fields, id: row.id }) };
   }
 
-  async function signedCopy(link) {
-    let signature = null;
-    if (link.signatureFile) {
-      try {
-        const bytes = await graph.readSignature(link.signatureFile);
-        if (bytes) signature = bytesToDataUrl(bytes);
-      } catch (error) {
-        // The record still reads without its picture; say so in the log.
-        log.warn?.('[checklist-link] signature could not be read', error);
-      }
+  async function storedSignature(link) {
+    if (!link.signatureFile) return null;
+    try {
+      const bytes = await graph.readSignature(link.signatureFile);
+      return bytes ? bytesToDataUrl(bytes) : null;
+    } catch (error) {
+      // The record still reads without its picture; say so in the log.
+      log.warn?.('[checklist-link] signature could not be read', error);
+      return null;
     }
+  }
+
+  // Who edited a signed checklist, and when -- shown on the signed copy and
+  // printed with it, because the signature no longer covers every value.
+  const editedBy = (link) => (link.editedBy ? { by: link.editedBy, on: link.editedOn } : null);
+
+  async function signedCopy(link) {
     return {
       state: 'signed',
       formMode: link.formMode,
       options: link.options,
       values: link.submitted ?? {},
-      signature,
+      signature: await storedSignature(link),
       signedOn: link.signedOn,
+      edited: editedBy(link),
     };
   }
 
@@ -73,6 +81,9 @@ export function createLinkApi({ graph, now = Date.now, log = console }) {
         // the link — this page has no way to read them itself.
         options: link.options,
         expiresOn: link.expiresOn,
+        // A REOPENED link was signed before. The employee may keep that
+        // signature rather than draw it again.
+        existingSignature: isReopened(link) ? await storedSignature(link) : null,
       },
     };
   }
@@ -92,7 +103,11 @@ export function createLinkApi({ graph, now = Date.now, log = console }) {
     if (state !== 'open') return GONE;
 
     const values = mergeSubmission(link, body?.values);
-    const errors = validateChecklist(values);
+    const reopened = isReopened(link);
+    // Keeping a signature needs one to keep. A new one sent alongside wins.
+    const keep = body?.keepSignature === true && reopened && Boolean(link.signatureFile)
+      && !values.signature;
+    const errors = validateChecklist(keep ? { ...values, signature: 'kept' } : values);
     if (hasErrors(errors)) return { status: 422, body: { errors } };
 
     // Claimed before anything is written. The eTag is the one read above, so a
@@ -109,18 +124,35 @@ export function createLinkApi({ graph, now = Date.now, log = console }) {
 
     const submittedAt = now();
     const signedOn = new Date(submittedAt).toISOString();
-    const { signature, ...stored } = values;
+    const { signature: drawn, ...stored } = values;
+    const signature = keep ? await storedSignature(link) : drawn;
     const signedCopyBody = {
-      state: 'signed', formMode: link.formMode, options: link.options, values: stored, signature, signedOn,
+      state: 'signed', formMode: link.formMode, options: link.options, values: stored, signature, signedOn, edited: null,
     };
-    let checklistId = null;
+    let written = false;
+    let checklistId = link.checklistId;
     try {
-      const fileName = signatureFileName(values, submittedAt);
-      const uploaded = await graph.uploadSignature(fileName, dataUrlToBytes(values.signature));
-      const created = await graph.createChecklist(
-        toChecklistItem(values, { submittedAt, signatureUrl: uploaded.serverRelativeUrl }),
-      );
-      checklistId = created.id;
+      let fileName = link.signatureFile;
+      let signatureUrl = null;
+      if (!keep) {
+        fileName = signatureFileName(values, submittedAt);
+        // A new signature never overwrites the one it replaces.
+        if (fileName === link.signatureFile) fileName = fileName.replace(/\.png$/, '-again.png');
+        signatureUrl = (await graph.uploadSignature(fileName, dataUrlToBytes(drawn))).serverRelativeUrl;
+      }
+
+      const item = toChecklistItem(values, { submittedAt, signatureUrl: signatureUrl ?? '' });
+      if (keep) delete item.SignatureUrl;
+      // Signed again, so the signature covers the values as they now stand.
+      if (link.editedBy) item.EditedAfterSigning = '';
+
+      if (reopened) {
+        // One record per link: a reopened link corrects the row it made.
+        await graph.updateChecklist(link.checklistId, item);
+      } else {
+        checklistId = (await graph.createChecklist(item)).id;
+      }
+      written = true;
 
       await markSigned(row.id, {
         LinkStatus: LINK_STATUS.SIGNED,
@@ -128,14 +160,15 @@ export function createLinkApi({ graph, now = Date.now, log = console }) {
         SignatureFile: fileName,
         ChecklistId: Number(checklistId),
         SignedOn: signedOn,
+        ...(link.editedBy ? { EditedBy: '' } : {}),
       });
 
       return { status: 200, body: signedCopyBody };
     } catch (error) {
       log.error('[checklist-link] submission failed', { code, checklistId, error });
-      // Only handed back if nothing was recorded. Once the checklist row
-      // exists, reopening the link would let it be signed twice.
-      if (checklistId === null) {
+      // Only handed back if nothing was recorded. Once the checklist row has
+      // been written, reopening the link would let it be signed twice.
+      if (!written) {
         await graph.updateLink(row.id, { LinkStatus: LINK_STATUS.WAITING }).catch((undo) => {
           log.error('[checklist-link] could not reopen the link', undo);
         });

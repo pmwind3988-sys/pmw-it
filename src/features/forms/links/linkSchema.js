@@ -42,6 +42,11 @@ export const LINK_COLUMNS = [
   text('SignatureFile', 'Signature file'),
   number('ChecklistId', 'Checklist row'),
   date('SignedOn', 'Signed on'),
+  // IT correcting what was signed. Never silent: who, when, and the values as
+  // they were first signed, kept the first time and never overwritten.
+  text('EditedBy', 'Edited by'),
+  date('EditedOn', 'Edited on'),
+  note('OriginalSubmitted', 'Values as first signed'),
 ];
 
 export const LINK_VIEWS = [
@@ -111,5 +116,8 @@ export function fromLinkItem(fields = {}) {
     signatureFile: fields.SignatureFile ?? '',
     checklistId: Number.isFinite(checklistId) && checklistId > 0 ? checklistId : null,
     signedOn: fields.SignedOn ?? '',
+    editedBy: fields.EditedBy ?? '',
+    editedOn: fields.EditedOn ?? '',
+    originalSubmitted: parse(fields.OriginalSubmitted, null, isObject),
   };
 }

@@ -192,3 +192,14 @@ body { background: var(--it-canvas, var(--bg)); color: var(--text-primary); }
   .cr-grid, .cr-sign, .cr-section { break-inside: avoid; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+.cr-edited {
+  flex-basis: 100%;
+  margin: 0;
+  padding: 8px 10px;
+  border-left: 3px solid #b45309;
+  background: #fffbeb;
+  color: var(--cr-ink);
+  font-size: 13px;
+  line-height: 1.45;
+}

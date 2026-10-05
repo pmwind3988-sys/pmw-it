@@ -92,6 +92,7 @@ function SignedCopy({ copy, justSigned }) {
         signature={copy.signature}
         signedOn={copy.signedOn}
         options={copy.options}
+        edited={copy.edited}
       />
     </>
   );
@@ -101,8 +102,10 @@ function OpenForm({ code, data, onSigned, onGone }) {
   const [values, setValues] = useState(() => ({
     ...data.values,
     items: data.values.items?.length ? data.values.items : [newItemRow()],
-    signature: null,
+    // A reopened link brings the signature given before; it can be kept.
+    signature: data.existingSignature ?? null,
   }));
+  const keeping = Boolean(data.existingSignature) && values.signature === data.existingSignature;
   const [errors, setErrors] = useState({});
   const [sending, setSending] = useState(false);
   const [failure, setFailure] = useState('');
@@ -129,7 +132,10 @@ function OpenForm({ code, data, onSigned, onGone }) {
     try {
       const { status, body } = await request(code, {
         method: 'POST',
-        body: JSON.stringify({ values }),
+        // A kept signature is not sent back: the server already has it.
+        body: JSON.stringify(keeping
+          ? { values: { ...values, signature: null }, keepSignature: true }
+          : { values }),
       });
       if (status === 200 && body.state === 'signed') {
         onSigned(body);
@@ -181,6 +187,9 @@ function OpenForm({ code, data, onSigned, onGone }) {
           value={values.signature}
           onChange={update('signature')}
           error={errors.signature}
+          help={keeping
+            ? 'This is the signature you gave before. Keep it, or sign again.'
+            : undefined}
         />
 
         {hasErrors(errors) && (

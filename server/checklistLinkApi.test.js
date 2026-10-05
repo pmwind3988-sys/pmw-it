@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createLinkApi } from './checklistLinkApi.js';
 import { createFakeGraph, ConflictError } from './fakeGraph.js';
-import { toLinkItem, LINK_STATUS } from '../src/features/forms/links/linkSchema.js';
+import { toLinkItem, fromLinkItem, LINK_STATUS } from '../src/features/forms/links/linkSchema.js';
+import { reopenFields } from '../src/features/forms/links/linkChanges.js';
 import { IN } from '../src/features/forms/checklistForm.js';
 
 const NOW = Date.parse('2026-10-05T04:00:00Z');
@@ -178,5 +179,96 @@ describe("a link that carries HR's entity and department lists", () => {
     const { status } = await api.submit(CODE, answer({ entity: 'PMWL', department: 'ENG' }));
     expect(status).toBe(200);
     expect(graph.checklists[0].fields).toMatchObject({ Entity: 'PMWL', Department: 'ENG' });
+  });
+});
+
+describe('a reopened link', () => {
+  const reopened = async ({ fail } = {}) => {
+    const ctx = setup({}, fail);
+    await ctx.api.submit(CODE, answer());
+    const first = ctx.graph.checklists[0];
+    const fields = ctx.graph.rows.get(1).fields;
+    // What the portal's Reopen writes (`reopenFields`).
+    const link = fromLinkItem({ ...fields, id: 1 });
+    await ctx.graph.updateLink(1, reopenFields(link, NOW + 14 * DAY));
+    return { ...ctx, first, fields };
+  };
+
+  it('opens with what was signed, and the signature already on it', async () => {
+    const { api } = await reopened();
+    const { body } = await api.get(CODE);
+    expect(body.state).toBe('open');
+    expect(body.values.position).toBe('Engineer');
+    expect(body.existingSignature).toBe(signature);
+  });
+
+  it('updates the same record rather than adding a second one', async () => {
+    const { api, graph, first } = await reopened();
+    const { status } = await api.submit(CODE, answer({ position: 'Senior Engineer' }));
+
+    expect(status).toBe(200);
+    expect(graph.checklists).toHaveLength(1);
+    expect(graph.checklists[0].id).toBe(first.id);
+    expect(graph.checklists[0].fields.Position).toBe('Senior Engineer');
+    expect(graph.rows.get(1).fields.ChecklistId).toBe(first.id);
+  });
+
+  it('keeps the signature it has when the employee does not sign again', async () => {
+    const { api, graph, fields, first } = await reopened();
+    const before = graph.files.size;
+    const { status, body } = await api.submit(CODE, {
+      values: { position: 'Senior Engineer' },
+      keepSignature: true,
+    });
+
+    expect(status).toBe(200);
+    expect(graph.files.size).toBe(before);
+    expect(graph.checklists[0].fields.SignatureUrl).toBe(first.fields.SignatureUrl);
+    expect(graph.checklists[0].fields.Position).toBe('Senior Engineer');
+    expect(graph.rows.get(1).fields.SignatureFile).toBe(fields.SignatureFile);
+    expect(body.signature).toBe(signature);
+  });
+
+  it('stores a new signature beside the old one when they sign again', async () => {
+    const { api, graph } = await reopened();
+    const before = graph.files.size;
+    const again = 'data:image/png;base64,iVBORw0KGgoAAAAN';
+    await api.submit(CODE, answer({ signature: again }));
+    expect(graph.files.size).toBe(before + 1);
+  });
+
+  it('clears IT\'s "edited after signing" note, because the new signature covers it', async () => {
+    const { api, graph, fields } = await reopened();
+    await graph.updateLink(1, { EditedBy: 'IT Desk', EditedOn: new Date(NOW).toISOString() });
+    const { status } = await api.submit(CODE, { values: JSON.parse(fields.Submitted), keepSignature: true });
+
+    expect(status).toBe(200);
+
+    expect(graph.checklists[0].fields.EditedAfterSigning).toBe('');
+    expect(graph.rows.get(1).fields.EditedBy).toBe('');
+  });
+
+  it('cannot keep a signature on a link that never had one', async () => {
+    const { api } = setup();
+    const { status, body } = await api.submit(CODE, { values: { position: 'Engineer' }, keepSignature: true });
+    expect(status).toBe(422);
+    expect(body.errors.signature).toBeTruthy();
+  });
+});
+
+describe('a checklist IT edited after signing', () => {
+  it('says so on the signed copy', async () => {
+    const { api, graph } = setup();
+    await api.submit(CODE, answer());
+    await graph.updateLink(1, { EditedBy: 'IT Desk', EditedOn: '2026-10-05T05:00:00.000Z' });
+
+    const { body } = await api.get(CODE);
+    expect(body.edited).toEqual({ by: 'IT Desk', on: '2026-10-05T05:00:00.000Z' });
+  });
+
+  it('says nothing when nobody edited it', async () => {
+    const { api } = setup();
+    await api.submit(CODE, answer());
+    expect((await api.get(CODE)).body.edited).toBeNull();
   });
 });

@@ -25,8 +25,9 @@ function Value({ field, value, label }) {
 }
 
 export default function ChecklistRecord({
-  formMode, values = {}, signature, signedOn, options = null,
+  formMode, values = {}, signature, signedOn, options = null, edited = null,
 }) {
+  const editedAt = Date.parse(edited?.on);
   const mode = FORM_MODES.find((entry) => entry.value === formMode);
   const shown = new Set(fieldsFor(formMode));
   const listField = shown.has('items') ? 'items' : 'checkedItems';
@@ -91,6 +92,15 @@ export default function ChecklistRecord({
             <span>Signed {formatMYT(signedAt, 'datetime12')} (Malaysia time)</span>
           )}
         </div>
+        {/* Printed with the record: the signature was given for the values
+            as they were then, and the copy must not suggest otherwise. */}
+        {edited && (
+          <p className="cr-edited">
+            Edited by {edited.by}
+            {Number.isFinite(editedAt) ? ` on ${formatMYT(editedAt, 'datetime12')}` : ''} after signing.
+            {' '}The values as originally signed are kept by PMW IT.
+          </p>
+        )}
       </footer>
     </article>
   );

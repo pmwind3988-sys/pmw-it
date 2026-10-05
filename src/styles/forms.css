@@ -684,3 +684,36 @@
 .cl-state-open, .cl-state-busy { background: var(--it-accent-wash); color: color-mix(in srgb, var(--it-accent) 45%, var(--text-primary)); border-color: color-mix(in srgb, var(--it-accent) 30%, transparent); }
 .cl-state-signed { background: var(--it-good-wash); color: color-mix(in srgb, var(--it-good) 60%, var(--text-primary)); border-color: color-mix(in srgb, var(--it-good) 30%, transparent); }
 .cl-state-expired, .cl-state-cancelled { background: var(--it-canvas, var(--bg)); color: var(--text-secondary); border-color: var(--border); }
+
+/* Shared checklists: the inline date panel, the danger action, the edit note. */
+.cl-panel {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--it-canvas, var(--bg));
+  border: 1px solid var(--border);
+}
+
+.cl-panel-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.cl-panel-row .ff-input { flex: 0 1 200px; }
+
+.cl-danger:not(:disabled) { color: var(--it-danger); }
+.cl-row-edited { color: color-mix(in srgb, var(--it-accent) 45%, var(--text-primary)); }
+
+.cl-warning {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 0 0 20px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--it-accent-wash);
+  border: 1px solid color-mix(in srgb, var(--it-accent) 35%, transparent);
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.cl-warning > svg { flex-shrink: 0; margin-top: 2px; color: color-mix(in srgb, var(--it-accent) 60%, var(--text-primary)); }

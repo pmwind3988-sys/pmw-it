@@ -6,6 +6,7 @@ import FormPage from './pages/FormPage';
 import AssetChecklistPage from './pages/AssetChecklistPage';
 import ChecklistSharePage from './pages/ChecklistSharePage';
 import ChecklistLinksPage from './pages/ChecklistLinksPage';
+import ChecklistLinkEditPage from './pages/ChecklistLinkEditPage';
 import LoginPage from './pages/LoginPage';
 import ListPage from './pages/ListPage';
 import DevicesPage from './pages/DevicesPage';
@@ -43,6 +44,7 @@ function App() {
         <Route path="/asset-checklist" element={<AssetChecklistPage />} />
         <Route path="/asset-checklist/share" element={<ChecklistSharePage />} />
         <Route path="/asset-checklist/links" element={<ChecklistLinksPage />} />
+        <Route path="/asset-checklist/links/:id" element={<ChecklistLinkEditPage />} />
         <Route path="/devices" element={<DevicesPage />} />
         <Route path="/devices/:id" element={<DeviceDetailPage />} />
         {/* `scan` and `batch` are declared above `:id` so they are not read as

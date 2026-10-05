@@ -471,3 +471,78 @@
 @media (pointer: coarse) {
   .ff-select { min-height: 44px; }
 }
+
+/* --- shared checklist links ----------------------------------------- */
+
+.ff-labelrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+/* A value IT fixed on a link. Plain text on a quiet tint, with a lock, so it
+   reads as given rather than as an input that happens to be disabled. */
+.ff-locked {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-height: 44px;
+  padding: 11px 12px;
+  border-radius: 9px;
+  background: var(--it-canvas, var(--bg));
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.ff-locked > svg { flex-shrink: 0; margin-top: 3px; color: var(--text-secondary); }
+.ff-locked ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.ff-locked-empty { color: var(--text-secondary); }
+
+/* The builder's per-field "employee can edit" switch. */
+.ff-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.ff-switch-track {
+  position: relative;
+  width: 30px;
+  height: 18px;
+  border-radius: 9px;
+  background: var(--border);
+  transition: background-color 120ms ease-out;
+  flex-shrink: 0;
+}
+
+.ff-switch-track::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--it-panel, #fff);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.25);
+  transition: transform 120ms ease-out;
+}
+
+.ff-switch-on { color: var(--text-primary); }
+.ff-switch-on .ff-switch-track { background: var(--it-brand, var(--text-primary)); }
+.ff-switch-on .ff-switch-track::after { transform: translateX(12px); }
+.ff-switch:focus-within .ff-switch-track { outline: 2px solid var(--it-brand, var(--text-primary)); outline-offset: 2px; }
+.ff-switch-fixed { cursor: default; font-style: italic; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ff-switch-track, .ff-switch-track::after { transition: none; }
+}

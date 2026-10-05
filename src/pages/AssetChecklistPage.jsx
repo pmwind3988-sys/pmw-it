@@ -2,19 +2,15 @@ import { useEffect, useState } from 'react';
 import AppShell from '../components/AppShell';
 import Button from '../components/ui/Button';
 import { Card, ErrorBanner } from '../components/ui/Surfaces';
-import { Check, AlertTriangle, Pencil } from '../components/ui/Icons';
+import { Check, AlertTriangle } from '../components/ui/Icons';
 import Field from '../components/form/Field';
-import {
-  TextInput, TextArea, NumberInput, DateInput, SelectInput,
-} from '../components/form/Inputs';
-import { RadioCards, CheckList } from '../components/form/Choices';
-import RepeatRows from '../components/form/RepeatRows';
+import { RadioCards } from '../components/form/Choices';
+import ChecklistFields from '../components/checklist/ChecklistFields';
+import ChecklistSignature from '../components/checklist/ChecklistSignature';
 import Wizard from '../components/form/Wizard';
-import SignatureDialog from '../components/SignatureDialog';
 import { useSharePointToken } from '../hooks/useRequests';
 import {
-  FORM_MODES, ENTITIES, CHECKLIST_ITEMS, REQUESTABLE_ITEMS, CHECKLIST_STEPS,
-  emptyChecklist, newItemRow, isRequest, modeLabel,
+  FORM_MODES, CHECKLIST_STEPS, emptyChecklist, modeLabel,
 } from '../features/forms/checklistForm';
 import { validateChecklist, hasErrors } from '../features/forms/validate';
 import { submitChecklist } from '../features/forms/sharepoint/submitChecklist';
@@ -47,7 +43,6 @@ export default function AssetChecklistPage() {
   const [values, setValues] = useState(emptyChecklist);
   const [step, setStep] = useState(0);
   const [errors, setErrors] = useState({});
-  const [signing, setSigning] = useState(false);
   const [phase, setPhase] = useState(null);
   const [failure, setFailure] = useState('');
   const [done, setDone] = useState(false);
@@ -175,139 +170,13 @@ export default function AssetChecklistPage() {
 
           {step === 1 && (
             <>
-              <div className="ff-grid">
-                <Field label="Employee Name" htmlFor="employeeName" required error={errors.employeeName}>
-                  <TextInput
-                    id="employeeName"
-                    value={values.employeeName}
-                    onChange={update('employeeName')}
-                    error={errors.employeeName}
-                    autoComplete="name"
-                  />
-                </Field>
+              <ChecklistFields values={values} errors={errors} update={update} />
 
-                <Field label="Employee No" htmlFor="employeeNo" required error={errors.employeeNo}>
-                  <TextInput
-                    id="employeeNo"
-                    value={values.employeeNo}
-                    onChange={update('employeeNo')}
-                    error={errors.employeeNo}
-                  />
-                </Field>
-
-                <Field label="Position" htmlFor="position" required error={errors.position}>
-                  <TextInput
-                    id="position"
-                    value={values.position}
-                    onChange={update('position')}
-                    error={errors.position}
-                  />
-                </Field>
-
-                <Field label="Entity" htmlFor="entity" required error={errors.entity}>
-                  <SelectInput
-                    id="entity"
-                    value={values.entity}
-                    onChange={update('entity')}
-                    options={ENTITIES}
-                    error={errors.entity}
-                  />
-                </Field>
-
-                <Field label="Date" htmlFor="formDate" required error={errors.formDate}>
-                  <DateInput
-                    id="formDate"
-                    value={values.formDate}
-                    onChange={update('formDate')}
-                    error={errors.formDate}
-                  />
-                </Field>
-              </div>
-
-              {isRequest(values.formMode) ? (
-                <Field
-                  label="What are you requesting?"
-                  error={errors.items}
-                  help="Add a line for each thing you need."
-                  wide
-                >
-                  <RepeatRows
-                    rows={values.items}
-                    onChange={update('items')}
-                    newRow={newItemRow}
-                    addLabel="Add another item"
-                    renderRow={(row, index, setRow) => (
-                      <div className="ff-itemrow">
-                        <SelectInput
-                          value={row.item}
-                          onChange={(item) => setRow({ ...row, item })}
-                          options={REQUESTABLE_ITEMS}
-                          placeholder="Choose an item…"
-                          aria-label={`Item ${index + 1}`}
-                        />
-                        <NumberInput
-                          value={row.quantity}
-                          onChange={(quantity) => setRow({ ...row, quantity })}
-                          aria-label={`Quantity for item ${index + 1}`}
-                        />
-                      </div>
-                    )}
-                  />
-                </Field>
-              ) : (
-                <Field
-                  label="Asset Checklist"
-                  help="Tick everything covered by this handover."
-                  wide
-                >
-                  <CheckList
-                    value={values.checkedItems}
-                    onChange={update('checkedItems')}
-                    options={CHECKLIST_ITEMS}
-                  />
-                </Field>
-              )}
-
-              <div className="ff-grid">
-                <Field label="Serial Numbers" htmlFor="serialNumbers" help="Optional.">
-                  <TextArea
-                    id="serialNumbers"
-                    rows={2}
-                    value={values.serialNumbers}
-                    onChange={update('serialNumbers')}
-                  />
-                </Field>
-
-                <Field label="Other Remarks" htmlFor="otherRemarks" help="Optional.">
-                  <TextArea
-                    id="otherRemarks"
-                    rows={2}
-                    value={values.otherRemarks}
-                    onChange={update('otherRemarks')}
-                  />
-                </Field>
-              </div>
-
-              <Field
-                label="Your Signature"
-                required
+              <ChecklistSignature
+                value={values.signature}
+                onChange={update('signature')}
                 error={errors.signature}
-                help="Sign in the middle of the box."
-                wide
-              >
-                {values.signature ? (
-                  <div className="ff-signed">
-                    <img src={values.signature} alt="Your signature" />
-                    <Button variant="ghost" size="sm" icon={Pencil} onClick={() => setSigning(true)}>
-                      Sign again
-                    </Button>
-                  </div>
-                ) : (
-                  <button type="button" className="ff-signbtn" onClick={() => setSigning(true)}>
-                    <Pencil size={16} /> Click to sign
-                  </button>
-                )}
-              </Field>
+              />
 
               {hasErrors(errors) && (
                 <p className="ff-summary" role="alert">
@@ -320,15 +189,6 @@ export default function AssetChecklistPage() {
         </Wizard>
       </Card>
 
-      {signing && (
-        <SignatureDialog
-          onSave={(dataUrl) => {
-            update('signature')(dataUrl || null);
-            setSigning(false);
-          }}
-          onClose={() => setSigning(false)}
-        />
-      )}
     </AppShell>
   );
 }

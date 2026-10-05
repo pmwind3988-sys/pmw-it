@@ -11,8 +11,8 @@ export default function SpecHistory({ changes, loading }) {
         <div key={group.dayLabel} className="sh-day">
           <span className="sh-date">{group.dayLabel}</span>
           <dl className="sh-rows">
-            {group.rows.map((row) => (
-              <div key={`${row.fieldName}-${row.newValue}`} className={row.rename ? 'sh-rename' : undefined}>
+            {group.rows.map((row, idx) => (
+              <div key={`${group.dayLabel}-${idx}`} className={row.rename ? 'sh-rename' : undefined}>
                 <dt>{row.label}</dt>
                 <dd><s>{row.oldValue || '—'}</s> → <strong>{row.newValue || '—'}</strong></dd>
               </div>

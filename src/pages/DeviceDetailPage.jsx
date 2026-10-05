@@ -35,6 +35,9 @@ const FIT_TONE = {
  *  to turn it off again on the next machine they open. */
 const TONE_KEY = 'deviceValueTones';
 
+const SHAREPOINT_SITE_URL =
+  import.meta.env.VITE_SHAREPOINT_SITE_URL || 'https://pmwgroupcom.sharepoint.com/sites/IThelpdesk';
+
 const readTonePreference = () => {
   try {
     return localStorage.getItem(TONE_KEY) !== 'off';
@@ -64,41 +67,6 @@ export default function DeviceDetailPage() {
     }
   }, [showTones]);
 
-  const act = async (action, input) => {
-    setActing(true);
-    setActionError('');
-    try {
-      const tokenRes = await getToken();
-      const outcome = await performLifecycle({
-        siteUrl: SITE, token: tokenRes.accessToken, deviceId: device.id, action, input,
-        expectedStatus: statusOf(device), recordedBy: tokenRes.account?.username ?? '',
-      });
-      setPending(outcome.pendingStints);
-      if (outcome.pendingStints.length) setActionError('The machine moved, but its owner history could not be written.');
-    } catch (failure) {
-      setActionError(failure.message);
-    } finally {
-      setActing(false);
-      reload();
-      history.reload();
-    }
-  };
-
-  const retry = async () => {
-    setActing(true);
-    try {
-      const tokenRes = await getToken();
-      await retryStints({ siteUrl: SITE, token: tokenRes.accessToken, writes: pending });
-      setPending([]);
-      setActionError('');
-    } catch (failure) {
-      setActionError(failure.message);
-    } finally {
-      setActing(false);
-      history.reload();
-    }
-  };
-
   const device = useMemo(
     () => devices.find((row) => String(row.id) === String(id)),
     [devices, id],
@@ -117,7 +85,40 @@ export default function DeviceDetailPage() {
   const departments = useMemo(() => [...new Set(devices.map((d) => d.department).filter(Boolean))].sort(), [devices]);
   const locations = useMemo(() => locationsIn(devices), [devices]);
 
-  const SITE = import.meta.env.VITE_SHAREPOINT_SITE_URL || 'https://pmwgroupcom.sharepoint.com/sites/IThelpdesk';
+  const act = async (action, input) => {
+    setActing(true);
+    setActionError('');
+    try {
+      const tokenRes = await getToken();
+      const outcome = await performLifecycle({
+        siteUrl: SHAREPOINT_SITE_URL, token: tokenRes.accessToken, deviceId: device.id, action, input,
+        expectedStatus: statusOf(device), recordedBy: tokenRes.account?.username ?? '',
+      });
+      setPending(outcome.pendingStints);
+      if (outcome.pendingStints.length) setActionError('The machine moved, but its owner history could not be written.');
+    } catch (failure) {
+      setActionError(failure.message);
+    } finally {
+      setActing(false);
+      reload();
+      history.reload();
+    }
+  };
+
+  const retry = async () => {
+    setActing(true);
+    try {
+      const tokenRes = await getToken();
+      await retryStints({ siteUrl: SHAREPOINT_SITE_URL, token: tokenRes.accessToken, writes: pending });
+      setPending([]);
+      setActionError('');
+    } catch (failure) {
+      setActionError(failure.message);
+    } finally {
+      setActing(false);
+      history.reload();
+    }
+  };
 
   return (
     <AppShell
@@ -172,7 +173,7 @@ export default function DeviceDetailPage() {
               </span>
               <LifecycleActions device={device} owners={owners} locations={locations} departments={departments} onAction={act} busy={acting} />
             </div>
-            {actionError && <ErrorBanner message={actionError} busy={acting} onRetry={pending.length ? retry : () => setActionError('')} />}
+            {actionError && <ErrorBanner message={actionError} busy={acting} onRetry={pending.length ? retry : undefined} />}
           </Card>
 
           <div className="dd-histories">

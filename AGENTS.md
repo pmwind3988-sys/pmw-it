@@ -120,6 +120,7 @@ pmw-it/
 | Opening and submitting a link (server side) | `server/checklistLinkApi.js`, `server/graph.js`, `api/c/[code].js` |
 | The public page | `checklist.html`, `src/public/`, `src/styles/public.css` |
 | The checklist form body, shared by all three pages | `src/components/checklist/` |
+| Entity / Department choices, live or carried by a link | `src/features/forms/formOptions.js`, `src/hooks/useOrgDirectory.js` |
 | The Azure / Vercel setup the links need | `docs/checklist-links-setup.md` |
 | Adding options to an existing choice column | `mergeChoices` in `src/features/sharepoint/provision.js` |
 | Which values on a device page read red or green | `src/features/devices/fieldTone.js` |
@@ -581,6 +582,17 @@ The signed row goes to `Asset Checklist Form` through the same
 `Asset Checklist Links`. That list and everything the server writes to are
 provisioned by the PORTAL when IT creates a link, because the server's
 identity is granted write on the site and nothing more.
+
+**A link carries its own Entity and Department choices.** The checklist reads
+them live from HR's `Companies` / `Departments` lists on the HR site, which
+neither the anonymous visitor nor the server's site-scoped identity can read.
+So the builder snapshots them onto the link (`Options`, shape in
+`features/forms/formOptions.js`), the public page draws its dropdowns from
+that, and `cleanSubmission` refuses anything outside it. The portal also
+merges every snapshot entity into the checklist's `Entity` choice column when
+the link is created, because the server has no right to add a choice later.
+Whoever may change the entity may change the department, and a department is
+always read against the entity that STANDS — IT's if IT fixed it.
 
 `npm run dev:links` runs both against an in-memory SharePoint with three demo
 links (`server/devApi.js`), for trying it without the app secret.

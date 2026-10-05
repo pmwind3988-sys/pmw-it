@@ -15,10 +15,22 @@ import { IN, OUT, INDIVIDUAL } from '../src/features/forms/checklistForm.js';
 
 const DAY = 86400000;
 
+// A stand-in for the snapshot of HR's lists a real link carries.
+const OPTIONS = {
+  entities: [
+    { value: 'PMW', label: 'PMW Industries' },
+    { value: 'PCI', label: 'PCI Engineering' },
+  ],
+  departments: {
+    PMW: [{ value: 'ENG', label: 'Engineering' }, { value: 'IT', label: 'Information Technology' }],
+    PCI: [{ value: 'QA', label: 'Quality Assurance' }, { value: 'LOG', label: 'Logistics' }],
+  },
+};
+
 export function createDevApi() {
   const expiresOn = new Date(Date.now() + 14 * DAY).toISOString();
   const link = (code, formMode, preset, editable = []) => toLinkItem(
-    { code, formMode, preset, editable, expiresOn },
+    { code, formMode, preset, editable, expiresOn, options: OPTIONS },
     { createdByName: 'IT Support (demo)', createdByEmail: 'demo@example.test' },
   );
 
@@ -28,6 +40,7 @@ export function createDevApi() {
         employeeName: 'Amir Hakim',
         employeeNo: 'E-1042',
         entity: 'PMW',
+        department: 'ENG',
         formDate: new Date().toISOString().slice(0, 10),
         checkedItems: ['Laptop', 'Mouse', 'Monitor'],
         serialNumbers: 'Laptop 5CG1234XYZ\nMonitor CN-0F8',
@@ -37,7 +50,7 @@ export function createDevApi() {
         employeeName: 'Siti Aminah',
         employeeNo: 'E-2210',
         position: 'Planner',
-        entity: 'PML',
+        entity: 'PCI',
       }),
     ],
   });

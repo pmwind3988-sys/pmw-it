@@ -4,6 +4,7 @@ import AppShell from '../components/AppShell';
 import Button from '../components/ui/Button';
 import { Card, ErrorBanner } from '../components/ui/Surfaces';
 import { Check, AlertTriangle, Link2, ClipboardList } from '../components/ui/Icons';
+import { MODE_ICONS } from '../components/checklist/modeIcons';
 import Field from '../components/form/Field';
 import { RadioCards } from '../components/form/Choices';
 import ChecklistFields from '../components/checklist/ChecklistFields';
@@ -15,6 +16,8 @@ import {
 } from '../features/forms/checklistForm';
 import { validateChecklist, hasErrors } from '../features/forms/validate';
 import { submitChecklist } from '../features/forms/sharepoint/submitChecklist';
+import { useOrgDirectory } from '../hooks/useOrgDirectory';
+import { snapshotOptions, withEntity } from '../features/forms/formOptions';
 
 const SHAREPOINT_SITE_URL =
   import.meta.env.VITE_SHAREPOINT_SITE_URL || 'https://pmwgroupcom.sharepoint.com/sites/IThelpdesk';
@@ -41,6 +44,11 @@ const PHASE_LABEL = {
 export default function AssetChecklistPage() {
   const navigate = useNavigate();
   const getToken = useSharePointToken();
+  // HR's company and department lists, as the Entity and Department choices.
+  // Null until they arrive, and null if they cannot be read — then the form
+  // offers the built-in entities and a typed department rather than refusing
+  // to open.
+  const options = snapshotOptions(useOrgDirectory());
 
   const [values, setValues] = useState(emptyChecklist);
   const [step, setStep] = useState(0);
@@ -53,17 +61,19 @@ export default function AssetChecklistPage() {
     document.title = 'PMW IT — Asset checklist';
   }, []);
 
-  const set = (field) => (value) => setValues((current) => ({ ...current, [field]: value }));
-
   /**
    * Errors are recomputed as soon as one is showing, so a field stops being
    * marked the moment it is fixed — rather than staying red until the next
    * time Submit is pressed.
    */
   const update = (field) => (value) => {
-    set(field)(value);
+    const next = field === 'entity'
+      ? withEntity(values, value, options)
+      : { ...values, [field]: value };
+
+    setValues(next);
     if (hasErrors(errors)) {
-      setErrors(validateChecklist({ ...values, [field]: value }, { step }));
+      setErrors(validateChecklist(next, { step }));
     }
   };
 
@@ -92,6 +102,7 @@ export default function AssetChecklistPage() {
         siteUrl: SHAREPOINT_SITE_URL,
         token: tokenRes.accessToken,
         values,
+        entities: (options?.entities ?? []).map((option) => option.value),
         onProgress: setPhase,
       });
       setDone(true);
@@ -175,6 +186,7 @@ export default function AssetChecklistPage() {
                 value={values.formMode}
                 onChange={update('formMode')}
                 options={FORM_MODES}
+                icons={MODE_ICONS}
                 error={errors.formMode}
               />
             </Field>
@@ -182,7 +194,12 @@ export default function AssetChecklistPage() {
 
           {step === 1 && (
             <>
-              <ChecklistFields values={values} errors={errors} update={update} />
+              <ChecklistFields
+                values={values}
+                errors={errors}
+                update={update}
+                options={options}
+              />
 
               <ChecklistSignature
                 value={values.signature}

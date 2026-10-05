@@ -2,8 +2,9 @@ import { spFetch, spUpload, listPath, ITEM_ACCEPT } from '../../sharepoint/spCli
 import { provisionSchema } from '../../sharepoint/provision.js';
 import { withRetry } from '../../sharepoint/writePool.js';
 import {
-  CHECKLIST_LIST_NAME, SIGNATURE_LIBRARY_NAME, CHECKLIST_COLUMNS, CHECKLIST_VIEWS,
+  CHECKLIST_LIST_NAME, SIGNATURE_LIBRARY_NAME, checklistColumns, CHECKLIST_VIEWS,
 } from './checklistSchema.js';
+import { ENTITIES } from '../checklistForm.js';
 import { toChecklistItem, signatureFileName } from '../toChecklistItem.js';
 
 /**
@@ -14,13 +15,19 @@ import { toChecklistItem, signatureFileName } from '../toChecklistItem.js';
  * rejects, which worked only because its list predates the bug.
  */
 
-export function provisionChecklist(siteUrl, token, { onProgress } = {}) {
+/**
+ * `entities` are the company codes HR's list offers. The Entity column is a
+ * choice, and SharePoint refuses a value it has never heard of, so every code
+ * on offer is merged in before the row is written. Merging only ever adds.
+ */
+export function provisionChecklist(siteUrl, token, { onProgress, entities = [] } = {}) {
+  const known = [...new Set([...ENTITIES, ...entities])];
   return provisionSchema(siteUrl, token, {
     lists: [
       {
         title: CHECKLIST_LIST_NAME,
         description: 'Signed asset checklists — what each employee received or handed back',
-        columns: CHECKLIST_COLUMNS,
+        columns: checklistColumns(known),
       },
       {
         title: SIGNATURE_LIBRARY_NAME,
@@ -82,12 +89,13 @@ async function uploadSignature(siteUrl, token, digest, folder, dataUrl, fileName
  * thing — it is a claim that somebody signed when they did not.
  */
 export async function submitChecklist({
-  siteUrl, token, values, onProgress,
+  siteUrl, token, values, onProgress, entities = [],
 }) {
   const report = (phase) => onProgress?.(phase);
 
   report('provisioning');
   const digest = await provisionChecklist(siteUrl, token, {
+    entities: [...entities, values.entity].filter(Boolean),
     onProgress: () => report('provisioning'),
   });
 

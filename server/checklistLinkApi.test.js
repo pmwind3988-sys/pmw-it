@@ -18,6 +18,7 @@ const linkFields = (overrides = {}) => ({
       employeeNo: 'E-1042',
       position: '',
       entity: 'PMW',
+      department: 'Engineering',
       formDate: '2026-10-05',
       checkedItems: ['Laptop'],
       serialNumbers: 'SN-1',
@@ -84,6 +85,7 @@ describe('submitting a link', () => {
     expect(row.Position).toBe('Engineer');
     expect(row.FormMode).toBe(IN);
     expect(row.AssetMatrix).toBe('Laptop');
+    expect(row.Department).toBe('Engineering');
     expect(row.SignatureUrl).toMatch(/^\/sites\/IThelpdesk\/Signatures\//);
 
     const link = graph.rows.get(1).fields;
@@ -148,5 +150,33 @@ describe('submitting a link', () => {
   it('refuses an expired link', async () => {
     const { api } = setup({ ExpiresOn: new Date(NOW - 1).toISOString() });
     expect((await api.submit(CODE, answer())).status).toBe(404);
+  });
+});
+
+describe("a link that carries HR's entity and department lists", () => {
+  const options = {
+    entities: [{ value: 'PMWL', label: 'PMW Lighting' }],
+    departments: { PMWL: [{ value: 'ENG', label: 'Engineering' }] },
+  };
+
+  it('hands the choices to the page and checks the answer against them', async () => {
+    const { api, graph } = setup({
+      Options: JSON.stringify(options),
+      Preset: JSON.stringify({
+        employeeName: 'Amir Hakim', employeeNo: 'E-1042', entity: '', formDate: '2026-10-05', checkedItems: ['Laptop'],
+      }),
+    });
+
+    const opened = await api.get(CODE);
+    expect(opened.body.options).toEqual(options);
+    expect(opened.body.editable).toEqual(expect.arrayContaining(['entity', 'department']));
+
+    const refused = await api.submit(CODE, answer({ entity: 'PMWL', department: 'Made Up' }));
+    expect(refused.status).toBe(422);
+    expect(refused.body.errors.department).toBeTruthy();
+
+    const { status } = await api.submit(CODE, answer({ entity: 'PMWL', department: 'ENG' }));
+    expect(status).toBe(200);
+    expect(graph.checklists[0].fields).toMatchObject({ Entity: 'PMWL', Department: 'ENG' });
   });
 });

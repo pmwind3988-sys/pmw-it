@@ -46,6 +46,7 @@ export function createLinkApi({ graph, now = Date.now, log = console }) {
     return {
       state: 'signed',
       formMode: link.formMode,
+      options: link.options,
       values: link.submitted ?? {},
       signature,
       signedOn: link.signedOn,
@@ -66,8 +67,11 @@ export function createLinkApi({ graph, now = Date.now, log = console }) {
       body: {
         state: 'open',
         formMode: link.formMode,
-        values: { formMode: link.formMode, ...cleanPreset(link.preset) },
+        values: { formMode: link.formMode, ...cleanPreset(link.preset, link.options) },
         editable: editableFields(link),
+        // The Entity and Department choices, as HR's lists stood when IT made
+        // the link — this page has no way to read them itself.
+        options: link.options,
         expiresOn: link.expiresOn,
       },
     };
@@ -107,7 +111,7 @@ export function createLinkApi({ graph, now = Date.now, log = console }) {
     const signedOn = new Date(submittedAt).toISOString();
     const { signature, ...stored } = values;
     const signedCopyBody = {
-      state: 'signed', formMode: link.formMode, values: stored, signature, signedOn,
+      state: 'signed', formMode: link.formMode, options: link.options, values: stored, signature, signedOn,
     };
     let checklistId = null;
     try {

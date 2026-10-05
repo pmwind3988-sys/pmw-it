@@ -92,6 +92,7 @@ export function emptyChecklist() {
     employeeNo: '',
     position: '',
     entity: '',
+    department: '',
     // The date the employee says it happened on, which is theirs to change.
     // The instant it was actually submitted is stamped separately at save.
     formDate: todayValue(),
@@ -117,7 +118,7 @@ export function todayValue(now = new Date()) {
 export const CHECKLIST_STEPS = ['Form type', 'Details'];
 
 export function fieldsFor(mode) {
-  const common = ['employeeName', 'employeeNo', 'position', 'entity', 'formDate'];
+  const common = ['employeeName', 'employeeNo', 'position', 'entity', 'department', 'formDate'];
   const closing = ['serialNumbers', 'otherRemarks', 'signature'];
 
   if (isRequest(mode)) return [...common, 'items', ...closing];

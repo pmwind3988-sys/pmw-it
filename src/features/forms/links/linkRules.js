@@ -1,6 +1,5 @@
-import {
-  ENTITIES, CHECKLIST_ITEMS, REQUESTABLE_ITEMS, fieldsFor,
-} from '../checklistForm.js';
+import { CHECKLIST_ITEMS, REQUESTABLE_ITEMS, fieldsFor } from '../checklistForm.js';
+import { entityChoices, departmentChoices, departmentFits } from '../formOptions.js';
 import { parseFormDate } from '../toChecklistItem.js';
 import { LINK_STATUS } from './linkSchema.js';
 
@@ -15,7 +14,7 @@ import { LINK_STATUS } from './linkSchema.js';
 
 /** Every field IT can pre-fill. The signature is never IT's to fill. */
 export const LOCKABLE_FIELDS = [
-  'employeeName', 'employeeNo', 'position', 'entity', 'formDate',
+  'employeeName', 'employeeNo', 'position', 'entity', 'department', 'formDate',
   'checkedItems', 'items', 'serialNumbers', 'otherRemarks',
 ];
 
@@ -41,10 +40,16 @@ export function isBlankValue(field, value) {
   return !String(value ?? '').trim();
 }
 
-/** A field IT left blank is always the employee's to fill. */
+/**
+ * A field IT left blank is always the employee's to fill. A department
+ * belongs to a company, so whoever may change the entity may change the
+ * department too — otherwise a new entity could leave them signing for a
+ * department it does not have, with no way to fix it.
+ */
 export function employeeMayEdit(link, field) {
   if (!LOCKABLE_FIELDS.includes(field)) return false;
   if (isBlankValue(field, link.preset?.[field])) return true;
+  if (field === 'department' && employeeMayEdit(link, 'entity')) return true;
   return (link.editable ?? []).includes(field);
 }
 
@@ -87,20 +92,34 @@ function cleanSignature(value) {
   return /^data:image\/png;base64,[A-Za-z0-9+/]+=*$/.test(value) ? value : null;
 }
 
+function cleanDepartment(options, entity, value) {
+  const choices = departmentChoices(options, entity);
+  if (choices === null) return text(value, SHORT);
+  return choices.some((choice) => choice.value === value) ? value : '';
+}
+
 /**
  * What the browser sent, reduced to what the form could have produced: known
  * options only, bounded lengths, whole quantities. Anything else is dropped
  * rather than refused — validation then says what is missing in words.
+ *
+ * `options` is the Entity/Department snapshot the link carries
+ * (`formOptions.js`); without one, the built-in entities and a typed
+ * department.
  */
-export function cleanSubmission(values = {}) {
+export function cleanSubmission(values = {}, options = null) {
   const day = text(values.formDate, 10);
   const checked = Array.isArray(values.checkedItems) ? values.checkedItems : [];
+  const entity = entityChoices(options).some((choice) => choice.value === values.entity)
+    ? values.entity
+    : '';
 
   return {
     employeeName: text(values.employeeName, SHORT),
     employeeNo: text(values.employeeNo, SHORT),
     position: text(values.position, SHORT),
-    entity: ENTITIES.includes(values.entity) ? values.entity : '',
+    entity,
+    department: cleanDepartment(options, entity, values.department),
     formDate: parseFormDate(day) === null ? '' : day,
     checkedItems: CHECKLIST_ITEMS.filter((item) => checked.includes(item)),
     items: cleanItems(values.items),
@@ -111,8 +130,8 @@ export function cleanSubmission(values = {}) {
 }
 
 /** IT's pre-filled values, cleaned the same way and without a signature. */
-export function cleanPreset(values = {}) {
-  const clean = cleanSubmission(values);
+export function cleanPreset(values = {}, options = null) {
+  const clean = cleanSubmission(values, options);
   delete clean.signature;
   return clean;
 }
@@ -123,12 +142,21 @@ export function cleanPreset(values = {}) {
  * the link.
  */
 export function mergeSubmission(link, submitted) {
-  const answer = cleanSubmission(submitted);
-  const merged = { formMode: link.formMode, ...cleanPreset(link.preset) };
+  const options = link.options ?? null;
+  const answer = cleanSubmission(submitted, options);
+  const merged = { formMode: link.formMode, ...cleanPreset(link.preset, options) };
 
   for (const field of LOCKABLE_FIELDS) {
     if (employeeMayEdit(link, field)) merged[field] = answer[field];
   }
+  // A department is only meaningful against the entity that STANDS, which may
+  // be IT's rather than the one the browser sent — so the employee's pick is
+  // read against that, and anything that does not belong to it is dropped.
+  if (employeeMayEdit(link, 'department')) {
+    merged.department = cleanDepartment(options, merged.entity, submitted?.department);
+  }
+  if (!departmentFits(options, merged.entity, merged.department)) merged.department = '';
+
   merged.signature = answer.signature;
   return merged;
 }

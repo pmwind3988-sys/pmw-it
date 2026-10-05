@@ -89,7 +89,7 @@ describe('what the employee may change', () => {
 
   it('lists only the fields this form type shows', () => {
     const fields = editableFields(link());
-    expect(fields).toEqual(['position', 'otherRemarks']);
+    expect(fields).toEqual(['position', 'department', 'otherRemarks']);
     expect(fields).not.toContain('items');
   });
 
@@ -243,5 +243,57 @@ describe('drafting a link from what IT filled in', () => {
 
   it('builds the address the employee opens', () => {
     expect(linkUrl('https://it.example.com/', 'Ab3dE5gH9k')).toBe('https://it.example.com/c/Ab3dE5gH9k');
+  });
+});
+
+describe('entity and department on a shared link', () => {
+  const options = {
+    entities: [{ value: 'PMWL', label: 'PMW Lighting' }, { value: 'PCI', label: 'PCI Industries' }],
+    departments: {
+      PMWL: [{ value: 'ENG', label: 'Engineering' }, { value: 'HR', label: 'Human Resources' }],
+      PCI: [{ value: 'QA', label: 'Quality' }],
+    },
+  };
+
+  it('accepts only an entity and department the link offered', () => {
+    const clean = cleanSubmission({ entity: 'PMWL', department: 'ENG' }, options);
+    expect(clean).toMatchObject({ entity: 'PMWL', department: 'ENG' });
+
+    expect(cleanSubmission({ entity: 'NOPE', department: 'ENG' }, options))
+      .toMatchObject({ entity: '', department: '' });
+    // QA is a real department, but not one of PMWL's.
+    expect(cleanSubmission({ entity: 'PMWL', department: 'QA' }, options).department).toBe('');
+  });
+
+  it('takes a typed department when the link carries no HR lists', () => {
+    expect(cleanSubmission({ entity: 'PMW', department: ' Stores ' }).department).toBe('Stores');
+  });
+
+  it('lets the employee change the department whenever they may change the entity', () => {
+    const open = link({ options, preset: { ...link().preset, entity: 'PMWL', department: 'ENG' }, editable: ['entity'] });
+    expect(employeeMayEdit(open, 'department')).toBe(true);
+
+    const fixed = link({ options, preset: { ...link().preset, entity: 'PMWL', department: 'ENG' } });
+    expect(employeeMayEdit(fixed, 'department')).toBe(false);
+  });
+
+  it('never signs for a department the kept entity does not have', () => {
+    // IT fixed the entity; the employee picks a department from another company.
+    const fixedEntity = link({ options, preset: { ...link().preset, entity: 'PMWL', department: '' } });
+    const merged = mergeSubmission(fixedEntity, { entity: 'PCI', department: 'QA', signature });
+    expect(merged.entity).toBe('PMWL');
+    expect(merged.department).toBe('');
+  });
+
+  it('reads the department against the entity IT fixed, not the one the browser sent', () => {
+    const fixedEntity = link({ options, preset: { ...link().preset, entity: 'PCI', department: '' } });
+    const merged = mergeSubmission(fixedEntity, { entity: 'PMWL', department: 'QA', signature });
+    expect(merged).toMatchObject({ entity: 'PCI', department: 'QA' });
+  });
+
+  it('keeps the choices on the link row', () => {
+    const item = toLinkItem(link({ options }));
+    expect(fromLinkItem(item).options).toEqual(options);
+    expect(fromLinkItem(toLinkItem(link())).options).toBeNull();
   });
 });

@@ -19,6 +19,7 @@ const complete = (overrides = {}) => ({
   employeeNo: 'E-1042',
   position: 'Engineer',
   entity: 'PMW',
+  department: 'Engineering',
   signature: 'data:image/png;base64,AAA',
   ...overrides,
 });
@@ -221,6 +222,11 @@ describe('toChecklistItem', () => {
   it('never leaves the row nameless', () => {
     expect(toChecklistItem(complete({ employeeName: '', employeeNo: '' })).Title)
       .toBe('Asset checklist');
+  });
+
+  it('stores the department beside the entity, and omits it when blank', () => {
+    expect(toChecklistItem(complete()).Department).toBe('Engineering');
+    expect('Department' in toChecklistItem(complete({ department: '  ' }))).toBe(false);
   });
 
   it('omits an entity nobody picked rather than sending an empty choice', () => {

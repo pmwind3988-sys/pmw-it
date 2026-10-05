@@ -10,6 +10,7 @@ export const FIELD_LABELS = {
   employeeNo: 'Employee No',
   position: 'Position',
   entity: 'Entity',
+  department: 'Department',
   formDate: 'Date',
   checkedItems: 'Asset Checklist',
   items: 'Requested Items',

@@ -10,7 +10,10 @@ import Field from '../components/form/Field';
 import { RadioCards } from '../components/form/Choices';
 import { SelectInput } from '../components/form/Inputs';
 import ChecklistFields from '../components/checklist/ChecklistFields';
+import { MODE_ICONS } from '../components/checklist/modeIcons';
 import { useSharePointToken } from '../hooks/useRequests';
+import { useOrgDirectory } from '../hooks/useOrgDirectory';
+import { snapshotOptions, withEntity } from '../features/forms/formOptions';
 import { FORM_MODES, emptyChecklist, modeLabel } from '../features/forms/checklistForm';
 import { isBlankValue } from '../features/forms/links/linkRules';
 import { createLink, draftLink, linkUrl } from '../features/forms/sharepoint/checklistLinks';
@@ -35,6 +38,12 @@ const EXPIRY_OPTIONS = [
 function EditSwitch({ field, values, editable, onToggle }) {
   if (isBlankValue(field, values[field])) {
     return <span className="ff-switch ff-switch-fixed">Employee fills this in</span>;
+  }
+  // A department belongs to a company: an entity the employee can change
+  // brings its department with it (`employeeMayEdit`).
+  if (field === 'department'
+    && (isBlankValue('entity', values.entity) || editable.includes('entity'))) {
+    return <span className="ff-switch ff-switch-fixed">Employee can edit, with Entity</span>;
   }
   const on = editable.includes(field);
   return (
@@ -88,6 +97,9 @@ export default function ChecklistSharePage() {
   const navigate = useNavigate();
   const { instance } = useMsal();
   const getToken = useSharePointToken();
+  // HR's entities and departments. The link keeps a copy of them, because the
+  // employee opening it cannot read HR's lists.
+  const options = snapshotOptions(useOrgDirectory());
 
   const [values, setValues] = useState(emptyChecklist);
   const [editable, setEditable] = useState([]);
@@ -112,7 +124,9 @@ export default function ChecklistSharePage() {
     return () => { live = false; };
   }, [url]);
 
-  const update = (field) => (value) => setValues((current) => ({ ...current, [field]: value }));
+  const update = (field) => (value) => setValues((current) => (field === 'entity'
+    ? withEntity(current, value, options)
+    : { ...current, [field]: value }));
   const toggle = (field) => setEditable((current) => (current.includes(field)
     ? current.filter((entry) => entry !== field)
     : [...current, field]));
@@ -134,6 +148,7 @@ export default function ChecklistSharePage() {
           formMode: values.formMode,
           values,
           editable,
+          options,
           expiresInDays: Number(expiry),
         }),
         createdByName: account?.name ?? '',
@@ -210,6 +225,7 @@ export default function ChecklistSharePage() {
             value={values.formMode}
             onChange={update('formMode')}
             options={FORM_MODES}
+            icons={MODE_ICONS}
           />
         </Field>
 
@@ -224,6 +240,7 @@ export default function ChecklistSharePage() {
               values={values}
               update={update}
               requireDetails={false}
+              options={options}
               adornment={(field) => (
                 <EditSwitch field={field} values={values} editable={editable} onToggle={toggle} />
               )}

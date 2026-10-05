@@ -31,6 +31,9 @@ export const LINK_COLUMNS = [
   text('EmployeeName', 'Employee Name'),
   note('Preset', 'Pre-filled values'),
   note('Editable', 'Employee may edit'),
+  // HR's entities and departments as they stood when the link was made. The
+  // public page has no way to read HR's lists itself (`formOptions.js`).
+  note('Options', 'Dropdown choices'),
   date('ExpiresOn', 'Expires'),
   choice('LinkStatus', 'Status', Object.values(LINK_STATUS)),
   text('CreatedByName', 'Created by'),
@@ -73,6 +76,7 @@ export function toLinkItem(link, { createdByName = '', createdByEmail = '' } = {
     EmployeeName: String(link.preset?.employeeName ?? '').trim(),
     Preset: JSON.stringify(link.preset ?? {}),
     Editable: JSON.stringify(link.editable ?? []),
+    Options: link.options ? JSON.stringify(link.options) : '',
     ExpiresOn: new Date(link.expiresOn).toISOString(),
     LinkStatus: link.status ?? LINK_STATUS.WAITING,
     CreatedByName: createdByName,
@@ -96,6 +100,7 @@ export function fromLinkItem(fields = {}) {
     employeeName: fields.EmployeeName ?? '',
     preset: parse(fields.Preset, {}, isObject),
     editable: parse(fields.Editable, [], Array.isArray),
+    options: parse(fields.Options, null, isObject),
     expiresOn: fields.ExpiresOn ?? '',
     status: fields.LinkStatus || LINK_STATUS.WAITING,
     createdByName: fields.CreatedByName ?? '',

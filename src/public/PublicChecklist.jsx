@@ -10,6 +10,7 @@ import { FORM_MODES, newItemRow } from '../features/forms/checklistForm';
 import { validateChecklist, hasErrors } from '../features/forms/validate';
 import { LOCKABLE_FIELDS } from '../features/forms/links/linkRules';
 import { isLinkCode } from '../features/forms/links/linkCode';
+import { withEntity } from '../features/forms/formOptions';
 
 /**
  * A shared checklist, opened from its link by somebody with no sign-in.
@@ -90,6 +91,7 @@ function SignedCopy({ copy, justSigned }) {
         values={copy.values}
         signature={copy.signature}
         signedOn={copy.signedOn}
+        options={copy.options}
       />
     </>
   );
@@ -110,7 +112,9 @@ function OpenForm({ code, data, onSigned, onGone }) {
 
   const update = (field) => (value) => {
     if (locked.includes(field)) return;
-    const next = { ...values, [field]: value };
+    const next = field === 'entity'
+      ? withEntity(values, value, data.options)
+      : { ...values, [field]: value };
     setValues(next);
     if (hasErrors(errors)) setErrors(validateChecklist(next));
   };
@@ -165,7 +169,13 @@ function OpenForm({ code, data, onSigned, onGone }) {
           {mode?.description && <span className="pc-mode-desc">{mode.description}</span>}
         </div>
 
-        <ChecklistFields values={values} errors={errors} update={update} locked={locked} />
+        <ChecklistFields
+          values={values}
+          errors={errors}
+          update={update}
+          locked={locked}
+          options={data.options}
+        />
 
         <ChecklistSignature
           value={values.signature}

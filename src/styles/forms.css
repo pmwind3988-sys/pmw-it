@@ -40,8 +40,7 @@
   display: grid;
   grid-template-columns: 1fr;
   gap: 16px;
-  /* Same rhythm as a lone field, or the field after a grid sits on it. */
-  margin-bottom: 16px;
+  margin-bottom: 22px;
 }
 
 @media (min-width: 640px) {
@@ -55,7 +54,7 @@
   flex-direction: column;
   gap: 6px;
   min-width: 0;
-  margin-bottom: 16px;
+  margin-bottom: 22px;
 }
 
 .ff-grid .ff-field { margin-bottom: 0; }
@@ -154,18 +153,96 @@
 }
 
 .ff-card {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  padding: 18px;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  padding: 26px 18px 22px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 14px;
   background: var(--surface);
   cursor: pointer;
-  transition: border-color 150ms ease-out, background-color 150ms ease-out;
+  transition: border-color 150ms ease-out, background-color 150ms ease-out,
+    transform 150ms ease-out, box-shadow 150ms ease-out;
 }
 
-.ff-card:hover { border-color: var(--text-secondary); }
+.ff-card:hover {
+  border-color: var(--text-secondary);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+}
+
+.ff-card-icon {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  margin-bottom: 8px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-secondary);
+  transition: background-color 150ms ease-out, color 150ms ease-out,
+    border-color 150ms ease-out;
+}
+
+.ff-card:hover .ff-card-icon,
+.ff-card-on .ff-card-icon {
+  color: var(--bg);
+  background: var(--text-primary);
+  border-color: var(--text-primary);
+}
+
+/* The "this one is picked" badge; only painted on the chosen card. */
+.ff-card-tick {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--text-primary);
+  color: var(--bg);
+}
+
+.ff-card-on .ff-card-tick { display: grid; }
+
+/* Phone: the tiles become menu rows — icon on the left, words beside it — so
+   all three fit on one screen instead of one tile per screen. */
+@media (max-width: 719px) {
+  .ff-card {
+    display: grid;
+    grid-template-columns: 52px minmax(0, 1fr);
+    grid-template-areas: "icon label" "icon desc";
+    column-gap: 14px;
+    row-gap: 2px;
+    align-items: center;
+    justify-items: start;
+    text-align: left;
+    padding: 14px 44px 14px 14px;
+  }
+  .ff-card:hover { transform: none; }
+  .ff-card-icon {
+    grid-area: icon;
+    width: 52px;
+    height: 52px;
+    margin: 0;
+    border-radius: 14px;
+  }
+  .ff-card-icon svg { width: 26px; height: 26px; }
+  .ff-card-label { grid-area: label; align-self: end; font-size: 15px; }
+  .ff-card-desc { grid-area: desc; align-self: start; }
+  .ff-card-tick { top: 50%; right: 14px; transform: translateY(-50%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ff-card, .ff-card-icon { transition: none; }
+  .ff-card:hover { transform: none; }
+}
 
 /* Two ways of showing the choice, not one: the ring survives a high-contrast
    mode or a forced-colours setting that flattens the border. */
@@ -182,7 +259,12 @@
   outline-offset: 2px;
 }
 
-.ff-card-label { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+.ff-card-label {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-primary);
+}
 .ff-card-desc { font-size: 13px; color: var(--text-secondary); line-height: 1.45; }
 
 /* --- tick list ------------------------------------------------------ */

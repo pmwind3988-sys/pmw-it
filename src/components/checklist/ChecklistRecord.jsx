@@ -2,6 +2,7 @@ import Logo from '../Logo';
 import { FORM_MODES, fieldsFor } from '../../features/forms/checklistForm';
 import { FIELD_LABELS, describeValue } from '../../features/forms/describe';
 import { formatMYT } from '../../utils/malaysiaTime';
+import { optionLabel } from '../../features/forms/formOptions';
 
 /**
  * A signed checklist as a document: what the employee keeps, and what prints
@@ -11,10 +12,10 @@ import { formatMYT } from '../../utils/malaysiaTime';
  * The print rules live in `public.css` under `@media print`.
  */
 
-const DETAILS = ['employeeName', 'employeeNo', 'position', 'entity', 'formDate'];
+const DETAILS = ['employeeName', 'employeeNo', 'position', 'entity', 'department', 'formDate'];
 
-function Value({ field, value }) {
-  const shown = describeValue(field, value);
+function Value({ field, value, label }) {
+  const shown = label ?? describeValue(field, value);
   if (Array.isArray(shown)) {
     return shown.length
       ? <ul className="cr-list">{shown.map((line) => <li key={line}>{line}</li>)}</ul>
@@ -23,7 +24,9 @@ function Value({ field, value }) {
   return shown ? <span className="cr-text">{shown}</span> : <span className="cr-empty">—</span>;
 }
 
-export default function ChecklistRecord({ formMode, values = {}, signature, signedOn }) {
+export default function ChecklistRecord({
+  formMode, values = {}, signature, signedOn, options = null,
+}) {
   const mode = FORM_MODES.find((entry) => entry.value === formMode);
   const shown = new Set(fieldsFor(formMode));
   const listField = shown.has('items') ? 'items' : 'checkedItems';
@@ -47,7 +50,15 @@ export default function ChecklistRecord({ formMode, values = {}, signature, sign
         {DETAILS.map((field) => (
           <div key={field} className="cr-cell">
             <dt>{FIELD_LABELS[field]}</dt>
-            <dd><Value field={field} value={values[field]} /></dd>
+            <dd>
+              <Value
+                field={field}
+                value={values[field]}
+                label={field === 'entity' || field === 'department'
+                  ? optionLabel(options, values, field)
+                  : undefined}
+              />
+            </dd>
           </div>
         ))}
       </dl>

@@ -6,9 +6,12 @@ import { CheckList } from '../form/Choices';
 import RepeatRows from '../form/RepeatRows';
 import { Lock } from '../ui/Icons';
 import {
-  ENTITIES, CHECKLIST_ITEMS, REQUESTABLE_ITEMS, isRequest, newItemRow,
+  CHECKLIST_ITEMS, REQUESTABLE_ITEMS, isRequest, newItemRow,
 } from '../../features/forms/checklistForm';
 import { FIELD_LABELS, describeValue } from '../../features/forms/describe';
+import {
+  entityChoices, departmentChoices, optionLabel,
+} from '../../features/forms/formOptions';
 
 /**
  * The body of the asset checklist — everything between the form type and the
@@ -20,10 +23,15 @@ import { FIELD_LABELS, describeValue } from '../../features/forms/describe';
  * link). `adornment(field)` puts something beside a field's label (the
  * builder's "employee can edit" switch). Neither decides anything: which
  * fields are locked is `linkRules.js`'s answer, passed in.
+ *
+ * `options` are the Entity and Department choices (`formOptions.js`): HR's
+ * lists, or null for the built-in entities and a typed department. Picking an
+ * entity that does not have the chosen department is the PAGE's business
+ * (`withEntity`), because it owns the values.
  */
 
-function LockedValue({ field, value }) {
-  const shown = describeValue(field, value);
+function LockedValue({ field, value, label }) {
+  const shown = label ?? describeValue(field, value);
   const lines = Array.isArray(shown) ? shown : [shown];
 
   return (
@@ -40,8 +48,9 @@ function LockedValue({ field, value }) {
 }
 
 export default function ChecklistFields({
-  values, errors = {}, update, locked = [], adornment, requireDetails = true,
+  values, errors = {}, update, locked = [], adornment, requireDetails = true, options = null,
 }) {
+  const departments = departmentChoices(options, values.entity);
   const isLocked = (field) => locked.includes(field);
   const adorn = (field) => adornment?.(field) ?? null;
 
@@ -56,7 +65,13 @@ export default function ChecklistFields({
       wide={wide}
       adornment={adorn(name)}
     >
-      {isLocked(name) ? <LockedValue field={name} value={values[name]} /> : input}
+      {isLocked(name) ? (
+        <LockedValue
+          field={name}
+          value={values[name]}
+          label={name === 'entity' || name === 'department' ? optionLabel(options, values, name) : undefined}
+        />
+      ) : input}
     </Field>
   );
 
@@ -93,10 +108,27 @@ export default function ChecklistFields({
             id="entity"
             value={values.entity}
             onChange={update('entity')}
-            options={ENTITIES}
+            options={entityChoices(options)}
             error={errors.entity}
           />
         ))}
+        {field('department', departments === null ? (
+          <TextInput
+            id="department"
+            value={values.department}
+            onChange={update('department')}
+            error={errors.department}
+          />
+        ) : (
+          <SelectInput
+            id="department"
+            value={values.department}
+            onChange={update('department')}
+            options={departments}
+            error={errors.department}
+            disabled={!values.entity}
+          />
+        ), { help: departments !== null && !values.entity ? 'Choose the entity first.' : undefined })}
         {field('formDate', (
           <DateInput
             id="formDate"

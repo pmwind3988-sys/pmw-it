@@ -19,14 +19,17 @@ const choice = (StaticName, Title, choices) => ({ StaticName, Title, kind: 'choi
  * `ensureAssetColumns` in `sharePointService.js` — that copy sent `Choices` on
  * a base `SP.Field` and would fail outright on a fresh site.
  */
-export const CHECKLIST_COLUMNS = [
+export const checklistColumns = (entities = ENTITIES) => [
   choice('FormMode', 'Form Mode', FORM_MODES.map((mode) => mode.value)),
   text('EmployeeName', 'Employee Name'),
   text('EmployeeNo', 'Employee No'),
   text('Position', 'Position'),
   // Only ever ADDED to. The options this list already carries stay, or every
   // row saved with one of them becomes unreadable in its own list.
-  choice('Entity', 'Entity', ENTITIES),
+  choice('Entity', 'Entity', entities),
+  // Text, not a choice: HR's department list is long and changes, and a choice
+  // column would refuse every department it had not been told about.
+  text('Department', 'Department'),
   date('SubmissionDate', 'Submission Date'),
   note('AssetMatrix', 'Asset Checklist'),
   text('SignatureUrl', 'Signature URL'),
@@ -40,6 +43,8 @@ export const CHECKLIST_COLUMNS = [
   text('SubmissionDateMYT', 'Submitted (MYT)'),
 ];
 
+export const CHECKLIST_COLUMNS = checklistColumns();
+
 const NAME = 'LinkTitle';
 
 /**
@@ -52,7 +57,7 @@ export const CHECKLIST_VIEWS = [
     isDefault: true,
     title: 'All Items',
     fields: [
-      NAME, 'FormMode', 'EmployeeName', 'EmployeeNo', 'Position', 'Entity',
+      NAME, 'FormMode', 'EmployeeName', 'EmployeeNo', 'Position', 'Entity', 'Department',
       'FormDate', 'AssetMatrix', 'RequestedItems', 'SerialNumbers',
       'OtherRemarks', 'SignatureUrl', 'SubmissionDateMYT',
     ],

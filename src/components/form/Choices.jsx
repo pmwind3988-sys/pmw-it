@@ -12,28 +12,37 @@ import { Check } from '../ui/Icons';
  * radio group has for free — arrow keys moving between options, and a screen
  * reader saying "2 of 3".
  */
-export function RadioCards({ name, value, onChange, options, error }) {
+export function RadioCards({ name, value, onChange, options, error, icons = {} }) {
   return (
     <div className="ff-cards" role="radiogroup" aria-invalid={error ? 'true' : undefined}>
-      {options.map((option) => (
-        <label
-          key={option.value}
-          className={`ff-card${value === option.value ? ' ff-card-on' : ''}`}
-        >
-          <input
-            type="radio"
-            name={name}
-            className="ff-sr-input"
-            value={option.value}
-            checked={value === option.value}
-            onChange={() => onChange(option.value)}
-          />
-          <span className="ff-card-label">{option.label}</span>
-          {option.description && (
-            <span className="ff-card-desc">{option.description}</span>
-          )}
-        </label>
-      ))}
+      {options.map((option) => {
+        const on = value === option.value;
+        const Icon = icons[option.value];
+        return (
+          <label key={option.value} className={`ff-card${on ? ' ff-card-on' : ''}`}>
+            <input
+              type="radio"
+              name={name}
+              className="ff-sr-input"
+              value={option.value}
+              checked={on}
+              onChange={() => onChange(option.value)}
+            />
+            {Icon && (
+              <span className="ff-card-icon" aria-hidden="true">
+                <Icon size={30} />
+              </span>
+            )}
+            <span className="ff-card-label">{option.label}</span>
+            {option.description && (
+              <span className="ff-card-desc">{option.description}</span>
+            )}
+            <span className="ff-card-tick" aria-hidden="true">
+              <Check size={13} />
+            </span>
+          </label>
+        );
+      })}
     </div>
   );
 }

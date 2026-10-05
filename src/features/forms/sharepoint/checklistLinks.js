@@ -2,14 +2,14 @@ import { spFetch, listPath, getFormDigest, ITEM_ACCEPT } from '../../sharepoint/
 import { provisionSchema } from '../../sharepoint/provision.js';
 import { withRetry } from '../../sharepoint/writePool.js';
 import {
-  CHECKLIST_LIST_NAME, SIGNATURE_LIBRARY_NAME, CHECKLIST_COLUMNS, CHECKLIST_VIEWS,
+  CHECKLIST_LIST_NAME, SIGNATURE_LIBRARY_NAME, checklistColumns, CHECKLIST_VIEWS,
 } from './checklistSchema.js';
 import {
   LINKS_LIST_NAME, LINK_COLUMNS, LINK_VIEWS, LINK_STATUS, toLinkItem, fromLinkItem,
 } from '../links/linkSchema.js';
 import { newLinkCode } from '../links/linkCode.js';
 import { cleanPreset, isBlankValue } from '../links/linkRules.js';
-import { fieldsFor } from '../checklistForm.js';
+import { ENTITIES, fieldsFor } from '../checklistForm.js';
 
 /**
  * Creating, listing and cancelling shared checklist links — from the portal,
@@ -23,7 +23,14 @@ import { fieldsFor } from '../checklistForm.js';
 
 const DAY = 86400000;
 
-export function provisionLinks(siteUrl, token, { onProgress } = {}) {
+/**
+ * `entities` are the codes the link may offer. The checklist's Entity column
+ * is a choice and SharePoint refuses a value it has never heard of — and the
+ * server that will write the signed row has no right to add one — so every
+ * code is merged in HERE, while somebody who can is creating the link.
+ */
+export function provisionLinks(siteUrl, token, { onProgress, entities = [] } = {}) {
+  const known = [...new Set([...ENTITIES, ...entities])];
   return provisionSchema(siteUrl, token, {
     lists: [
       {
@@ -34,7 +41,7 @@ export function provisionLinks(siteUrl, token, { onProgress } = {}) {
       {
         title: CHECKLIST_LIST_NAME,
         description: 'Signed asset checklists — what each employee received or handed back',
-        columns: CHECKLIST_COLUMNS,
+        columns: checklistColumns(known),
       },
       {
         title: SIGNATURE_LIBRARY_NAME,
@@ -51,8 +58,11 @@ export function provisionLinks(siteUrl, token, { onProgress } = {}) {
  * The link as it will be stored. Pure, so "only a filled field can be locked
  * or opened, and only one this form type shows" is testable on its own.
  */
-export function draftLink({ formMode, values, editable = [], expiresInDays = 14, now = Date.now(), code = newLinkCode() }) {
-  const preset = cleanPreset(values);
+export function draftLink({
+  formMode, values, editable = [], options = null,
+  expiresInDays = 14, now = Date.now(), code = newLinkCode(),
+}) {
+  const preset = cleanPreset(values, options);
   const shown = new Set(fieldsFor(formMode));
   return {
     code,
@@ -60,6 +70,7 @@ export function draftLink({ formMode, values, editable = [], expiresInDays = 14,
     preset,
     // A blank field is the employee's anyway; listing it would say nothing.
     editable: editable.filter((field) => shown.has(field) && !isBlankValue(field, preset[field])),
+    options,
     expiresOn: new Date(now + expiresInDays * DAY).toISOString(),
     status: LINK_STATUS.WAITING,
   };
@@ -68,7 +79,10 @@ export function draftLink({ formMode, values, editable = [], expiresInDays = 14,
 export async function createLink({
   siteUrl, token, link, createdByName, createdByEmail, onProgress,
 }) {
-  const digest = await provisionLinks(siteUrl, token, { onProgress });
+  const digest = await provisionLinks(siteUrl, token, {
+    onProgress,
+    entities: (link.options?.entities ?? []).map((entity) => entity.value),
+  });
 
   const response = await withRetry(() => spFetch(siteUrl, `${listPath(LINKS_LIST_NAME)}/items`, {
     token,

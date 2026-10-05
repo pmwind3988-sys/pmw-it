@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { planSync } from './syncDevices.js';
-import { indexByName } from './diffDevice.js';
+import { planImport } from './syncDevices.js';
 
 const device = (overrides) => ({
   computerName: 'PC1', owner: 'Ali', department: 'SALES', deviceType: 'Laptop',
@@ -11,9 +10,9 @@ const device = (overrides) => ({
   ...overrides,
 });
 
-describe('planSync', () => {
+describe('planImport', () => {
   it('inserts a machine the list has never seen', () => {
-    const plan = planSync([device()], indexByName([]));
+    const plan = planImport([device()], []);
     expect(plan.inserts).toHaveLength(1);
     expect(plan.updates).toHaveLength(0);
     expect(plan.changeRows).toHaveLength(0);
@@ -21,20 +20,20 @@ describe('planSync', () => {
 
   it('does nothing for a machine whose tracked fields are unchanged', () => {
     const existing = { ...device(), id: 7 };
-    const plan = planSync([device()], indexByName([existing]));
+    const plan = planImport([device()], [existing]);
     expect(plan.inserts).toHaveLength(0);
     expect(plan.updates).toHaveLength(0);
   });
 
   it('updates a machine whose RAM grew, and logs one change row', () => {
     const existing = { ...device(), id: 7 };
-    const plan = planSync([device({ installedRamGB: 16 })], indexByName([existing]));
+    const plan = planImport([device({ installedRamGB: 16 })], [existing]);
 
     expect(plan.updates).toHaveLength(1);
     expect(plan.updates[0].id).toBe(7);
     expect(plan.changeRows).toEqual([
       {
-        computerName: 'PC1', fieldName: 'installedRamGB',
+        computerName: 'PC1', deviceId: 7, fieldName: 'installedRamGB',
         oldValue: '8', newValue: '16', changeType: 'Updated',
       },
     ]);
@@ -42,38 +41,38 @@ describe('planSync', () => {
 
   it('matches an existing machine case-insensitively', () => {
     const existing = { ...device({ computerName: 'pc1' }), id: 7 };
-    const plan = planSync(
+    const plan = planImport(
       [device({ computerName: 'PC1', installedRamGB: 16 })],
-      indexByName([existing]),
+      [existing],
     );
     expect(plan.updates).toHaveLength(1);
   });
 
   it('does not update on an untracked change alone', () => {
     const existing = { ...device(), id: 7, ipAddress: '192.168.1.5' };
-    const plan = planSync([device({ ipAddress: '192.168.1.99' })], indexByName([existing]));
+    const plan = planImport([device({ ipAddress: '192.168.1.99' })], [existing]);
     expect(plan.updates).toHaveLength(0);
     expect(plan.changeRows).toHaveLength(0);
   });
 
   it('carries the item body on both inserts and updates', () => {
-    const plan = planSync([device()], indexByName([]));
+    const plan = planImport([device()], []);
     expect(plan.inserts[0].body.Title).toBe('PC1');
     expect(plan.inserts[0].computerName).toBe('PC1');
   });
 
   it('counts a new-and-changed batch correctly', () => {
     const existing = { ...device({ computerName: 'PC1' }), id: 7 };
-    const plan = planSync(
+    const plan = planImport(
       [device({ installedRamGB: 16 }), device({ computerName: 'PC2' })],
-      indexByName([existing]),
+      [existing],
     );
     expect(plan.inserts.map((i) => i.computerName)).toEqual(['PC2']);
     expect(plan.updates.map((u) => u.computerName)).toEqual(['PC1']);
   });
 });
 
-describe('planSync — fields set by hand', () => {
+describe('planImport — fields set by hand', () => {
   const existing = (overrides) => ({
     ...device(), id: 7, ...overrides,
   });
@@ -81,9 +80,9 @@ describe('planSync — fields set by hand', () => {
   it('leaves a hand-set field alone when the file disagrees', () => {
     // Somebody corrected the owner in the register. Re-importing the same
     // unchanged scan file must not quietly undo that.
-    const plan = planSync(
+    const plan = planImport(
       [device({ owner: 'Ali' })],
-      indexByName([existing({ owner: 'Ali Bin Hassan', manualFields: ['owner'] })]),
+      [existing({ owner: 'Ali Bin Hassan', manualFields: ['owner'] })],
     );
 
     expect(plan.updates).toHaveLength(0);
@@ -91,9 +90,9 @@ describe('planSync — fields set by hand', () => {
   });
 
   it('still writes the hand-set value when something else changed', () => {
-    const plan = planSync(
+    const plan = planImport(
       [device({ owner: 'Ali', installedRamGB: 16 })],
-      indexByName([existing({ owner: 'Ali Bin Hassan', manualFields: ['owner'] })]),
+      [existing({ owner: 'Ali Bin Hassan', manualFields: ['owner'] })],
     );
 
     expect(plan.updates).toHaveLength(1);
@@ -104,11 +103,11 @@ describe('planSync — fields set by hand', () => {
   });
 
   it('protects only the fields named, not the whole row', () => {
-    const plan = planSync(
+    const plan = planImport(
       [device({ owner: 'Ali', department: 'ENGINEERING' })],
-      indexByName([existing({
+      [existing({
         owner: 'Ali Bin Hassan', department: 'SALES', manualFields: ['owner'],
-      })]),
+      })],
     );
 
     expect(plan.changeRows.map((c) => c.fieldName)).toEqual(['department']);
@@ -117,32 +116,32 @@ describe('planSync — fields set by hand', () => {
   });
 
   it('protects several fields at once', () => {
-    const plan = planSync(
+    const plan = planImport(
       [device({ owner: 'Ali', department: 'ENGINEERING', deviceType: 'Desktop' })],
-      indexByName([existing({
+      [existing({
         owner: 'Ali Bin Hassan',
         department: 'SALES',
         deviceType: 'Laptop',
         manualFields: ['owner', 'department', 'deviceType'],
-      })]),
+      })],
     );
 
     expect(plan.updates).toHaveLength(0);
   });
 
   it('carries the manual list forward so it is not wiped by the update', () => {
-    const plan = planSync(
+    const plan = planImport(
       [device({ installedRamGB: 16 })],
-      indexByName([existing({ manualFields: ['owner'] })]),
+      [existing({ manualFields: ['owner'] })],
     );
 
     expect(plan.updates[0].body.ManualFields).toBe('owner');
   });
 
   it('behaves normally when nothing is hand-set', () => {
-    const plan = planSync(
+    const plan = planImport(
       [device({ owner: 'Ali' })],
-      indexByName([existing({ owner: 'Ali Bin Hassan' })]),
+      [existing({ owner: 'Ali Bin Hassan' })],
     );
 
     expect(plan.changeRows.map((c) => c.fieldName)).toEqual(['owner']);
@@ -150,11 +149,79 @@ describe('planSync — fields set by hand', () => {
   });
 
   it('ignores a manual entry naming a field that no longer exists', () => {
-    const plan = planSync(
+    const plan = planImport(
       [device()],
-      indexByName([existing({ manualFields: ['owner', 'somethingRemoved'] })]),
+      [existing({ manualFields: ['owner', 'somethingRemoved'] })],
     );
 
     expect(plan.updates).toHaveLength(0);
+  });
+});
+
+describe('planImport — lifecycle', () => {
+  const NOW = Date.UTC(2026, 9, 5);
+  const scan = (over) => device({ serialNumber: 'S1', location: 'F1', ...over });
+  const row = (over) => ({ ...device({ serialNumber: 'S1', location: 'F1' }), id: 7, createdOn: Date.UTC(2026, 7, 21), ...over });
+
+  it('marks a new machine In use and opens its first stint, since at least the scan', () => {
+    const plan = planImport([scan()], [], { now: NOW });
+    expect(plan.inserts[0].body.Status).toBe('In use');
+    expect(plan.stintOps).toHaveLength(1);
+    expect(plan.stintOps[0]).toMatchObject({ computerName: 'PC1', deviceId: null, close: null });
+    expect(plan.stintOps[0].open).toMatchObject({ owner: 'Ali', location: 'F1', assignedOnApprox: true });
+  });
+
+  it('renames a machine found by serial and logs the rename', () => {
+    const plan = planImport([scan({ computerName: 'PC9' })], [row()], { now: NOW });
+    expect(plan.updates[0]).toMatchObject({ id: 7 });
+    expect(plan.updates[0].body.Title).toBe('PC9');
+    expect(plan.changeRows).toContainEqual(expect.objectContaining({ fieldName: 'computerName', oldValue: 'PC1', newValue: 'PC9', deviceId: 7 }));
+  });
+
+  it('never clears a location or serial an older report does not carry', () => {
+    const plan = planImport([device({ installedRamGB: 16 })], [row()], { now: NOW });
+    expect(plan.updates[0].body.Location).toBe('F1');
+    expect(plan.updates[0].body.SerialNumber).toBe('S1');
+  });
+
+  it('records a new owner the scan reveals as a reassignment', () => {
+    const plan = planImport([scan({ owner: 'Aisyah' })], [row()], { now: NOW });
+    expect(plan.stintOps).toHaveLength(1);
+    expect(plan.stintOps[0].close).toMatchObject({ endReason: 'Reassigned' });
+    expect(plan.stintOps[0].open).toMatchObject({ owner: 'Aisyah', assignedOnApprox: false });
+  });
+
+  it('leaves a hand-typed owner and its history alone', () => {
+    const plan = planImport([scan({ owner: 'Aisyah' })], [row({ manualFields: ['owner'] })], { now: NOW });
+    expect(plan.stintOps).toHaveLength(0);
+  });
+
+  it('brings a retired machine back when it is scanned again', () => {
+    const plan = planImport([scan()], [row({ status: 'Retired', owner: null })], { now: NOW });
+    expect(plan.updates[0].body.Status).toBe('In use');
+    expect(plan.stintOps[0].open).toMatchObject({ owner: 'Ali' });
+  });
+
+  it('sends the old machine to the stash when the answer says so', () => {
+    const old = row({ id: 8, computerName: 'ALI-OLD', serialNumber: 'S0' });
+    const incoming = scan({ computerName: 'ALI-NEW', serialNumber: 'S2', sourceFileName: 'new.txt' });
+    const plan = planImport([incoming], [old], { now: NOW, answers: { 'new.txt|8': 'stash' } });
+    expect(plan.retirements).toHaveLength(1);
+    expect(plan.retirements[0].body).toMatchObject({ Status: 'Spare', Owner: '' });
+    expect(plan.stintOps.find((op) => op.deviceId === 8).close.endReason).toBe('Replaced');
+    // The new machine is a real hand-over, not a guess about the past.
+    expect(plan.stintOps.find((op) => op.computerName === 'ALI-NEW').open.assignedOnApprox).toBe(false);
+  });
+
+  it('keeps both when told to', () => {
+    const old = row({ id: 8, computerName: 'ALI-OLD', serialNumber: 'S0' });
+    const plan = planImport([scan({ computerName: 'ALI-NEW', serialNumber: 'S2', sourceFileName: 'new.txt' })], [old], { answers: { 'new.txt|8': 'keep' } });
+    expect(plan.retirements).toHaveLength(0);
+  });
+
+  it('skips the second of two reports with one serial', () => {
+    const plan = planImport([scan(), scan({ computerName: 'PC2', sourceFileName: 'x.txt' })], []);
+    expect(plan.inserts).toHaveLength(1);
+    expect(plan.skipped[0].computerName).toBe('PC2');
   });
 });

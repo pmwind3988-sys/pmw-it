@@ -46,7 +46,7 @@ function fakeSharePoint({ items = [] } = {}) {
       if (url.includes('/items?')) return reply({ d: { results: items } });
       if (url.includes('/items')) {
         written.push({ url, body: JSON.parse(init.body) });
-        return reply({}, 201);
+        return reply({ Id: 501 }, 201);
       }
       return reply({});
     },

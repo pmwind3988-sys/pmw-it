@@ -29,6 +29,7 @@
   - No state reset from an effect. Clamp or compare during render.
   - No ref writes during render.
   - No helper exported next to a component in the same file.
+- **Every button shows when it is working.** Any button that starts a SharePoint read or write shows the spinner from the press until the work settles. Use `<Button loading>`, or `<Spinner />` inside a raw `<button>` (Task 9a). The label stays as it is, a second press is blocked, and only the pressed button spins. Buttons that start nothing (Cancel, close, a tab) do not get it.
 - **Icons:** add any new glyph to `src/components/ui/Icons.jsx`, and import every icon a component uses.
 - **Copy rules:**
   - No emoji.
@@ -77,6 +78,8 @@
 | `src/features/devices/ui/LifecycleActions.jsx`, `AssignDialog.jsx`, `OwnerHistory.jsx`, `SpecHistory.jsx` | create | the machine page additions |
 | `src/features/devices/ui/DeviceTable.jsx`, `src/features/devices/fieldGroups.js` | modify | new columns lead / grouped |
 | `src/pages/DevicesPage.jsx`, `src/pages/DeviceDetailPage.jsx` | modify | wire it all |
+| `src/components/ui/Spinner.jsx` | create | the one busy mark |
+| `src/components/ui/Button.jsx`, `src/components/ui/Surfaces.jsx` | modify | `loading` on Button, `busy` on ErrorBanner's Retry |
 | `src/components/ui/Icons.jsx` | modify | `Monitor`, `Archive`, `Tombstone`, `Map`, `Wrench` |
 | `src/styles/devices.css` | modify | map, cards, prompt, history styles |
 | `AGENTS.md` | modify | conventions, where-to-look, routes |
@@ -2480,6 +2483,127 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ---
 
+### Task 9a: Every button shows that it is working
+
+**Files:**
+- Create: `src/components/ui/Spinner.jsx`
+- Modify: `src/components/ui/Button.jsx`, `src/components/ui/Surfaces.jsx` (`ErrorBanner`), `src/styles/shell.css`
+- Modify (existing device buttons): `src/pages/DevicesPage.jsx` (Refresh), `src/pages/DeviceDetailPage.jsx` (Refresh), `src/features/devices/ui/DropZone.jsx`, `src/features/devices/ui/DeviceTable.jsx` (the confirm Save / Remove / Remove N buttons)
+
+**Interfaces:**
+- Produces:
+  - `<Spinner size={14} />`: an inline, `currentColor`, `aria-hidden` spinning ring
+  - `<Button loading>`: shows the spinner in place of the icon, keeps the label, is disabled, and sets `aria-busy="true"`
+  - `<ErrorBanner busy>`: its Retry button shows the spinner and is disabled
+
+**The rule (also in Global Constraints):** any button that starts a SharePoint read or write shows the spinner from the press until the work settles. Use `<Button loading>`, or `<Spinner />` inside a raw `<button>` that cannot become a `Button`. The label never changes to "Loading…": the spinner says it is working, and the label still says what. The button keeps its width, so nothing beside it moves.
+
+- [ ] **Step 1: Write the spinner and the button state**
+
+Create `src/components/ui/Spinner.jsx`:
+
+```jsx
+/** The one "this is working" mark. Inherits the text colour of whatever holds it. */
+export default function Spinner({ size = 14 }) {
+  return <span className="ui-spinner" style={{ width: size, height: size }} aria-hidden="true" />;
+}
+```
+
+Replace `src/components/ui/Button.jsx` with:
+
+```jsx
+import Spinner from './Spinner';
+
+/**
+ * The one button. Variants and sizes are class names on `.ui-btn` — see
+ * `src/styles/shell.css`.
+ *
+ * `loading` is the universal busy state: the spinner takes the icon's place,
+ * the label stays so the reader still knows WHAT is happening, and the button
+ * is disabled so a second press cannot send the same write twice.
+ */
+export default function Button({
+  children,
+  variant = 'primary',
+  size = 'md',
+  icon: Icon,
+  className = '',
+  loading = false,
+  disabled,
+  ...props
+}) {
+  return (
+    <button
+      className={`ui-btn ui-btn-${size} ui-btn-${variant}${loading ? ' ui-btn-loading' : ''} ${className}`.trim()}
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
+      {...props}
+    >
+      {loading ? <Spinner size={14} /> : Icon && <Icon size={14} />}
+      {children}
+    </button>
+  );
+}
+```
+
+In `src/components/ui/Surfaces.jsx`, give `ErrorBanner` a `busy` prop. Change its signature to accept `busy = false`. Change its Retry button to:
+
+```jsx
+        <button type="button" onClick={onRetry} disabled={busy} aria-busy={busy || undefined}>
+          {busy && <Spinner size={12} />} Retry
+        </button>
+```
+
+Keep the button's existing label text if it differs from `Retry`, and import `Spinner from './Spinner'`.
+
+Append to `src/styles/shell.css`. It goes in shell.css because the button is portal-wide; check first that `@keyframes spin` exists there (it is used at line ~1341). If it does not, add it.
+
+```css
+/* The universal busy mark. A ring with one side open, turning. */
+.ui-spinner {
+  display: inline-block;
+  flex: none;
+  box-sizing: border-box;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  vertical-align: -2px;
+}
+.ui-btn-loading { cursor: progress; }
+.ui-btn-loading:disabled { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  /* Still visibly working, without the spin. */
+  .ui-spinner { animation: ui-spinner-pulse 1.2s ease-in-out infinite; border-right-color: currentColor; }
+}
+@keyframes ui-spinner-pulse { 50% { opacity: 0.35; } }
+```
+
+`.ui-btn-loading:disabled { opacity: 1; }` keeps a busy button looking pressed-and-working rather than greyed out and broken. Check that `.ui-btn:disabled` (line ~696) sets opacity. If it uses another property, mirror it.
+
+- [ ] **Step 2: Put it on the device section's existing buttons**
+
+- `src/pages/DevicesPage.jsx`: on the Refresh `Button`, add `loading={loading}`. `disabled={loading}` can go, since `loading` disables it.
+- `src/pages/DeviceDetailPage.jsx`: the same on its Refresh `Button`.
+- `src/features/devices/ui/DropZone.jsx`: on the `Button` at line ~60, replace `disabled={busy}` with `loading={busy}`.
+- `src/features/devices/ui/DeviceTable.jsx`: import `Spinner from '../../../components/ui/Spinner'`. The four raw buttons that start a write all carry `disabled={busy}`: the confirm-many Remove (~278), the confirm-many confirm (~295), the row Save (~514) and the row Remove confirm (~540). Add `aria-busy={busy || undefined}` to each, and put `{busy && <Spinner size={12} />}` as their first child. Leave the Cancel / `dt-icon` buttons alone: they start nothing.
+
+- [ ] **Step 3: Lint and build**
+
+Run: `npm run lint && npm run build && npm test`
+Expected: only the existing `ThemeContext.jsx` lint error, a passing build, and passing tests.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add src/components/ui src/styles/shell.css src/pages/DevicesPage.jsx src/pages/DeviceDetailPage.jsx src/features/devices/ui/DropZone.jsx src/features/devices/ui/DeviceTable.jsx
+git commit -m "Give every button a loading state: a spinner in place of the icon, label kept, second press blocked
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
+---
+
 ### Task 10: The replacement question in the import review
 
 **Files:**
@@ -4018,7 +4142,7 @@ export default function AssignDialog({
         </p>
         <div className="ui-confirm-actions">
           <Button variant="secondary" type="button" onClick={onCancel}>Cancel</Button>
-          <Button type="submit" disabled={busy || !values.owner.trim()}>{title.startsWith('Bring') ? 'Bring back' : 'Change owner'}</Button>
+          <Button type="submit" loading={busy} disabled={!values.owner.trim()}>{title.startsWith('Bring') ? 'Bring back' : 'Change owner'}</Button>
         </div>
       </form>
     </div>
@@ -4051,13 +4175,17 @@ export default function LifecycleActions({
   device, owners, locations, departments, onAction, busy,
 }) {
   const [dialog, setDialog] = useState(null);
+  // Which button started the work, so only THAT one spins while `busy`.
+  const [pressed, setPressed] = useState(null);
   const { ask, dialog: confirm } = useConfirm();
 
   const press = async (action) => {
     if (action === ACTIONS.CHANGE_OWNER || action === ACTIONS.ASSIGN) {
+      setPressed(action);
       setDialog(action);
       return;
     }
+    setPressed(action);
     if (action === ACTIONS.RETIRE) {
       const yes = await ask({
         title: `Retire ${device.computerName}?`,
@@ -4075,7 +4203,8 @@ export default function LifecycleActions({
       {actionsFor(device).map((action, index) => (
         <Button key={action} variant={index === 0 ? 'primary' : 'secondary'} size="sm"
           className={action === ACTIONS.RETIRE ? 'la-danger' : undefined}
-          disabled={busy} onClick={() => press(action)}>
+          disabled={busy && pressed !== action} loading={busy && pressed === action}
+          onClick={() => press(action)}>
           {LABEL[action]}
         </Button>
       ))}
@@ -4261,7 +4390,7 @@ import { mapHref } from '../features/devices/map/mapLinks';
               </span>
               <LifecycleActions device={device} owners={owners} locations={locations} departments={departments} onAction={act} busy={acting} />
             </div>
-            {actionError && <ErrorBanner message={actionError} onRetry={pending.length ? retry : () => setActionError('')} />}
+            {actionError && <ErrorBanner message={actionError} busy={acting} onRetry={pending.length ? retry : () => setActionError('')} />}
           </Card>
 
           <div className="dd-histories">

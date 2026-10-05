@@ -2211,5 +2211,4 @@ body {
   /* Still visibly working, without the spin. */
   .ui-spinner { animation: ui-spinner-pulse 1.2s ease-in-out infinite; border-right-color: currentColor; }
 }
-@keyframes spin { to { transform: rotate(360deg); } }
 @keyframes ui-spinner-pulse { 50% { opacity: 0.35; } }

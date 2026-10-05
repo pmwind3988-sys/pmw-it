@@ -1,4 +1,4 @@
-import { AlertTriangle } from './Icons';
+import { AlertTriangle, RefreshCw } from './Icons';
 import Spinner from './Spinner';
 
 export function Card({ children, className = '', ...rest }) {
@@ -23,7 +23,7 @@ export function ErrorBanner({ message, onRetry, busy = false }) {
       </span>
       {onRetry && (
         <button type="button" onClick={onRetry} disabled={busy} aria-busy={busy || undefined}>
-          {busy && <Spinner size={12} />} Retry
+          {busy ? <Spinner size={12} /> : <RefreshCw size={13} />} Retry
         </button>
       )}
     </div>

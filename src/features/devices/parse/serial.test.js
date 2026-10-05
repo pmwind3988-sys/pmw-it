@@ -7,7 +7,7 @@ describe('normaliseSerial', () => {
   });
 
   it('removes invisible characters too', () => {
-    expect(normaliseSerial('5CG 8241​KQZ')).toBe('5CG8241KQZ');
+    expect(normaliseSerial('5CG\u00a08241\u200bKQZ')).toBe('5CG8241KQZ');
   });
 });
 
@@ -18,7 +18,7 @@ describe('cleanSerial', () => {
 
   it.each([
     'System Serial Number', 'Chassis Serial Number', 'Default string',
-    'To be filled by O.E.M.', '0', '00000000', 'XXXXXXXX', '', '   ', ' ', null, undefined,
+    'To be filled by O.E.M.', 'Not specified', '0', '00000000', 'XXXXXXXX', '', '   ', '\u00a0', null, undefined,
   ])('treats %j as no serial', (value) => {
     expect(cleanSerial(value)).toBeNull();
     expect(isPlaceholderSerial(value)).toBe(true);

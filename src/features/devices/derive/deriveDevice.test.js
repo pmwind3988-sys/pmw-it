@@ -65,7 +65,8 @@ describe('deriveDevice — the awkward machines', () => {
 
   it('scores DESKTOP-8SBR420 Critical', () => {
     const device = deriveDevice(load('[STOCKYARDF1] DESKTOP-8SBR420_.txt'));
-    expect(device.department).toBe('STOCKYARDF1');
+    expect(device.location).toBe('F1');
+    expect(device.department).toBe('STOCKYARD');
     expect(device.deviceType).toBe('Desktop');
     expect(device.installedRamGB).toBe(2);
     // The 932 GB disk in its report is IT's own; what is in the machine is

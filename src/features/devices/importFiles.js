@@ -31,7 +31,7 @@ function dedupe(devices, rejected) {
   return { devices: [...byName.values()], rejected };
 }
 
-export async function importFiles(files) {
+export async function importFiles(files, { knownLocations } = {}) {
   const devices = [];
   const rejected = [];
 
@@ -59,7 +59,7 @@ export async function importFiles(files) {
       continue;
     }
 
-    devices.push(deriveDevice({ text, fileName: file.name, lastModified: file.lastModified }));
+    devices.push(deriveDevice({ text, fileName: file.name, lastModified: file.lastModified, knownLocations }));
   }
 
   return dedupe(devices, rejected);

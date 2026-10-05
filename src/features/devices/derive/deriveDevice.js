@@ -14,10 +14,10 @@ import { enrichFit } from './enrichFit.js';
 const firstOrNull = (lines) => (lines?.length ? cleanValue(lines[0]) : null);
 const joinLines = (lines) => (lines?.length ? lines.join('\n') : null);
 
-export function deriveDevice({ text, fileName, lastModified }) {
+export function deriveDevice({ text, fileName, lastModified, knownLocations }) {
   const { fields, unknownLabels } = parseReport(text);
 
-  const identity = deriveIdentity(fields, fileName);
+  const identity = deriveIdentity(fields, fileName, { knownLocations });
   const ram = deriveRam(fields['RAM Slot Info'] ?? [], fields['Total RAM'] ?? []);
   const storage = deriveStorage(fields['Storage Drives'] ?? []);
   const cpu = deriveCpu(fields.Processor ?? [], ram.ramType);

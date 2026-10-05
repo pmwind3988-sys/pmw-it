@@ -1,9 +1,11 @@
 import { cleanValue } from '../parse/placeholders.js';
 import { parsePairs, parseMailFiles } from '../parse/parseValues.js';
+import { splitLocation } from './deriveLocation.js';
 
 /** Longest first, so `PML GUARDHOUSE` matches before `PML` ever could. */
 export const KNOWN_DEPARTMENTS = [
   'PML GUARDHOUSE', 'STOCKYARDF1', 'ENGINEERING', 'PRODUCTION', 'PURCHASING',
+  'STOCKYARD', 'GUARDHOUSE',
   'MARKETING', 'SHIPPING', 'FINANCE', 'ACCOUNT', 'SALES', 'ADMIN', 'STORE',
   'QAQC', 'QC', 'HR', 'IT',
 ];
@@ -86,14 +88,16 @@ function resolveDeviceType(fields) {
   return { deviceType: 'Unknown', deviceTypeConfident: false };
 }
 
-export function deriveIdentity(fields, fileName) {
+export function deriveIdentity(fields, fileName, { knownLocations } = {}) {
   const { bracket, stem } = parseFileName(fileName);
-  const { department, person } = splitBracket(bracket);
+  const { location, rest } = splitLocation(bracket, knownLocations);
+  const { department, person } = splitBracket(rest);
 
   const fromField = fields['Computer Name']?.length ? cleanValue(fields['Computer Name'][0]) : null;
 
   return {
     computerName: fromField ?? (stem || null),
+    location,
     department,
     ...resolveOwner(fields, person),
     ...resolveDeviceType(fields),

@@ -33,11 +33,19 @@ describe('deriveIdentity — department and owner from the bracket', () => {
     expect(result.ownerSource).toBe('Filename');
   });
 
-  it('keeps a two-word department whole', () => {
+  it('reads PML GUARDHOUSE as a location and a department', () => {
     const result = deriveIdentity(withFields({ 'Computer Name': ['PMWP001'] }),
       '[PML GUARDHOUSE] PMWP001_.txt');
-    expect(result.department).toBe('PML GUARDHOUSE');
-    expect(result.owner).toBe(null);
+    expect(result.location).toBe('PML');
+    expect(result.department).toBe('GUARDHOUSE');
+  });
+
+  it('reads the location in front of the department', () => {
+    const result = deriveIdentity(withFields({ 'Computer Name': ['AMIR-HP'] }),
+      '[F1 ENGINEERING AMIR] AMIR-HP_.txt');
+    expect(result.location).toBe('F1');
+    expect(result.department).toBe('ENGINEERING');
+    expect(result.owner).toBe('Amir');
   });
 
   it('reads a department-only bracket', () => {

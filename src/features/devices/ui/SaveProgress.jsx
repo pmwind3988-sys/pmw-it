@@ -21,7 +21,7 @@ const PHASES = {
 
 export default function SaveProgress({ state, onRetry, onDone }) {
   const {
-    phase, done, total, results, error, changeCount, unchanged,
+    phase, done, total, results, error, changeCount, unchanged, stintFailures, skipped,
   } = state;
 
   if (error) {
@@ -84,6 +84,8 @@ export default function SaveProgress({ state, onRetry, onDone }) {
           updated > 0 && `${updated} updated`,
           changeCount > 0 && `${changeCount} change${changeCount === 1 ? '' : 's'} logged`,
           unchanged > 0 && `${unchanged} already current`,
+          stintFailures > 0 && `${stintFailures} owner-history entr${stintFailures === 1 ? 'y' : 'ies'} could not be written`,
+          skipped?.length > 0 && `${skipped.length} skipped: ${skipped.map((s) => s.computerName).join(', ')}`,
         ].filter(Boolean).join(' · ')}
       </p>
 

@@ -51,4 +51,12 @@ describe('sortForReview', () => {
     sortForReview(rows);
     expect(rows.map((r) => r.computerName)).toEqual(['B', 'A']);
   });
+
+  it('puts a row waiting for an answer above everything else', () => {
+    const rows = [
+      { computerName: 'A', owner: 'x', sourceFileName: 'a', deviceType: 'Laptop' },
+      { computerName: 'B', owner: 'y', sourceFileName: 'b', deviceType: 'Laptop' },
+    ];
+    expect(sortForReview(rows, new Set(['b'])).map((r) => r.computerName)).toEqual(['B', 'A']);
+  });
 });

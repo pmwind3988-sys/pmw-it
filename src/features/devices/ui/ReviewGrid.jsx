@@ -1,5 +1,7 @@
+import { Fragment } from 'react';
 import { formatMYT } from '../../../utils/malaysiaTime';
 import { issuesFor } from '../reviewIssues';
+import ReplacementPrompt from './ReplacementPrompt';
 
 /**
  * `editable: true` marks a column whose value was DERIVED rather than read
@@ -10,6 +12,7 @@ import { issuesFor } from '../reviewIssues';
 const COLUMNS = [
   { key: 'computerName', label: 'Computer' },
   { key: 'owner', label: 'Owner', editable: true },
+  { key: 'location', label: 'Location', editable: true },
   { key: 'department', label: 'Department', editable: true },
   { key: 'deviceType', label: 'Type', editable: true, options: ['Laptop', 'Desktop', 'Unknown'] },
   { key: 'computerModel', label: 'Model' },
@@ -28,7 +31,9 @@ const COLUMNS = [
  * moment an edit cleared its last issue -- which is exactly when someone is
  * typing into it.
  */
-export default function ReviewGrid({ devices, excluded, onChange, onToggleRow }) {
+export default function ReviewGrid({
+  devices, excluded, onChange, onToggleRow, prompts = [], answers = {}, onAnswer, notices = new Map(),
+}) {
   const rows = devices;
 
   return (
@@ -56,54 +61,68 @@ export default function ReviewGrid({ devices, excluded, onChange, onToggleRow })
               ].filter(Boolean).join(' ');
 
               return (
-                <tr key={id} className={className || undefined}>
-                  <td className="rg-check">
-                    <input
-                      type="checkbox"
-                      checked={!isExcluded}
-                      onChange={() => onToggleRow(id)}
-                      aria-label={`Include ${device.computerName}`}
-                    />
-                  </td>
+                <Fragment key={id}>
+                  <tr className={className || undefined}>
+                    <td className="rg-check">
+                      <input
+                        type="checkbox"
+                        checked={!isExcluded}
+                        onChange={() => onToggleRow(id)}
+                        aria-label={`Include ${device.computerName}`}
+                      />
+                    </td>
 
-                  {COLUMNS.map((column) => {
-                    const value = device[column.key];
+                    {COLUMNS.map((column) => {
+                      const value = device[column.key];
 
-                    if (!column.editable) {
-                      const riskClass = column.key === 'riskLevel'
-                        ? `rg-risk rg-risk-${String(value).toLowerCase()}`
-                        : undefined;
-                      return <td key={column.key} className={riskClass}>{value ?? '—'}</td>;
-                    }
+                      if (!column.editable) {
+                        const riskClass = column.key === 'riskLevel'
+                          ? `rg-risk rg-risk-${String(value).toLowerCase()}`
+                          : undefined;
+                        return <td key={column.key} className={riskClass}>{value ?? '—'}</td>;
+                      }
 
-                    return (
-                      <td key={column.key} className="rg-editable">
-                        {column.options ? (
-                          <select
-                            value={value ?? 'Unknown'}
-                            aria-label={`${column.label} for ${device.computerName}`}
-                            onChange={(event) => onChange(id, column.key, event.target.value)}
-                          >
-                            {column.options.map((option) => (
-                              <option key={option} value={option}>{option}</option>
-                            ))}
-                          </select>
-                        ) : (
-                          <input
-                            type="text"
-                            value={value ?? ''}
-                            placeholder="—"
-                            aria-label={`${column.label} for ${device.computerName}`}
-                            onChange={(event) =>
-                              onChange(id, column.key, event.target.value || null)}
-                          />
-                        )}
+                      return (
+                        <td key={column.key} className="rg-editable">
+                          {column.options ? (
+                            <select
+                              value={value ?? 'Unknown'}
+                              aria-label={`${column.label} for ${device.computerName}`}
+                              onChange={(event) => onChange(id, column.key, event.target.value)}
+                            >
+                              {column.options.map((option) => (
+                                <option key={option} value={option}>{option}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <input
+                              type="text"
+                              value={value ?? ''}
+                              placeholder="—"
+                              aria-label={`${column.label} for ${device.computerName}`}
+                              onChange={(event) =>
+                                onChange(id, column.key, event.target.value || null)}
+                            />
+                          )}
+                        </td>
+                      );
+                    })}
+
+                    <td title="Malaysia time">{formatMYT(device.scannedOn, 'datetime12')}</td>
+                  </tr>
+                  {notices.get(id) && (
+                    <tr className="rg-notice-row">
+                      <td colSpan={COLUMNS.length + 2}>{notices.get(id)}</td>
+                    </tr>
+                  )}
+                  {!isExcluded && prompts.filter((p) => p.sourceFileName === id).map((prompt) => (
+                    <tr key={prompt.key} className="rg-prompt-row">
+                      <td colSpan={COLUMNS.length + 2}>
+                        <ReplacementPrompt prompt={prompt} answer={answers[prompt.key]} onAnswer={onAnswer} />
                       </td>
-                    );
-                  })}
-
-                  <td title="Malaysia time">{formatMYT(device.scannedOn, 'datetime12')}</td>
-                </tr>
+                    </tr>
+                  ))}
+                </Fragment>
               );
             })}
           </tbody>

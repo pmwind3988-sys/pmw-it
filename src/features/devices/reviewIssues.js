@@ -24,8 +24,15 @@ export function issuesFor(device) {
   return issues;
 }
 
-export function sortForReview(devices) {
+/**
+ * Rows waiting on a replacement answer first -- Save cannot go ahead without
+ * them -- then rows with problems, then by name.
+ */
+export function sortForReview(devices, first = new Set()) {
   return [...devices].sort((a, b) => {
+    const aFirst = first.has(a.sourceFileName) ? 1 : 0;
+    const bFirst = first.has(b.sourceFileName) ? 1 : 0;
+    if (aFirst !== bFirst) return bFirst - aFirst;
     const bHasProblems = issuesFor(b).length > 0 ? 1 : 0;
     const aHasProblems = issuesFor(a).length > 0 ? 1 : 0;
     if (bHasProblems !== aHasProblems) return bHasProblems - aHasProblems;

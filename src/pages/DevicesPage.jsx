@@ -23,13 +23,16 @@ import { labelOf } from '../features/devices/deviceFilters';
 import { syncDevices } from '../features/devices/sharepoint/syncDevices';
 import { updateDevice, deleteDevice, deleteDevices } from '../features/devices/sharepoint/updateDevice';
 import { provisionLists } from '../features/devices/sharepoint/provisionLists';
+import { matchIncoming, noticeFor } from '../features/devices/lifecycle/matchIncoming';
+import { replacementsFor, unanswered } from '../features/devices/lifecycle/replacements';
+import { locationsIn } from '../features/devices/map/locations';
 
 const SHAREPOINT_SITE_URL =
   import.meta.env.VITE_SHAREPOINT_SITE_URL || 'https://pmwgroupcom.sharepoint.com/sites/IThelpdesk';
 
 const IDLE_SAVE = {
   phase: 'starting', done: 0, total: 0, results: null, error: null,
-  changeCount: 0, unchanged: 0,
+  changeCount: 0, unchanged: 0, stintFailures: 0, skipped: [],
 };
 
 /** Everything in the query string that is a filter rather than a view switch. */
@@ -56,6 +59,7 @@ export default function DevicesPage() {
   // file it came from.
   const [edits, setEdits] = useState({});
   const [excluded, setExcluded] = useState(new Set());
+  const [answers, setAnswers] = useState({});
   const [save, setSave] = useState(IDLE_SAVE);
   const [rowBusy, setRowBusy] = useState(false);
   const [rowError, setRowError] = useState('');
@@ -65,6 +69,13 @@ export default function DevicesPage() {
     () => parsed.map((device) => ({ ...device, ...(edits[device.sourceFileName] ?? {}) })),
     [parsed, edits],
   );
+
+  const matches = useMemo(() => matchIncoming(merged, saved), [merged, saved]);
+  const prompts = useMemo(() => replacementsFor(matches, saved), [matches, saved]);
+  const notices = useMemo(() => new Map(
+    matches.map((match) => [match.device.sourceFileName, noticeFor(match)]).filter(([, text]) => text),
+  ), [matches]);
+  const waiting = unanswered(prompts, answers, excluded);
 
   const filters = useMemo(
     () => Object.fromEntries(FILTER_KEYS.map((key) => [key, params.get(key) ?? ''])),
@@ -118,7 +129,7 @@ export default function DevicesPage() {
   const handleFiles = useCallback(async (files) => {
     setBusy(true);
     try {
-      const incoming = await importFiles(files);
+      const incoming = await importFiles(files, { knownLocations: locationsIn(saved) });
       // A second drop adds to the review rather than starting it over, so a
       // batch that arrives in several goes still ends up as one save. Edits
       // already made are keyed by file name and survive untouched.
@@ -126,13 +137,15 @@ export default function DevicesPage() {
         ? mergeImports({ devices: parsed, rejected: [] }, incoming)
         : incoming;
       // Sorted once per drop: the grid must not reorder while somebody edits it.
-      setParsed(sortForReview(result.devices));
+      const asking = new Set(replacementsFor(matchIncoming(result.devices, saved), saved)
+        .map((prompt) => prompt.sourceFileName));
+      setParsed(sortForReview(result.devices, asking));
       setRejected(result.rejected);
       if (result.devices.length) setStage('review');
     } finally {
       setBusy(false);
     }
-  }, [parsed]);
+  }, [parsed, saved]);
 
   const handleChange = (id, key, value) =>
     setEdits((current) => ({ ...current, [id]: { ...(current[id] ?? {}), [key]: value } }));
@@ -150,6 +163,7 @@ export default function DevicesPage() {
     setRejected([]);
     setEdits({});
     setExcluded(new Set());
+    setAnswers({});
     setSave(IDLE_SAVE);
     setStage('drop');
   };
@@ -170,6 +184,7 @@ export default function DevicesPage() {
         siteUrl: SHAREPOINT_SITE_URL,
         token: tokenRes.accessToken,
         devices: toSave,
+        answers,
         changedBy: tokenRes.account?.username ?? '',
         onProgress: ({ phase, done, total }) =>
           setSave((current) => ({ ...current, phase, done, total })),
@@ -179,6 +194,8 @@ export default function DevicesPage() {
         results: outcome.results,
         changeCount: outcome.changeCount,
         unchanged: outcome.unchanged,
+        stintFailures: outcome.stintFailures,
+        skipped: outcome.skipped,
       }));
       reload();
     } catch (failure) {
@@ -454,11 +471,14 @@ export default function DevicesPage() {
             <p className="review-summary">
               {included} of {merged.length} selected
               {flagged > 0 && <span className="review-flagged"> · {flagged} need attention</span>}
+              {waiting > 0 && <span className="review-flagged"> · {waiting} replacement{waiting === 1 ? '' : 's'} to answer</span>}
             </p>
             <div className="review-actions">
               <Button variant="secondary" size="sm" onClick={resetImport}>Start over</Button>
-              <Button size="sm" disabled={included === 0} onClick={() => handleSave(null)}>
-                Save {included} to SharePoint
+              <Button size="sm" disabled={included === 0 || waiting > 0} onClick={() => handleSave(null)}>
+                {waiting > 0
+                  ? `Save — ${waiting} replacement${waiting === 1 ? '' : 's'} need${waiting === 1 ? 's' : ''} an answer`
+                  : `Save ${included} to SharePoint`}
               </Button>
             </div>
           </div>
@@ -471,6 +491,10 @@ export default function DevicesPage() {
               excluded={excluded}
               onChange={handleChange}
               onToggleRow={handleToggleRow}
+              prompts={prompts}
+              answers={answers}
+              notices={notices}
+              onAnswer={(key, value) => setAnswers((current) => ({ ...current, [key]: value }))}
             />
           )}
 

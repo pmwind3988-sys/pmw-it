@@ -3,10 +3,12 @@
   "configurations": [
     {
       "name": "pmw-it",
-      "runtimeExecutable": "npm",
+      "runtimeExecutable": "node",
       "runtimeArgs": [
-        "run",
-        "dev"
+        "--use-system-ca",
+        "node_modules/vite/bin/vite.js",
+        "--port",
+        "5173"
       ],
       "port": 5173
     },

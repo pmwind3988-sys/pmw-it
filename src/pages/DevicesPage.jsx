@@ -137,12 +137,11 @@ export default function DevicesPage() {
     setParams((current) => {
       const next = new URLSearchParams(current);
       next.set('view', 'register');
+      // Always default to In use + In repair, but let an explicit status key override it
+      if (key !== 'status') next.set('status', IN_FLEET);
       if (!key || key === 'view') return next;
       if (value) {
         next.set(key, value);
-        // When opening from a card, also filter to In use + In repair unless
-        // the card is setting status itself
-        if (key !== 'status') next.set('status', IN_FLEET);
       } else {
         next.delete(key);
       }

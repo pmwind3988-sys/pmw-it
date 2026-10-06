@@ -22,6 +22,8 @@ import { locationsIn } from '../features/devices/map/locations';
 import { labelOf } from '../features/devices/deviceFilters';
 import { mapHref } from '../features/devices/map/mapLinks';
 import PartTable from '../features/devices/ui/PartTable';
+import PlaceFill from '../features/devices/ui/PlaceFill';
+import { updateDevice } from '../features/devices/sharepoint/updateDevice';
 
 /** Remembered per browser: somebody who turns the colouring off is not asked
  *  to turn it off again on the next machine they open. */
@@ -51,6 +53,7 @@ export default function DeviceDetailPage() {
   const [actionError, setActionError] = useState('');
   const [actionNote, setActionNote] = useState('');
   const [pending, setPending] = useState([]);
+  const [placing, setPlacing] = useState(false);
 
   useEffect(() => {
     try {
@@ -95,6 +98,27 @@ export default function DeviceDetailPage() {
       setActionError(failure.message);
     } finally {
       setActing(false);
+      reload();
+      history.reload();
+    }
+  };
+
+  // A blank location or department filled in by hand: a correction, written as
+  // a manual edit so the next import leaves it alone.
+  const fillPlace = async (edits) => {
+    setPlacing(true);
+    setActionError('');
+    setActionNote('');
+    try {
+      const tokenRes = await getToken();
+      await updateDevice({
+        siteUrl: SHAREPOINT_SITE_URL, token: tokenRes.accessToken, existing: device, edits,
+        changedBy: tokenRes.account?.username ?? '',
+      });
+    } catch (failure) {
+      setActionError(failure.message);
+    } finally {
+      setPlacing(false);
       reload();
       history.reload();
     }
@@ -173,6 +197,8 @@ export default function DeviceDetailPage() {
                 </span>
                 <LifecycleActions device={device} owners={owners} locations={locations} departments={departments} onAction={act} busy={acting} />
               </div>
+              <PlaceFill key={device.id} device={device} locations={locations} departments={departments}
+                onSave={fillPlace} busy={placing} />
               {actionNote && !actionError && <p className="dd-note" role="status">{actionNote}</p>}
               {actionError && <ErrorBanner message={actionError} busy={acting} onRetry={pending.length ? retry : undefined} />}
             </Card>

@@ -1844,3 +1844,18 @@ a.mt:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--it-brand-line); 
 .dv-register-scope { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-bottom: 12px; }
 .dv-register-scope select { font-size: 16px; min-height: 44px; }
 .dv-linkish { background: none; border: 0; padding: 0; min-height: 44px; font: inherit; font-size: 14px; color: var(--it-brand); cursor: pointer; text-decoration: underline; }
+
+/* --- Grade colours: set from the saved standard on .dv-graded ----------- */
+.dv-graded {
+  --grade-critical: #dc2626; --grade-critical-ink: #ffffff;
+  --grade-attention: #f59e0b; --grade-attention-ink: #101828;
+  --grade-moderate: #1a88de; --grade-moderate-ink: #ffffff;
+  --grade-optimal: #12a150; --grade-optimal-ink: #ffffff;
+  --grade-unknown: #8a97a8; --grade-unknown-ink: #101828;
+}
+.g-critical { background: var(--grade-critical); color: var(--grade-critical-ink); }
+.g-attention { background: var(--grade-attention); color: var(--grade-attention-ink); }
+.g-moderate { background: var(--grade-moderate); color: var(--grade-moderate-ink); }
+.g-optimal { background: var(--grade-optimal); color: var(--grade-optimal-ink); }
+.g-unknown { background: var(--grade-unknown); color: var(--grade-unknown-ink); }
+.dv-standard-note { margin: 0 0 12px; padding: 8px 12px; border-radius: 10px; background: var(--it-accent-wash); color: var(--it-ink); font-size: 14px; }

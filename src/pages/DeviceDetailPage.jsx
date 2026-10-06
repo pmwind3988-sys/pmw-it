@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import AppShell from '../components/AppShell';
+import { gradeCssVars } from '../features/devices/standards/gradeColors';
 import { Card, EmptyState, ErrorBanner } from '../components/ui/Surfaces';
 import Button from '../components/ui/Button';
 import { ArrowLeft, RefreshCw } from '../components/ui/Icons';
@@ -50,7 +51,7 @@ const readTonePreference = () => {
 export default function DeviceDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { devices, loading, error, reload } = useDevices();
+  const { devices, loading, error, reload, standards } = useDevices();
   const [showEmpty, setShowEmpty] = useState(false);
   const [showRaw, setShowRaw] = useState(false);
   const [showTones, setShowTones] = useState(readTonePreference);
@@ -140,7 +141,12 @@ export default function DeviceDetailPage() {
         </>
       )}
     >
-      {error && <ErrorBanner message={error} onRetry={reload} />}
+      <div className="dv-graded" style={gradeCssVars(standards.standard.colors)}>
+        {(standards.note || standards.error) && (
+          <p className="dv-standard-note" role="status">{standards.note || standards.error}</p>
+        )}
+
+        {error && <ErrorBanner message={error} onRetry={reload} />}
 
       {!device ? (
         <Card>
@@ -317,6 +323,7 @@ export default function DeviceDetailPage() {
           )}
         </>
       )}
+      </div>
     </AppShell>
   );
 }

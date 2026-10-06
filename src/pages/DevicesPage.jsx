@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import AppShell from '../components/AppShell';
+import { gradeCssVars } from '../features/devices/standards/gradeColors';
 import StatCard from '../components/ui/StatCard';
 import { Card, EmptyState, ErrorBanner } from '../components/ui/Surfaces';
 import Button from '../components/ui/Button';
@@ -52,7 +53,7 @@ const FILTER_KEYS = [
 export default function DevicesPage() {
   const getToken = useSharePointToken();
   const [params, setParams] = useSearchParams();
-  const { devices: saved, loading, error, reload } = useDevices();
+  const { devices: saved, loading, error, reload, standards } = useDevices();
 
   const view = params.get('view') ?? 'map';
 
@@ -413,7 +414,12 @@ export default function DevicesPage() {
         </Button>
       )}
     >
-      {tabs}
+      <div className="dv-graded" style={gradeCssVars(standards.standard.colors)}>
+        {(standards.note || standards.error) && (
+          <p className="dv-standard-note" role="status">{standards.note || standards.error}</p>
+        )}
+
+        {tabs}
 
       {error && <ErrorBanner message={error} onRetry={reload} />}
 
@@ -622,6 +628,7 @@ export default function DevicesPage() {
           <SaveProgress state={save} onRetry={handleSave} onDone={resetImport} />
         </Card>
       )}
+      </div>
     </AppShell>
   );
 }

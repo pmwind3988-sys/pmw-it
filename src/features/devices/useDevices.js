@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useIsAuthenticated } from '@azure/msal-react';
 import { useSharePointToken } from '../../hooks/useRequests';
 import { readAllDevices } from './sharepoint/readDevices';
+import { useStandards } from './useStandards';
+import { regrade } from './derive/regrade';
 
 const SHAREPOINT_SITE_URL =
   import.meta.env.VITE_SHAREPOINT_SITE_URL || 'https://pmwgroupcom.sharepoint.com/sites/IThelpdesk';
@@ -43,5 +45,10 @@ export function useDevices() {
     return () => { cancelled = true; };
   }, [isAuthenticated, getToken, nonce]);
 
-  return { devices, loading, error, reload };
+  const standards = useStandards();
+  // Graded on the way out with the standard in force: saving a standard
+  // regrades every machine on the next render, with no re-scan.
+  const graded = useMemo(() => regrade(devices, standards.standard), [devices, standards.standard]);
+
+  return { devices: graded, loading, error, reload, standards };
 }

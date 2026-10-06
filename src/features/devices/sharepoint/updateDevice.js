@@ -5,7 +5,7 @@ import { DEVICE_LIST_NAME, CHANGE_LIST_NAME } from './deviceSchema.js';
 import { runPool, withRetry } from '../../sharepoint/writePool.js';
 import { formatMYT } from '../../../utils/malaysiaTime.js';
 import { cleanLocation } from '../map/locations.js';
-import { ensureProvisioned } from './ensureProvisioned.js';
+import { provisionDeviceColumns } from './provisionLists.js';
 
 /**
  * The only fields the register lets somebody retype. They are exactly the ones
@@ -103,11 +103,8 @@ export async function updateDevice({
   const { changes, manualFields } = planEdit(existing, edits);
   if (!changes.length) return { changes: [] };
 
-  // Location (and the other columns) may predate the list: a machine page can
-  // be the first thing anybody writes through.
-  const digest = (await ensureProvisioned(siteUrl, token)) ?? await getFormDigest(siteUrl, token);
-
-  const response = await withRetry(() =>
+  let digest = await getFormDigest(siteUrl, token);
+  const merge = () => withRetry(() =>
     spFetch(siteUrl, `${listPath(DEVICE_LIST_NAME)}/items(${existing.id})`, {
       token,
       digest,
@@ -116,6 +113,21 @@ export async function updateDevice({
       body: itemBody(edits, manualFields),
       headers: { 'X-HTTP-Method': 'MERGE', 'IF-MATCH': '*' },
     }));
+
+  let response = await merge();
+
+  // A list made before Location (or ManualFields) existed refuses the write by
+  // naming the column. Only then are the columns added and the write tried
+  // again -- checking first would cost every save the round trips that almost
+  // never find anything.
+  if (response.status === 400) {
+    const reason = await response.text();
+    if (!/does not exist on type/i.test(reason)) {
+      throw new Error(`Could not save the change (400): ${reason}`);
+    }
+    digest = await provisionDeviceColumns(siteUrl, token);
+    response = await merge();
+  }
 
   if (!response.ok) {
     throw new Error(`Could not save the change (${response.status}): ${await response.text()}`);

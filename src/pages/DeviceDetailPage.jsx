@@ -115,8 +115,10 @@ export default function DeviceDetailPage() {
         siteUrl: SHAREPOINT_SITE_URL, token: tokenRes.accessToken, existing: device, edits,
         changedBy: tokenRes.account?.username ?? '',
       });
+      return true;
     } catch (failure) {
       setActionError(failure.message);
+      return false;
     } finally {
       setPlacing(false);
       reload();

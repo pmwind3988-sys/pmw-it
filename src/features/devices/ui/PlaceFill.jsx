@@ -10,17 +10,23 @@ import Button from '../../../components/ui/Button';
 export default function PlaceFill({ device, locations, departments, onSave, busy }) {
   const id = useId();
   const [values, setValues] = useState({ location: '', department: '' });
-  const missing = ['location', 'department'].filter((key) => !String(device[key] ?? '').trim());
-  if (!missing.length) return null;
+  // Said the moment the write lands: the register re-reads in the background,
+  // and the boxes sitting there until it does looked like a save still running.
+  const [saved, setSaved] = useState([]);
+  const blank = ['location', 'department'].filter((key) => !String(device[key] ?? '').trim());
+  const missing = blank.filter((key) => !saved.includes(key));
+  if (!blank.length) return null;
+  if (!missing.length) return <p className="dd-place dd-place-say" role="status">Saved.</p>;
 
   const set = (key) => (event) => setValues((current) => ({ ...current, [key]: event.target.value }));
   const edits = Object.fromEntries(missing
     .map((key) => [key, values[key].trim()])
     .filter(([, value]) => value));
 
-  const submit = (event) => {
+  const submit = async (event) => {
     event.preventDefault();
-    if (Object.keys(edits).length) onSave(edits);
+    const keys = Object.keys(edits);
+    if (keys.length && await onSave(edits)) setSaved((current) => [...current, ...keys]);
   };
 
   return (

@@ -44,3 +44,18 @@ export function provisionLists(siteUrl, token, { onProgress } = {}) {
     onProgress,
   });
 }
+
+/**
+ * Only the columns of the device list and its change log -- no owner-history
+ * list, no views. What an edit from a machine page needs when SharePoint has
+ * just said a column is missing: one request per list when everything is
+ * already there, against the dozens a full run spends checking views.
+ */
+export function provisionDeviceColumns(siteUrl, token) {
+  return provisionSchema(siteUrl, token, {
+    lists: [
+      { title: DEVICE_LIST_NAME, description: 'One row per machine, from the scan reports', columns: DEVICE_COLUMNS },
+      { title: CHANGE_LIST_NAME, description: 'Field-level change history for the device list', columns: CHANGE_COLUMNS },
+    ],
+  });
+}

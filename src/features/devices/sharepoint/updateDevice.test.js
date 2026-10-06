@@ -4,8 +4,9 @@ import {
 import {
   planEdit, updateDevice, deleteDevice, deleteDevices, EDITABLE_FIELDS,
 } from './updateDevice.js';
+import { provisionDeviceColumns } from './provisionLists.js';
 
-vi.mock('./provisionLists.js', () => ({ provisionLists: vi.fn(async () => 'D') }));
+vi.mock('./provisionLists.js', () => ({ provisionDeviceColumns: vi.fn(async () => 'D') }));
 
 const SITE = 'https://contoso.sharepoint.com/sites/it';
 
@@ -108,7 +109,39 @@ function fakeSharePoint({ failOn } = {}) {
 const writes = (calls) => calls.filter((c) => c.method === 'POST' && !c.url.endsWith('/contextinfo'));
 
 describe('updateDevice', () => {
-  afterEach(() => { vi.unstubAllGlobals(); });
+  afterEach(() => { vi.unstubAllGlobals(); provisionDeviceColumns.mockClear(); });
+
+  it('writes straight away, without checking the columns first', async () => {
+    const sp = fakeSharePoint();
+    vi.stubGlobal('fetch', sp.fetch);
+    await updateDevice({ siteUrl: SITE, token: 't', existing: row(), edits: { location: 'f2' } });
+    expect(provisionDeviceColumns).not.toHaveBeenCalled();
+  });
+
+  it('adds the columns and writes again when SharePoint says one is missing', async () => {
+    const sp = fakeSharePoint();
+    let refused = false;
+    vi.stubGlobal('fetch', async (url, init) => {
+      if (!refused && url.includes('items(7)')) {
+        refused = true;
+        sp.calls.push({ url });
+        return { ok: false, status: 400, text: async () => "The property 'Location' does not exist on type 'SP.Data.X'", headers: { get: () => null } };
+      }
+      return sp.fetch(url, init);
+    });
+    await updateDevice({ siteUrl: SITE, token: 't', existing: row(), edits: { location: 'f2' } });
+    expect(provisionDeviceColumns).toHaveBeenCalledTimes(1);
+    const merges = sp.calls.filter((c) => c.url.includes('items(7)'));
+    expect(merges).toHaveLength(2);
+    expect(merges[1].body.Location).toBe('F2');
+  });
+
+  it('does not add columns for any other refusal', async () => {
+    vi.stubGlobal('fetch', fakeSharePoint({ failOn: 'items(7)' }).fetch);
+    await expect(updateDevice({ siteUrl: SITE, token: 't', existing: row(), edits: { location: 'F2' } }))
+      .rejects.toThrow('(400)');
+    expect(provisionDeviceColumns).not.toHaveBeenCalled();
+  });
 
   it('sends only the edited columns plus the manual list', async () => {
     const sp = fakeSharePoint();

@@ -20,14 +20,20 @@ const TEXT_COLUMN = {
 // and the map -> machine -> action path can be the very first thing anyone does.
 // One run per page load; a failed run is forgotten so the next press retries.
 let provisioning = null;
-function ensureProvisioned(siteUrl, token) {
-  if (!provisioning) {
-    provisioning = provisionLists(siteUrl, token).catch((failure) => {
-      provisioning = null;
-      throw failure;
-    });
+// Resolves to the digest provisioning obtained only for the call that ran it;
+// later calls get null and fetch their own, because a digest expires (~30 min)
+// and a page left open must not keep sending a dead one.
+async function ensureProvisioned(siteUrl, token) {
+  if (provisioning) {
+    await provisioning;
+    return null;
   }
-  return provisioning;
+  const run = provisionLists(siteUrl, token);
+  provisioning = run.catch((failure) => {
+    provisioning = null;
+    throw failure;
+  });
+  return (await provisioning, await run);
 }
 
 /** A PARTIAL write: only the columns the action changed. Never toListItem. */

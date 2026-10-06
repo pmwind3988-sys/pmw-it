@@ -145,8 +145,11 @@ describe('performLifecycle', () => {
     const sp = fakeSharePoint({ device, stints: legacy });
     vi.stubGlobal('fetch', sp.fetch);
     await fresh(move);
+    const digestCallsAfterFirst = sp.calls.filter((c) => c.url.endsWith('/_api/contextinfo')).length;
     await fresh(move);
     expect(provisionLists).toHaveBeenCalledTimes(1);
+    // The second action fetches its own digest rather than reusing a cached one.
+    expect(sp.calls.filter((c) => c.url.endsWith('/_api/contextinfo')).length).toBe(digestCallsAfterFirst + 1);
   });
 
   it('forgets a failed provisioning so the next press retries', async () => {

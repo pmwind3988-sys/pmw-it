@@ -356,8 +356,8 @@ generic `^Word:` split reads `Total Slots: 2 | Used Slots: 2` and
 belong to. An unknown label owns the lines beneath it, so a field the scan script
 adds later surfaces in review rather than contaminating its predecessor.
 
-**A hand-edited device field outranks the scan file.** The register lets the
-four fields be retyped (owner, department, device type, location) and records
+**A hand-edited device field outranks the scan file.** The register lets four
+fields be retyped: owner, department, device type and location. It records
 which ones in `ManualFields`. `applyManualOverrides` in `syncDevices.js` then
 holds those back on re-import — from the diff AND from the body, or updating
 anything else would overwrite them as a side effect. Clearing a field is how

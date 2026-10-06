@@ -5,9 +5,9 @@ import MapGrid from './MapGrid';
 import { locationTiles } from '../map/zones';
 import { ringLayout } from '../map/mapLayout';
 import { mapHref } from '../map/mapLinks';
-import { personaFor } from '../derive/persona';
+import { profileKeyFor } from '../standards/defaultStandard.js';
 
-export default function LocationView({ devices, location }) {
+export default function LocationView({ devices, location, standard }) {
   const navigate = useNavigate();
   const tiles = useMemo(() => locationTiles(devices, location), [devices, location]);
   const ringed = [...tiles.departments, ...(tiles.unassigned ? [tiles.unassigned] : [])];
@@ -27,7 +27,7 @@ export default function LocationView({ devices, location }) {
       cell: layout.cells[index],
       render: (ref, onKeyDown) => (
         <MapTile key={tile.name} to={mapHref({ location, department: tile.name })}
-          eyebrow={personaFor(tile.name === 'Unassigned' ? null : tile.name).label ?? 'Department'}
+          eyebrow={tile.name === 'Unassigned' ? 'Department' : standard.profiles[profileKeyFor(standard, tile.name)].label}
           title={tile.name} summary={tile} cell={layout.cells[index]} tileRef={ref} onKeyDown={onKeyDown} />
       ),
     })),

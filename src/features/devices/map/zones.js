@@ -1,6 +1,7 @@
 import { inFleet, statusOf, SPARE, RETIRED } from '../lifecycle/status.js';
 import { labelOf, UNASSIGNED } from '../deviceFilters.js';
 import { cleanLocation } from './locations.js';
+import { GRADES, UNKNOWN, PARTS } from '../standards/defaultStandard.js';
 
 /**
  * Every number a tile on the map shows, at every level -- location,
@@ -9,16 +10,23 @@ import { cleanLocation } from './locations.js';
  */
 export const PLACES = { STASH: 'stash', GRAVEYARD: 'graveyard', NO_LOCATION: 'nolocation' };
 
-const LEVELS = ['Critical', 'Needs Attention', 'Moderate', 'Optimal', 'Unknown'];
+const ALL_GRADES = [...GRADES, UNKNOWN];
 
 export function summarise(name, devices) {
-  const fit = Object.fromEntries(LEVELS.map((level) => [level, 0]));
+  const parts = Object.fromEntries(PARTS.map(({ key }) => [key, Object.fromEntries(ALL_GRADES.map((g) => [g, 0]))]));
   let laptops = 0;
   let desktops = 0;
   let other = 0;
+  let criticalMachines = 0;
+  let attentionMachines = 0;
 
   for (const device of devices) {
-    fit[LEVELS.includes(device.fitStatus) ? device.fitStatus : 'Unknown'] += 1;
+    for (const { key } of PARTS) {
+      const grade = device.parts?.[key]?.grade;
+      parts[key][ALL_GRADES.includes(grade) ? grade : UNKNOWN] += 1;
+    }
+    if (device.criticalParts?.length) criticalMachines += 1;
+    else if (device.attentionParts?.length) attentionMachines += 1;
     if (device.deviceType === 'Laptop') laptops += 1;
     else if (device.deviceType === 'Desktop') desktops += 1;
     else other += 1;
@@ -31,12 +39,16 @@ export function summarise(name, devices) {
     laptops,
     desktops,
     other,
-    fit,
-    critical: fit.Critical,
-    attention: fit['Needs Attention'],
-    health: count
-      ? LEVELS.map((level) => ({ level, share: fit[level] / count })).filter((part) => part.share > 0)
-      : [],
+    parts,
+    criticalMachines,
+    attentionMachines,
+    partBars: PARTS.map(({ key, label }) => ({
+      key,
+      label,
+      segs: count
+        ? ALL_GRADES.map((grade) => ({ grade, share: parts[key][grade] / count })).filter((seg) => seg.share > 0)
+        : [],
+    })),
   };
 }
 
@@ -84,8 +96,6 @@ export function locationTiles(devices, code) {
   };
 }
 
-const FIT_RANK = { Critical: 0, 'Needs Attention': 1, Moderate: 2, Optimal: 3 };
-
 export function machinesIn(devices, { location, department, place } = {}) {
   let rows;
   if (place === PLACES.STASH) rows = devices.filter((d) => statusOf(d) === SPARE);
@@ -98,7 +108,8 @@ export function machinesIn(devices, { location, department, place } = {}) {
   }
 
   return [...rows].sort((a, b) =>
-    (FIT_RANK[a.fitStatus] ?? 4) - (FIT_RANK[b.fitStatus] ?? 4)
+    (b.criticalParts?.length ?? 0) - (a.criticalParts?.length ?? 0)
+    || (b.attentionParts?.length ?? 0) - (a.attentionParts?.length ?? 0)
     || String(a.computerName ?? '').localeCompare(String(b.computerName ?? '')));
 }
 

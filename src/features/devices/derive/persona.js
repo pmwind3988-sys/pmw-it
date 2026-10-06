@@ -68,37 +68,3 @@ const UNKNOWN = {
 };
 
 export const PERSONAS = { HEAVY, DESK, MOBILE, UNKNOWN };
-
-/**
- * Department to profile. Keys are the department names the filename parser
- * already recognises, uppercased; anything else falls through to the desk
- * baseline rather than inventing a requirement nobody asked for.
- */
-const BY_DEPARTMENT = {
-  ENGINEERING: HEAVY,
-  PRODUCTION: HEAVY,
-  QAQC: HEAVY,
-  QC: HEAVY,
-  IT: HEAVY,
-  MARKETING: HEAVY,
-
-  SALES: MOBILE,
-  ADMIN: MOBILE,
-
-  LOGISTICS: DESK,
-  SHIPPING: DESK,
-  PURCHASING: DESK,
-  STORE: DESK,
-  STOCKYARDF1: DESK,
-  STOCKYARD: DESK,
-  GUARDHOUSE: DESK,
-  'PML GUARDHOUSE': DESK,
-  FINANCE: DESK,
-  ACCOUNT: DESK,
-  HR: DESK,
-};
-
-export function personaFor(department) {
-  if (!department) return UNKNOWN;
-  return BY_DEPARTMENT[String(department).trim().toUpperCase()] ?? DESK;
-}

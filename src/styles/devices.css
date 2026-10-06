@@ -1717,22 +1717,15 @@ a.mt:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--it-brand-line); 
 .mt-title { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .mt-name { font-size: 22px; font-weight: 800; letter-spacing: -0.01em; }
 .mt-count { font-size: 13px; color: var(--it-ink-soft); }
-.mt-health { display: flex; height: 8px; border-radius: 999px; overflow: hidden; background: var(--it-line); }
-.mt-seg { display: block; height: 100%; }
-.mt-seg-crit { background: var(--it-danger); }
-.mt-seg-attn { background: var(--it-accent); }
-.mt-seg-mod { background: var(--it-brand-mid); }
-.mt-seg-ok { background: var(--it-good); }
-.mt-seg-unk { background: var(--it-ink-soft); }
 .mt-split { display: flex; flex-wrap: wrap; gap: 14px; font-size: 14px; color: var(--it-ink-soft); }
 .mt-split > span { display: inline-flex; align-items: center; gap: 6px; }
 .mt-split strong { color: inherit; }
 .mt:not(.mt-hub) .mt-split strong { color: var(--it-ink); }
 .mt-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; }
 .mt-chip { font-size: 12px; padding: 3px 8px; border-radius: 6px; background: var(--it-brand-wash); color: var(--it-ink); }
-.mt-badge { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
-.mt-badge-crit { background: var(--it-danger-wash); color: var(--it-danger); }
-.mt-badge-ok { background: var(--it-good-wash); color: var(--it-good); }
+.mt-badge { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--grade-attention-ink, var(--it-accent-wash)); color: var(--grade-attention, var(--it-accent)); }
+.mt-badge.g-critical { background: var(--grade-critical-ink, var(--it-danger-wash)); color: var(--grade-critical, var(--it-danger)); }
+.mt-badge.g-optimal { background: var(--grade-optimal-ink, var(--it-good-wash)); color: var(--grade-optimal, var(--it-good)); }
 .mt-glyph { position: absolute; top: 14px; right: 16px; }
 
 .dv-level {
@@ -1859,3 +1852,12 @@ a.mt:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--it-brand-line); 
 .g-optimal { background: var(--grade-optimal); color: var(--grade-optimal-ink); }
 .g-unknown { background: var(--grade-unknown); color: var(--grade-unknown-ink); }
 .dv-standard-note { margin: 0 0 12px; padding: 8px 12px; border-radius: 10px; background: var(--it-accent-wash); color: var(--it-ink); font-size: 14px; }
+
+/* --- Part bars on a map tile ------------------------------------------- */
+.pb { display: flex; flex-direction: column; gap: 4px; }
+.pb-row { display: grid; grid-template-columns: 64px 1fr; align-items: center; gap: 8px; font-size: 12px; }
+.pb-label { color: var(--it-ink-soft); font-weight: 600; }
+.mt-hub .pb-label { color: var(--it-on-brand-dim); }
+.pb-track { display: flex; height: 6px; border-radius: 999px; overflow: hidden; background: var(--it-line); }
+.pb-seg { display: block; height: 100%; }
+.dv-level .pb-label { color: var(--it-on-brand-dim); }

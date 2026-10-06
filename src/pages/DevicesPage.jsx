@@ -423,7 +423,7 @@ export default function DevicesPage() {
 
       {error && <ErrorBanner message={error} onRetry={reload} />}
 
-      {view === 'map' && <DeviceMap devices={saved} loading={loading} params={params} />}
+      {view === 'map' && <DeviceMap devices={saved} loading={loading} params={params} standard={standards.standard} />}
 
       {view === 'dashboard' && (
         <>

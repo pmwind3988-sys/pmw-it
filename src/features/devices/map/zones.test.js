@@ -2,11 +2,19 @@ import { describe, it, expect } from 'vitest';
 import {
   summarise, worldTiles, locationTiles, machinesIn, searchMachines, PLACES,
 } from './zones.js';
+import { partGrades } from '../derive/partGrades.js';
+import { defaultStandard } from '../standards/defaultStandard.js';
 
-const m = (over) => ({
-  id: Math.random(), computerName: 'PC', owner: 'A', location: 'F1', department: 'ENGINEERING',
-  deviceType: 'Laptop', fitStatus: 'Optimal', status: null, ...over,
-});
+const S = defaultStandard();
+const m = (over) => {
+  const base = {
+    id: Math.random(), computerName: 'PC', owner: 'A', location: 'F1', department: 'ENGINEERING',
+    deviceType: 'Laptop', status: null, scanComplete: true,
+    cpuGenerationRank: 12, installedRamGB: 32, storageTotalGB: 512, storageType: 'SSD only',
+    dedicatedGpu: true, osSupported: true, windowsMajor: 11, ...over,
+  };
+  return { ...base, ...partGrades(base, S) };
+};
 
 describe('summarise', () => {
   it('counts laptops, desktops and anything else apart', () => {
@@ -14,12 +22,13 @@ describe('summarise', () => {
     expect(s).toMatchObject({ count: 3, laptops: 1, desktops: 1, other: 1 });
   });
 
-  it('counts critical and needs-attention machines and their share', () => {
-    const s = summarise('F1', [m({ fitStatus: 'Critical' }), m({ fitStatus: 'Needs Attention' }), m(), m()]);
-    expect(s.critical).toBe(1);
-    expect(s.attention).toBe(1);
-    expect(s.health).toEqual([
-      { level: 'Critical', share: 0.25 }, { level: 'Needs Attention', share: 0.25 }, { level: 'Optimal', share: 0.5 },
+  it('counts each part’s grades on its own, and the machines with a critical part', () => {
+    const s = summarise('F1', [m({ installedRamGB: 4 }), m({ storageType: 'HDD only', installedRamGB: 4 }), m()]);
+    expect(s.parts.ram.Critical).toBe(2);
+    expect(s.parts.storage.Critical).toBe(1);
+    expect(s.criticalMachines).toBe(2);
+    expect(s.partBars.find((bar) => bar.key === 'ram').segs).toEqual([
+      { grade: 'Critical', share: 2 / 3 }, { grade: 'Optimal', share: 1 / 3 },
     ]);
   });
 });
@@ -70,7 +79,7 @@ describe('locationTiles', () => {
 
 describe('machinesIn', () => {
   it('lists a department worst first', () => {
-    const rows = [m({ computerName: 'B' }), m({ computerName: 'A', fitStatus: 'Critical' })];
+    const rows = [m({ computerName: 'B' }), m({ computerName: 'A', installedRamGB: 4 })];
     expect(machinesIn(rows, { location: 'F1', department: 'ENGINEERING' }).map((d) => d.computerName)).toEqual(['A', 'B']);
   });
 

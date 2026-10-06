@@ -1746,14 +1746,10 @@ a.mt:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--it-brand-line); 
 
 .mc {
   display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border-radius: 14px; text-decoration: none;
-  color: var(--it-ink); background: var(--it-panel); border: 1px solid var(--it-line); border-top-width: 4px;
+  color: var(--it-ink); background: var(--it-panel); border: 1px solid var(--it-line);
   box-shadow: var(--it-card-shadow);
 }
 .mc:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--it-brand-line); }
-.mc-crit { border-top-color: var(--it-danger); }
-.mc-attn { border-top-color: var(--it-accent); }
-.mc-mod { border-top-color: var(--it-brand-mid); }
-.mc-ok { border-top-color: var(--it-good); }
 .mc-head { display: flex; justify-content: space-between; gap: 8px; }
 .mc-who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .mc-name { font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace; font-size: 13px; color: var(--it-ink-soft); }
@@ -1762,16 +1758,7 @@ a.mt:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--it-brand-line); 
 .mc-bar { display: grid; grid-template-columns: 36px 1fr 84px; gap: 8px; align-items: center; font-size: 12px; }
 .mc-bar-key { font-weight: 700; color: var(--it-ink-soft); }
 .mc-bar-track { display: block; height: 7px; border-radius: 999px; background: var(--it-line); overflow: hidden; }
-.mc-bar-fill { display: block; height: 100%; border-radius: 999px; background: currentColor; }
-.mc-crit .mc-bar-fill { color: var(--it-danger); }
-.mc-attn .mc-bar-fill { color: var(--it-accent); }
-.mc-mod .mc-bar-fill { color: var(--it-brand-mid); }
-.mc-ok .mc-bar-fill { color: var(--it-good); }
 .mc-bar-value { text-align: right; }
-.mc-verdict { align-self: flex-start; font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: var(--it-canvas); }
-.mc-verdict-crit { background: var(--it-danger-wash); color: var(--it-danger); }
-.mc-verdict-attn { background: var(--it-accent-wash); color: var(--it-ink); }
-.mc-verdict-ok { background: var(--it-good-wash); color: var(--it-good); }
 
 @media (prefers-reduced-motion: reduce) {
   .mt, a.mt:hover { transition: none; transform: none; }
@@ -1859,3 +1846,13 @@ a.mt:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--it-brand-line); 
 .pb-track { display: flex; height: 6px; border-radius: 999px; overflow: hidden; background: var(--it-line); }
 .pb-seg { display: block; height: 100%; }
 .dv-level .pb-label { color: var(--it-on-brand-dim); }
+
+/* --- Part chips and the part table ------------------------------------- */
+.pc { display: flex; flex-wrap: wrap; gap: 4px; }
+.pc-chip { display: inline-flex; align-items: center; min-height: 24px; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.mc .mc-bar-fill { background: var(--grade-unknown); }
+.mc .mc-bar-fill[class*="g-"] { color: transparent; }
+.pt-scroll { overflow-x: auto; }
+.pt { width: 100%; border-collapse: collapse; font-size: 14px; }
+.pt th, .pt td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--it-line); vertical-align: top; }
+.pt thead th { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--it-ink-soft); }

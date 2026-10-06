@@ -72,6 +72,12 @@ export function noticeFor(match) {
   if (match.note) return match.note;
   if (!match.existing) return null;
   const status = statusOf(match.existing);
+  if (status !== SPARE && status !== RETIRED) return null;
+  const movedOn = match.existing.statusChangedOn;
+  const scannedOn = match.device.scannedOn;
+  if (movedOn !== null && movedOn !== undefined && scannedOn !== null && scannedOn !== undefined && scannedOn <= movedOn) {
+    return `Older than its move to ${status === SPARE ? 'IT Stash' : 'the Graveyard'}: specs updated, status kept.`;
+  }
   if (status === SPARE) return 'Brought back from IT Stash: it goes back into use with whoever the scan names.';
   if (status === RETIRED) return 'Brought back from the Graveyard: it goes back into use with whoever the scan names.';
   return null;

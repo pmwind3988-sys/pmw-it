@@ -15,6 +15,9 @@ const ownerKey = (owner) => String(owner ?? '').trim().replace(/\s+/g, ' ').toLo
 
 export function replacementsFor(matches, existing) {
   const prompts = [];
+  // A machine whose own report is in this batch is being re-scanned, not
+  // replaced: stashing it as well would race its update.
+  const rescanned = new Set(matches.map((match) => match.existing?.id).filter((id) => id !== null && id !== undefined));
 
   for (const match of matches) {
     if (match.kind === MATCH.DUPLICATE_SERIAL) continue;
@@ -24,7 +27,7 @@ export function replacementsFor(matches, existing) {
 
     const selfId = match.existing?.id ?? null;
     for (const row of existing) {
-      if (row.id === selfId || !inFleet(row) || ownerKey(row.owner) !== owner) continue;
+      if (row.id === selfId || rescanned.has(row.id) || !inFleet(row) || ownerKey(row.owner) !== owner) continue;
       prompts.push({
         key: `${match.device.sourceFileName}|${row.id}`,
         sourceFileName: match.device.sourceFileName,

@@ -219,6 +219,35 @@ describe('planImport — lifecycle', () => {
     expect(plan.retirements).toHaveLength(0);
   });
 
+  it('keeps the status and owner of a stashed machine when an older report is dropped again', () => {
+    const movedOn = Date.UTC(2026, 9, 1);
+    const stashed = row({ status: 'Spare', owner: '', department: null, statusChangedOn: movedOn });
+    const plan = planImport([scan({ scannedOn: movedOn - 1000, installedRamGB: 16 })], [stashed], { now: NOW });
+    expect(plan.updates).toHaveLength(1);
+    expect(plan.updates[0].body.Status).toBe('Spare');
+    expect(plan.updates[0].body.Owner).toBe('');
+    expect(plan.stintOps).toHaveLength(0);
+  });
+
+  it('still brings a stashed machine back when the report is newer than the move', () => {
+    const movedOn = Date.UTC(2026, 9, 1);
+    const stashed = row({ status: 'Spare', owner: '', statusChangedOn: movedOn });
+    const plan = planImport([scan({ scannedOn: movedOn + 1000 })], [stashed], { now: NOW });
+    expect(plan.updates[0].body.Status).toBe('In use');
+    expect(plan.stintOps).toHaveLength(1);
+  });
+
+  it('does not stash a machine that is re-scanned in the same batch', () => {
+    const old = row({ id: 8, computerName: 'ALI-OLD', serialNumber: 'S0' });
+    const incoming = [
+      scan({ computerName: 'ALI-OLD', serialNumber: 'S0', owner: 'Bob', sourceFileName: 'old.txt' }),
+      scan({ computerName: 'ALI-NEW', serialNumber: 'S2', owner: 'Ali', sourceFileName: 'new.txt' }),
+    ];
+    const plan = planImport(incoming, [old], { now: NOW, answers: { 'new.txt|8': 'stash' } });
+    expect(plan.prompts).toHaveLength(0);
+    expect(plan.retirements).toHaveLength(0);
+  });
+
   it('skips the second of two reports with one serial', () => {
     const plan = planImport([scan(), scan({ computerName: 'PC2', sourceFileName: 'x.txt' })], []);
     expect(plan.inserts).toHaveLength(1);

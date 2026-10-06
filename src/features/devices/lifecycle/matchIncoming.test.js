@@ -54,6 +54,13 @@ describe('noticeFor', () => {
     expect(noticeFor(m)).toMatch(/Brought back from the Graveyard/);
   });
 
+  it('does not claim to bring a machine back when the report is older than its move', () => {
+    const [m] = matchIncoming([scan({ scannedOn: 1000 })], [row({ status: 'Spare', statusChangedOn: 5000 })]);
+    expect(noticeFor(m)).toMatch(/Older than its move to IT Stash: specs updated, status kept/);
+    const [r] = matchIncoming([scan({ scannedOn: 1000 })], [row({ status: 'Retired', statusChangedOn: 5000 })]);
+    expect(noticeFor(r)).toMatch(/Older than its move to the Graveyard/);
+  });
+
   it('says nothing for an ordinary re-scan', () => {
     expect(noticeFor(matchIncoming([scan()], [row()])[0])).toBeNull();
   });

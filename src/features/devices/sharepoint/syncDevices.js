@@ -67,13 +67,16 @@ export function planImport(incoming, existing, {
     }
 
     if (!row) {
+      const insertKey = `insert:${inserts.length}`;
       inserts.push({
+        key: insertKey,
         computerName: device.computerName,
         body: toListItem({ ...device, status: IN_USE, statusChangedOn: on }),
       });
       if (device.owner) {
         stintOps.push({
           computerName: device.computerName,
+          workKey: insertKey,
           deviceId: null,
           close: null,
           open: {
@@ -94,12 +97,25 @@ export function planImport(incoming, existing, {
     };
     const resolved = applyManualOverrides(carried, row);
     const wasActive = inFleet(row);
-    resolved.status = wasActive ? (row.status ?? null) : IN_USE;
-    if (!wasActive) resolved.statusChangedOn = on;
+    // A report scanned before the machine went to the stash or the graveyard
+    // describes it as it was; it updates the specs but does not bring it back.
+    const older = !wasActive && row.statusChangedOn !== null && row.statusChangedOn !== undefined
+      && on <= row.statusChangedOn;
+    if (older) {
+      resolved.owner = row.owner ?? '';
+      resolved.department = row.department ?? null;
+      if ('ownerSource' in row) resolved.ownerSource = row.ownerSource;
+      resolved.status = row.status ?? null;
+      resolved.statusChangedOn = row.statusChangedOn;
+    } else {
+      resolved.status = wasActive ? (row.status ?? null) : IN_USE;
+      if (!wasActive) resolved.statusChangedOn = on;
+    }
 
     const changes = diffDevice(row, resolved);
+    const updateKey = changes.length ? `update:${row.id}` : null;
     if (changes.length) {
-      updates.push({ computerName: device.computerName, id: row.id, body: toListItem(resolved) });
+      updates.push({ key: updateKey, computerName: device.computerName, id: row.id, body: toListItem(resolved) });
       for (const change of changes) changeRows.push({ computerName: device.computerName, deviceId: row.id, ...change });
     }
 
@@ -113,12 +129,13 @@ export function planImport(incoming, existing, {
       const stint = currentStint(row, stints);
       stintOps.push({
         computerName: resolved.computerName,
+        workKey: updateKey,
         deviceId: row.id,
         close: stint ? { stint, endedOn: on, endReason: 'Reassigned', note: null } : null,
         open: startFor(),
       });
-    } else if (!wasActive && resolved.owner) {
-      stintOps.push({ computerName: resolved.computerName, deviceId: row.id, close: null, open: startFor() });
+    } else if (!wasActive && !older && resolved.owner) {
+      stintOps.push({ computerName: resolved.computerName, workKey: updateKey, deviceId: row.id, close: null, open: startFor() });
     }
   }
 
@@ -140,8 +157,10 @@ export function planImport(incoming, existing, {
     });
     if (plan.refusal) continue;
 
-    retirements.push({ id: old.id, computerName: old.computerName, body: lifecycleItem(plan.fields), changes: plan.changes });
-    stintOps.push({ computerName: old.computerName, deviceId: old.id, close: plan.close, open: null });
+    retirements.push({ key: `retire:${old.id}`, id: old.id, computerName: old.computerName, body: lifecycleItem(plan.fields), changes: plan.changes });
+    stintOps.push({
+      computerName: old.computerName, workKey: `retire:${old.id}`, deviceId: old.id, close: plan.close, open: null,
+    });
   }
 
   return { matches, prompts, inserts, updates, changeRows, stintOps, retirements, skipped };
@@ -202,19 +221,23 @@ export async function syncDevices({
 
   // A new machine's first stint can only point at it once SharePoint has
   // given the row an id; a machine whose row failed gets no history at all.
+  // Keyed by the work entry, never by computer name: a replaced machine and
+  // its successor can share a name, and one's success must not vouch for the
+  // other's write.
   const idOf = new Map();
   const landed = new Set();
   results.forEach((result, index) => {
     if (result.error) return;
-    landed.add(work[index].computerName);
-    if (work[index].action === 'insert') idOf.set(work[index].computerName, result.value?.id ?? null);
+    landed.add(work[index].key);
+    if (work[index].action === 'insert') idOf.set(work[index].key, result.value?.id ?? null);
   });
 
   let stintsWritten = 0;
   let stintFailures = 0;
   for (const op of plan.stintOps) {
-    if (!landed.has(op.computerName)) continue;
-    const deviceId = op.deviceId ?? idOf.get(op.computerName);
+    // A null workKey means the row needed no write (nothing about it changed).
+    if (op.workKey && !landed.has(op.workKey)) continue;
+    const deviceId = op.deviceId ?? idOf.get(op.workKey);
     if (deviceId === null || deviceId === undefined) {
       stintFailures += 1;
       continue;
@@ -238,7 +261,7 @@ export async function syncDevices({
   const changeResults = await runPool(changeRows, async (row) => {
     const response = await post(itemPath(CHANGE_LIST_NAME), {
       Title: row.computerName,
-      DeviceId: row.deviceId ?? idOf.get(row.computerName) ?? null,
+      DeviceId: row.deviceId ?? null,
       FieldName: row.fieldName,
       OldValue: row.oldValue,
       NewValue: row.newValue,

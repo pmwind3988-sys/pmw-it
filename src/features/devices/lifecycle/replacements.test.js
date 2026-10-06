@@ -47,3 +47,14 @@ describe('unanswered', () => {
     expect(unanswered(list, {}, new Set(['d.txt']))).toBe(1);
   });
 });
+
+describe('replacementsFor — same batch', () => {
+  it('does not ask about an old machine whose own report is in the batch', () => {
+    const existing = [row()];
+    const incoming = [
+      scan({ computerName: 'CARMEN-HP', serialNumber: 'OLD1', owner: 'Bob', sourceFileName: 'old.txt' }),
+      scan({ owner: 'Carmen' }),
+    ];
+    expect(prompts(incoming, existing)).toHaveLength(0);
+  });
+});

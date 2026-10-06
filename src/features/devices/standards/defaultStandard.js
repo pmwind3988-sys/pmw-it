@@ -22,10 +22,10 @@ export const STORAGE_TYPES = ['HDD only', 'Mixed', 'SSD only'];
 export const GRAPHICS_KINDS = ['dedicated', 'builtIn'];
 export const WINDOWS_KINDS = ['win11', 'win10Supported', 'outOfSupport', 'other'];
 export const DEFAULT_COLORS = {
-  Critical: '#dc2626',
+  Critical: '#b91c1c',
   'Needs attention': '#f59e0b',
-  Moderate: '#1a88de',
-  Optimal: '#12a150',
+  Moderate: '#1e3a8a',
+  Optimal: '#16a34a',
   Unknown: '#8a97a8',
 };
 

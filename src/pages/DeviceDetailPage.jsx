@@ -199,7 +199,7 @@ export default function DeviceDetailPage() {
                 </span>
                 <LifecycleActions device={device} owners={owners} locations={locations} departments={departments} onAction={act} busy={acting} />
               </div>
-              <PlaceFill key={device.id} device={device} locations={locations} departments={departments}
+              <PlaceFill key={`${device.id}|${device.location ?? ''}|${device.department ?? ''}`} device={device} locations={locations} departments={departments}
                 onSave={fillPlace} busy={placing} />
               {actionNote && !actionError && <p className="dd-note" role="status">{actionNote}</p>}
               {actionError && <ErrorBanner message={actionError} busy={acting} onRetry={pending.length ? retry : undefined} />}

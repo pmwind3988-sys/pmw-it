@@ -1806,6 +1806,14 @@ a.mt:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--it-brand-line); 
    line -- the sentence, a labelled box per blank field, Save -- not a full-width form. */
 .dd-place { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--it-line); }
 .dd-place-say { font-size: 14px; color: var(--it-ink-soft); }
+.dd-place-value { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; }
+.dd-place-label { font-size: 13px; font-weight: 600; color: var(--it-ink-soft); }
+.dd-place-change {
+  font: inherit; font-size: 13px; font-weight: 600; color: var(--it-brand);
+  background: none; border: 0; padding: 4px 2px; min-height: 32px; cursor: pointer;
+}
+.dd-place-change:hover { text-decoration: underline; }
+.dd-place-actions { display: inline-flex; gap: 8px; }
 .dd-place .ad-field { flex-direction: row; align-items: center; gap: 8px; }
 .dd-place .ad-field input { width: 200px; max-width: 100%; min-height: 36px; }
 @media (max-width: 520px) {

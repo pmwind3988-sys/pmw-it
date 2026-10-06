@@ -1,54 +1,91 @@
 import { useId, useState } from 'react';
 import Button from '../../../components/ui/Button';
 
+const FIELDS = [
+  { key: 'location', label: 'Location', placeholder: 'e.g. F1' },
+  { key: 'department', label: 'Department', placeholder: '' },
+];
+
+const textOf = (value) => String(value ?? '').trim();
+
 /**
- * Fills in a location or department the machine has never had. Only the blank
- * ones are offered: filling a gap is a correction, while changing a place the
- * machine already has is a move, and moves go through Change owner so the
- * owner history records them.
+ * A machine's location and department, set or corrected in place. A blank
+ * field opens as a box; a set one shows its value and a Change button. Saving
+ * is a correction of the record, written as a manual edit so the next import
+ * leaves it alone -- a machine actually going to somebody else still goes
+ * through Change owner, which is what the owner history records.
  */
 export default function PlaceFill({ device, locations, departments, onSave, busy }) {
   const id = useId();
-  const [values, setValues] = useState({ location: '', department: '' });
-  // Said the moment the write lands: the register re-reads in the background,
-  // and the boxes sitting there until it does looked like a save still running.
-  const [saved, setSaved] = useState([]);
-  const blank = ['location', 'department'].filter((key) => !String(device[key] ?? '').trim());
-  const missing = blank.filter((key) => !saved.includes(key));
-  if (!blank.length) return null;
-  if (!missing.length) return <p className="dd-place dd-place-say" role="status">Saved.</p>;
+  const [opened, setOpened] = useState([]);
+  const [values, setValues] = useState({});
+  // What was just saved, shown until the register's re-read catches up: the
+  // old value sitting there meanwhile looked like a save still running. The
+  // page keys this component on the stored values, so the re-read resets it.
+  const [saved, setSaved] = useState({});
+  const [note, setNote] = useState('');
 
-  const set = (key) => (event) => setValues((current) => ({ ...current, [key]: event.target.value }));
-  const edits = Object.fromEntries(missing
-    .map((key) => [key, values[key].trim()])
-    .filter(([, value]) => value));
+  const current = (key) => (key in saved ? saved[key] : textOf(device[key]));
+  const editing = FIELDS.filter(({ key }) => !current(key) || opened.includes(key)).map(({ key }) => key);
+  const valueOf = (key) => (key in values ? values[key] : current(key));
+
+  const edits = Object.fromEntries(editing
+    .map((key) => [key, textOf(valueOf(key))])
+    // Locations are stored upper-case, so 'f2' over 'F2' is no change; a
+    // department's capitalisation is the department's to correct.
+    .filter(([key, value]) => value && (key === 'location'
+      ? value.toUpperCase() !== current(key).toUpperCase()
+      : value !== current(key))));
+
+  const open = (key) => {
+    setNote('');
+    setOpened((list) => [...list, key]);
+  };
+  const close = () => {
+    setOpened([]);
+    setValues({});
+  };
+  const set = (key) => (event) => setValues((list) => ({ ...list, [key]: event.target.value }));
 
   const submit = async (event) => {
     event.preventDefault();
-    const keys = Object.keys(edits);
-    if (keys.length && await onSave(edits)) setSaved((current) => [...current, ...keys]);
+    if (!Object.keys(edits).length) return;
+    if (await onSave(edits)) {
+      const shown = { ...edits };
+      if ('location' in shown) shown.location = shown.location.toUpperCase();
+      setSaved((list) => ({ ...list, ...shown }));
+      close();
+      setNote('Saved.');
+    }
   };
+
+  const options = { location: locations, department: departments };
 
   return (
     <form className="dd-place" onSubmit={submit}>
-      <span className="dd-place-say">
-        No {missing.join(' or ')} recorded yet.
-      </span>
-      {missing.includes('location') && (
-        <label className="ad-field">
-          <span>Location</span>
-          <input list={`${id}-locs`} value={values.location} onChange={set('location')} placeholder="e.g. F1" />
-          <datalist id={`${id}-locs`}>{locations.map((l) => <option key={l} value={l} />)}</datalist>
+      {FIELDS.map(({ key, label, placeholder }) => (editing.includes(key) ? (
+        <label className="ad-field" key={key}>
+          <span>{label}</span>
+          <input list={`${id}-${key}`} value={valueOf(key)} onChange={set(key)}
+            placeholder={current(key) ? '' : placeholder || `No ${key} yet`} />
+          <datalist id={`${id}-${key}`}>{options[key].map((o) => <option key={o} value={o} />)}</datalist>
         </label>
+      ) : (
+        <span className="dd-place-value" key={key}>
+          <span className="dd-place-label">{label}</span>
+          <strong>{current(key)}</strong>
+          <button type="button" className="dd-place-change" onClick={() => open(key)}>Change</button>
+        </span>
+      )))}
+      {editing.length > 0 && (
+        <span className="dd-place-actions">
+          <Button type="submit" size="sm" loading={busy} disabled={!Object.keys(edits).length}>Save</Button>
+          {opened.length > 0 && (
+            <Button type="button" variant="secondary" size="sm" disabled={busy} onClick={close}>Cancel</Button>
+          )}
+        </span>
       )}
-      {missing.includes('department') && (
-        <label className="ad-field">
-          <span>Department</span>
-          <input list={`${id}-depts`} value={values.department} onChange={set('department')} />
-          <datalist id={`${id}-depts`}>{departments.map((d) => <option key={d} value={d} />)}</datalist>
-        </label>
-      )}
-      <Button type="submit" size="sm" loading={busy} disabled={!Object.keys(edits).length}>Save</Button>
+      {note && !editing.length && <span className="dd-place-say" role="status">{note}</span>}
     </form>
   );
 }

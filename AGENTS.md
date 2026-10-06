@@ -82,7 +82,7 @@ pmw-it/
 | `/asset-checklist/links` | Every shared link: waiting / signed / expired / cancelled; copy, open, change expiry, expire now, cancel, reopen, delete |
 | `/asset-checklist/links/:id` | IT correcting a SIGNED checklist; the record then says "Edited by … after signing" |
 | `/c/:code` | **Public, no sign-in.** A separate page (`checklist.html`), not a portal route: the employee fills and signs; afterwards the same link is the locked, printable copy |
-| `/devices` | Device list. `?view=map` (default): locations → departments → machines, with the IT Stash and the Graveyard; `?location=`, `&department=`, `?place=stash\|graveyard\|nolocation`. Also `dashboard`, `register`, `import` |
+| `/devices` | Device list. `?view=map` (default): locations → departments → machines, with the IT Stash and the Graveyard; `?location=`, `&department=`, `?place=stash\|graveyard\|nolocation`. Also `dashboard`, `register`, `import`, `standards` (where IT sets the grading standard and colours) |
 | `/devices/:id` | One machine: status, change owner / repair / stash / retire / bring back, owner history, spec history, every scanned field |
 | `/assets` | Asset inventory: what IT owns, its figures, and the deliveries still unsaved on this device (`?category=`, `?status=`, `?condition=`, `?location=`, `?unlabelled=1`) |
 | `/assets/scan` | Purchase details, then the camera. Scans become a batch on this device — nothing reaches SharePoint here |
@@ -127,6 +127,10 @@ pmw-it/
 | The Azure / Vercel setup the links need | `docs/checklist-links-setup.md` |
 | Adding options to an existing choice column | `mergeChoices` in `src/features/sharepoint/provision.js` |
 | Which values on a device page read red or green | `src/features/devices/fieldTone.js` |
+| What counts as Critical … Optimal, per part and profile | `src/features/devices/standards/defaultStandard.js`, the Standards tab, the `IT Device Standards` list |
+| How one part of a machine is graded | `src/features/devices/derive/partGrades.js` |
+| Whether a saved standard is usable, and what a save changed | `standards/validateStandard.js`, `standards/diffStandard.js`, `standards/previewChanges.js` |
+| Grade colours | `standards/gradeColors.js`; `--grade-*` variables on `.dv-graded` |
 | Any SharePoint list/column/view provisioning | `src/features/sharepoint/provision.js` |
 | The SharePoint fetch wrapper and binary upload | `src/features/sharepoint/spClient.js` |
 | Concurrency and retry for SharePoint writes | `src/features/sharepoint/writePool.js` |
@@ -301,20 +305,24 @@ parts reach the RAM-type fallback and a DDR4 board alone calls a 2014 APU
 Aging. Vendor detection reads the family names as well, so a report that says
 `Athlon(tm) II X2 240` and never says "AMD" is not counted as `Other`.
 
-**A machine is judged against the desk it sits on, not against one fleet-wide
-bar.** `persona.js` maps a department to a workload profile — Engineering /
-Technical / Media, Logistics / Operations / Desk, Executive / Field — and
-`deviceFit.js` grades every machine against that profile as Critical, Needs
-Attention, Moderate or Optimal, writing out the sentence behind each verdict.
-This sits BESIDE `riskScore.js`, which is unchanged and still department-blind:
-risk asks "is this machine dangerous?", fit asks "is it the right machine for
-this person?", and 16 GB with no graphics card can pass one and fail the other.
+**A machine is graded part by part, against the desk it sits on, by a standard
+IT sets.** Five parts -- CPU, RAM, Storage, Graphics, Windows -- each get their
+own grade (Critical, Needs attention, Moderate, Optimal, or Unknown when the
+scan did not say), and there is deliberately NO overall grade: one word for the
+whole machine hid which part to fix. Each workload profile (Engineering, Desk,
+Field) has its own cut-offs, and the department → profile map is part of the
+same standard. A value `< criticalBelow` is Critical, `< attentionBelow` Needs
+attention, `< optimalFrom` Moderate, otherwise Optimal; storage takes the worse
+of disk type and size; obsolete CPU families are always Critical.
 
-The whole persona layer is computed on read (`enrichFit.js`, applied by
-`deriveDevice` on import and `refixStored` on every SharePoint read) and NOTHING
-of it is stored. Every ingredient it needs is already on the row, so changing
-the memory floor for Engineering re-grades the fleet on the next page load with
-no re-scan and no column migration.
+The standard is DATA: versions in the `IT Device Standards` list, append-only,
+the newest valid one in force, edited on the Standards tab by whoever SharePoint
+lets add items to that list. A broken newest version is skipped and named, never
+silently. Grades are computed on read (`useDevices` → `regrade`) and nothing of
+them is stored, so a saved standard regrades the fleet on the next render with
+no re-scan. Colour in the device section only ever means a grade, and comes from
+the standard's five colours through `--grade-*` CSS variables -- never a
+hard-coded red.
 
 The portability suggestion is a label, never a fault: a desktop in a field role
 is tagged and counted, and does not on its own move a machine out of Moderate.

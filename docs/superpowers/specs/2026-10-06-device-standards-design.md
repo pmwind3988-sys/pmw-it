@@ -101,8 +101,8 @@ with a profile picker.
 **Text on coloured chips.** It is black or white, chosen automatically by the colour's brightness
 so it stays readable.
 
-**Unreadable choices.** If the admin picks two grade colours too alike to tell apart (contrast
-ratio under 1.5 between any two), the page warns but still allows the save.
+**Unreadable choices.** If the admin picks two grade colours too alike to tell apart — perceived
+colour difference under 100 (redmean RGB distance) between any two — the page warns but still allows the save.
 
 **Dark mode.** The same colours are used, with the text rule above.
 

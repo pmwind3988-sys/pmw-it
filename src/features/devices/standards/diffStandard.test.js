@@ -12,7 +12,7 @@ describe('diffStandard', () => {
     after.profiles.heavy.ram.optimalFrom = 24;
     after.profiles.desk.windows.win10Supported = 'Optimal';
     after.departments.QAQC = 'desk';
-    after.colors.Critical = '#dc2626';
+    after.colors.Critical = '#b91c1c';
     expect(diffStandard(defaultStandard(), after)).toEqual([
       'Engineering RAM optimal from 32 → 24',
       'Desk Windows 10 (supported) Moderate → Optimal',

@@ -32,7 +32,7 @@ describe('the default standard', () => {
     expect(defaultStandard().profiles.heavy.ram.optimalFrom).toBe(32);
     const b = cloneStandard(DEFAULT_STANDARD);
     b.colors.Critical = '#000000';
-    expect(DEFAULT_STANDARD.colors.Critical).toBe('#b91c1c');
+    expect(DEFAULT_STANDARD.colors.Critical).toBe('#dc2626');
   });
 });
 

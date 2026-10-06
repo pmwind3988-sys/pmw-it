@@ -14,14 +14,16 @@ describe('gradeColors', () => {
     expect(contrastRatio('#123456', '#123456')).toBeCloseTo(1, 5);
   });
 
-  it('warns only when two grades are too alike', () => {
+  it('warns only when two grades are too alike by colour distance', () => {
     expect(tooSimilar(DEFAULT_COLORS)).toBe(false);
     expect(tooSimilar({ ...DEFAULT_COLORS, Moderate: '#12a150' })).toBe(true);
+    expect(tooSimilar({ ...DEFAULT_COLORS, Optimal: '#14a352' })).toBe(false);
+    expect(tooSimilar({ ...DEFAULT_COLORS, Optimal: '#f5a00c' })).toBe(true);
   });
 
   it('turns the colours into CSS variables with a text colour each', () => {
     const vars = gradeCssVars(DEFAULT_COLORS);
-    expect(vars['--grade-critical']).toBe('#b91c1c');
+    expect(vars['--grade-critical']).toBe('#dc2626');
     expect(vars['--grade-attention-ink']).toBe('#101828');
     expect(Object.keys(vars)).toHaveLength(10);
   });

@@ -1723,9 +1723,7 @@ a.mt:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--it-brand-line); 
 .mt:not(.mt-hub) .mt-split strong { color: var(--it-ink); }
 .mt-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; }
 .mt-chip { font-size: 12px; padding: 3px 8px; border-radius: 6px; background: var(--it-brand-wash); color: var(--it-ink); }
-.mt-badge { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--grade-attention-ink, var(--it-accent-wash)); color: var(--grade-attention, var(--it-accent)); }
-.mt-badge.g-critical { background: var(--grade-critical-ink, var(--it-danger-wash)); color: var(--grade-critical, var(--it-danger)); }
-.mt-badge.g-optimal { background: var(--grade-optimal-ink, var(--it-good-wash)); color: var(--grade-optimal, var(--it-good)); }
+.mt-badge { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
 .mt-glyph { position: absolute; top: 14px; right: 16px; }
 
 .dv-level {

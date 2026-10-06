@@ -17,6 +17,7 @@ import DeviceCharts from '../features/devices/ui/DeviceCharts';
 import DepartmentHeatmap from '../features/devices/ui/DepartmentHeatmap';
 import Leaderboards from '../features/devices/ui/Leaderboards';
 import DeviceMap from '../features/devices/ui/DeviceMap';
+import StandardsPage from '../features/devices/ui/StandardsPage';
 import { importFiles, mergeImports } from '../features/devices/importFiles';
 import { issuesFor, sortForReview } from '../features/devices/reviewIssues';
 import { useDevices } from '../features/devices/useDevices';
@@ -380,6 +381,7 @@ export default function DevicesPage() {
         ['dashboard', 'Dashboard'],
         ['register', 'Register'],
         ['import', 'Import'],
+        ['standards', 'Standards'],
       ].map(([key, label]) => (
         <button
           type="button"
@@ -628,6 +630,8 @@ export default function DevicesPage() {
           <SaveProgress state={save} onRetry={handleSave} onDone={resetImport} />
         </Card>
       )}
+
+      {view === 'standards' && <StandardsPage devices={saved} standards={standards} />}
       </div>
     </AppShell>
   );

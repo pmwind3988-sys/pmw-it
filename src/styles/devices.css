@@ -1864,3 +1864,48 @@ a.mt:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--it-brand-line); 
 .hm-cell { min-width: 44px; min-height: 44px; border: 0; border-radius: 8px; font: inherit; font-weight: 700; cursor: pointer; }
 .hm-zero { color: var(--it-ink-soft); }
 .dt-grade { font-weight: 700; }
+
+/* --- Standards tab ------------------------------------------------------ */
+.sd { display: flex; flex-direction: column; gap: 16px; }
+.sd-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 16px; }
+.sd-head .dm-sub { max-width: 760px; margin: 4px 0 0; }
+.sd-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.sd-body { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+.sd-main { flex: 999 1 640px; min-width: 0; border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
+.sd-side { flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+.sd-table, .sd-card { background: var(--it-panel); border: 1px solid var(--it-line); border-radius: 16px; }
+.sd-table { overflow-x: auto; }
+.sd-card { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+.sd-card h3 { margin: 0; font-size: 17px; }
+.sd-card-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; align-items: flex-end; }
+.sd-row { display: grid; grid-template-columns: 220px repeat(3, minmax(160px, 1fr)); gap: 0 14px; align-items: center; padding: 4px 18px; min-width: 760px; }
+.sd-row-head { padding: 14px 18px; border-bottom: 1px solid var(--it-line); font-size: 12px; color: var(--it-ink-soft); }
+.sd-row-head strong { display: block; font-size: 15px; color: var(--it-ink); }
+.sd-part { padding: 12px 0; border-bottom: 1px solid var(--it-line); }
+.sd-part-name { padding: 0 18px 6px; display: flex; flex-direction: column; gap: 2px; }
+.sd-part-name small, .sd-row-label small { color: var(--it-ink-soft); font-size: 13px; }
+.sd-row-label { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.sd-dot { flex: none; width: 12px; height: 12px; border-radius: 50%; }
+.sd-num, .sd-choice { display: flex; align-items: center; gap: 8px; }
+.sd-num input, .sd-choice select, .sd-dept select {
+  flex: 1; min-width: 0; min-height: 44px; padding: 0 10px; font: inherit; font-size: 16px;
+  border: 1px solid var(--it-line); border-radius: 10px; background: var(--it-panel); color: var(--it-ink);
+}
+.sd-num span { font-size: 13px; color: var(--it-ink-soft); }
+.sd-changed { border-color: var(--it-brand) !important; background: var(--it-brand-wash) !important; }
+.sd-scale { display: flex; flex-direction: column; gap: 4px; }
+.sd-scale-bar { display: flex; height: 10px; border-radius: 999px; overflow: hidden; background: var(--it-line); }
+.sd-scale-bar > span { display: block; height: 100%; }
+.sd-error { color: var(--it-danger); font-weight: 600; }
+.sd-depts { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.sd-dept { display: flex; align-items: center; gap: 10px; }
+.sd-dept > span { flex: 0 0 120px; font-weight: 600; font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace; }
+.sd-colors { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+.sd-color { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border: 1px solid var(--it-line); border-radius: 12px; }
+.sd-color input { width: 44px; height: 44px; border: 0; padding: 0; background: transparent; cursor: pointer; }
+.sd-color > span:nth-child(2) { flex: 1; display: flex; flex-direction: column; }
+.sd-color small { color: var(--it-ink-soft); font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace; }
+.sd-warn { margin: 0; padding: 8px 12px; border-radius: 10px; background: var(--it-accent-wash); color: var(--it-ink); font-weight: 600; }
+.sd-preview, .sd-history { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
+.sd-history li { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; padding-top: 8px; border-top: 1px solid var(--it-line); }
+.sd-history small { display: block; color: var(--it-ink-soft); }

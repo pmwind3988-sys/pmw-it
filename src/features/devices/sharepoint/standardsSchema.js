@@ -22,7 +22,7 @@ export function toStandardItem({ version, standard, savedBy, summary, savedOn })
 }
 
 export function fromStandardItem(row) {
-  let standard = null;
+  let standard;
   try {
     standard = JSON.parse(row.Standard);
   } catch {

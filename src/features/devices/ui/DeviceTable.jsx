@@ -107,6 +107,7 @@ const CELL_ENTRIES = 2;
 
 const FILTER_LABELS = {
   risk: 'Risk', attention: 'Needs attention', type: 'Type', department: 'Department',
+  status: 'Status', location: 'Location',
   os: 'OS', av: 'Antivirus', storage: 'Storage', ram: 'RAM', cpu: 'CPU age',
   windows: 'Windows', stale: 'Stale scans', q: 'Search',
   fit: 'Device health', persona: 'Workload profile', license: 'Office licence',

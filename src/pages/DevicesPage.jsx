@@ -20,13 +20,13 @@ import { importFiles, mergeImports } from '../features/devices/importFiles';
 import { issuesFor, sortForReview } from '../features/devices/reviewIssues';
 import { useDevices } from '../features/devices/useDevices';
 import { fleetSummary, complianceSummary } from '../features/devices/stats/deviceStats';
-import { labelOf } from '../features/devices/deviceFilters';
+import { labelOf, IN_FLEET } from '../features/devices/deviceFilters';
 import { syncDevices } from '../features/devices/sharepoint/syncDevices';
 import { updateDevice, deleteDevice, deleteDevices } from '../features/devices/sharepoint/updateDevice';
 import { provisionLists } from '../features/devices/sharepoint/provisionLists';
 import { matchIncoming, noticeFor } from '../features/devices/lifecycle/matchIncoming';
 import { replacementsFor, unanswered } from '../features/devices/lifecycle/replacements';
-import { locationsIn } from '../features/devices/map/locations';
+import { locationsIn, cleanLocation } from '../features/devices/map/locations';
 import { inFleet, statusOf, STATUSES, RETIRED, SPARE } from '../features/devices/lifecycle/status';
 import { performLifecycle } from '../features/devices/sharepoint/writeLifecycle';
 import { ACTIONS } from '../features/devices/lifecycle/planLifecycle';
@@ -138,8 +138,14 @@ export default function DevicesPage() {
       const next = new URLSearchParams(current);
       next.set('view', 'register');
       if (!key || key === 'view') return next;
-      if (value) next.set(key, value);
-      else next.delete(key);
+      if (value) {
+        next.set(key, value);
+        // When opening from a card, also filter to In use + In repair unless
+        // the card is setting status itself
+        if (key !== 'status') next.set('status', IN_FLEET);
+      } else {
+        next.delete(key);
+      }
       return next;
     });
   }, [setParams]);
@@ -261,7 +267,11 @@ export default function DevicesPage() {
    * owner still goes the old way: a blank hands the field back to the scan.
    */
   const handleRowSave = (device, edits) => runRowAction(async (tokenRes) => {
-    const moved = OWNERSHIP.some((key) => key in edits && trimmed(edits[key]) !== trimmed(device[key]));
+    const moved = OWNERSHIP.some((key) => {
+      if (!(key in edits)) return false;
+      if (key === 'location') return cleanLocation(edits[key]) !== cleanLocation(device[key]);
+      return trimmed(edits[key]) !== trimmed(device[key]);
+    });
     const owner = trimmed('owner' in edits ? edits.owner : device.owner);
     let existing = device;
     let rest = edits;
@@ -534,6 +544,7 @@ export default function DevicesPage() {
               <span>Status</span>
               <select value={filters.status} onChange={(event) => setParam('status', event.target.value)}>
                 <option value="">All but retired</option>
+                <option value={IN_FLEET}>In use or in repair</option>
                 {STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
               </select>
             </label>

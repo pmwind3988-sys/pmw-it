@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { applyFilters, toCsv, ramBucket, isStale, labelOf } from './deviceFilters.js';
+import { applyFilters, toCsv, ramBucket, isStale, labelOf, IN_FLEET } from './deviceFilters.js';
 
 const rows = [
   {
@@ -197,5 +197,9 @@ describe('status and location filters', () => {
   it('filters by location code, and by Unassigned for none', () => {
     expect(applyFilters(rows, { location: 'F1' }).map((r) => r.computerName)).toEqual(['A', 'B']);
     expect(applyFilters(rows, { location: 'Unassigned' }).map((r) => r.computerName)).toEqual(['C']);
+  });
+
+  it("filters by status 'In fleet', keeping blank and In use/In repair, dropping Spare and Retired", () => {
+    expect(applyFilters(rows, { status: IN_FLEET }).map((r) => r.computerName)).toEqual(['A']);
   });
 });

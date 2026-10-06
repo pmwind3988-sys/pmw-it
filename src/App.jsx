@@ -16,6 +16,7 @@ import AssetScanPage from './pages/AssetScanPage';
 import AssetBatchPage from './pages/AssetBatchPage';
 import AssetDetailPage from './pages/AssetDetailPage';
 import AssetHandoverPage from './pages/AssetHandoverPage';
+import AssetTillPage from './pages/AssetTillPage';
 import AssetPeoplePage from './pages/AssetPeoplePage';
 import AssetPersonPage from './pages/AssetPersonPage';
 
@@ -54,6 +55,7 @@ function App() {
         <Route path="/assets/scan" element={<AssetScanPage />} />
         <Route path="/assets/batch/:id" element={<AssetBatchPage />} />
         <Route path="/assets/handover" element={<AssetHandoverPage />} />
+        <Route path="/assets/till" element={<AssetTillPage />} />
         <Route path="/assets/people" element={<AssetPeoplePage />} />
         {/* The email is URL-encoded into the path; it is the identity every
             per-person question keys on, and a name would break the moment

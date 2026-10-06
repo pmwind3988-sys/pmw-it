@@ -36,7 +36,7 @@ export default function AssetPeoplePage() {
       subtitle={overdue > 0 ? `${overdue} item${overdue === 1 ? '' : 's'} overdue` : 'Everyone currently holding something'}
       search={{ value: query, onChange: setQuery, placeholder: 'Find a person…' }}
       actions={(
-        <Button icon={ScanLine} onClick={() => navigate('/assets/handover')}>Hand over</Button>
+        <Button icon={ScanLine} onClick={() => navigate('/assets/till?mode=out')}>Open till</Button>
       )}
     >
       {error && <ErrorBanner message={error} onRetry={reload} />}

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { newBatch } from '../draft/batch.js';
 import { TRACKED, BULK } from '../assetKinds.js';
 import {
-  scanIn, STOCK_RESULT, matchRegister, needsKind, needsSerial, setKind, nextTag,
+  scanIn, addModel, STOCK_RESULT, matchRegister, needsKind, needsSerial, setKind, nextTag,
   noCodeDraft, holdsFor, itemCount,
 } from './stockIn.js';
 
@@ -76,6 +76,21 @@ describe('scanIn', () => {
 
   it('ignores an empty read', () => {
     expect(scanIn(newBatch(), '  ', REGISTER).result).toBe(STOCK_RESULT.EMPTY);
+  });
+});
+
+describe('addModel', () => {
+  it('counts a picked bulk model up and adds a picked tracked one waiting for its serial', () => {
+    let { batch } = addModel(newBatch(), MICE);
+    let result;
+    ({ batch, result } = addModel(batch, MICE));
+    expect(result).toBe(STOCK_RESULT.COUNTED);
+    expect(batch.drafts[0].quantity).toBe(2);
+
+    ({ batch } = addModel(batch, LAPTOP));
+    expect(batch.drafts).toHaveLength(2);
+    expect(needsSerial(batch.drafts[1])).toBe(true);
+    expect(batch.drafts[1].serialNumber).toBe('');
   });
 });
 

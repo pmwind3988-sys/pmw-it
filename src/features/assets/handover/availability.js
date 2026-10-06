@@ -90,7 +90,10 @@ export function holdersOf(handovers, assetKey) {
 export function nameOfItem(handover, units = []) {
   if (handover?.serialNumber) return handover.serialNumber;
 
-  const at = Number(handover?.unitIndex);
+  // A plain count names no item. Checked before converting, because
+  // Number(null) is 0 and would call every counted handover "item 1".
+  if (handover?.unitIndex == null || handover.unitIndex === '') return '';
+  const at = Number(handover.unitIndex);
   if (!Number.isInteger(at) || at < 0) return '';
 
   const unit = units.find((entry) => entry.index === at);

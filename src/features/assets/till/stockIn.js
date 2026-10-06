@@ -92,8 +92,29 @@ export function draftOfModel(asset, overrides = {}) {
  */
 export function needsKind(draft) {
   return draft.category === 'Other'
-    && !String(draft.model ?? '').trim()
     && !(draft.manualFields ?? []).includes('category');
+}
+
+const sameModel = (a, b) => ['category', 'manufacturer', 'model']
+  .every((field) => String(a[field] ?? '').trim().toLowerCase() === String(b[field] ?? '').trim().toLowerCase());
+
+/**
+ * A model picked rather than scanned — from type-to-find or a quick key. A
+ * bulk model already on the receipt counts up, exactly as scanning its box
+ * again would; a tracked one is another machine, waiting for its serial.
+ */
+export function addModel(batch, asset) {
+  if (asset.trackingMode !== TRACKED) {
+    const existing = batch.drafts.find((draft) => draft.trackingMode !== TRACKED && sameModel(draft, asset));
+    if (existing) {
+      const next = setDraftField(existing, 'quantity', (existing.quantity ?? 1) + 1);
+      return { batch: replaceDraft(batch, next), result: STOCK_RESULT.COUNTED, draft: next };
+    }
+    const draft = draftOfModel(asset, { quantity: 1, scanSource: 'Manual' });
+    return { batch: addDraft(batch, draft), result: STOCK_RESULT.ADDED, draft };
+  }
+  const draft = draftOfModel(asset, { scanSource: 'Manual' });
+  return { batch: addDraft(batch, draft), result: STOCK_RESULT.ADDED, draft };
 }
 
 /** A tracked line from a part number: one specific machine nobody has named. */
@@ -220,7 +241,10 @@ export function holdOf(draft, { registerTags = new Map(), batchTags = new Map() 
 
   const issues = draftIssues(draft, { registerTags, batchTags });
   const stopping = issues.find((issue) => issue.blocking || issue.field === 'category' || issue.field === 'model');
-  return stopping ? stopping.message : null;
+  if (!stopping) return null;
+  // The review grid explains why at length; at a till the person needs the
+  // instruction, not the reasoning.
+  return stopping.field === 'model' ? 'Type its make and model.' : stopping.message;
 }
 
 /** Label → localId of the first line wearing it, the shape `draftIssues` wants. */

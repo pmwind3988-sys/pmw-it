@@ -23,6 +23,7 @@ import './styles/auth.css';
 import './styles/devices.css';
 import './styles/semantic.css';
 import './styles/assets.css';
+import './styles/till.css';
 import './styles/forms.css';
 
 // MSAL request timeout (30 seconds)

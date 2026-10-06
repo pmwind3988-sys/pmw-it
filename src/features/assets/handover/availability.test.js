@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  nameOfItem,
   owned, out, available, isOut, outstanding, isOpen, isOverdue, statusFor,
   holdersOf, heldBy, peopleWithItems, groupHolders, HANDOVER_KIND, HANDOVER_STATUS,
 } from './availability.js';
@@ -211,5 +212,15 @@ describe('groupHolders', () => {
     ]);
 
     expect(grouped.map((entry) => entry.name)).toEqual(['Siti', 'Amir']);
+  });
+});
+
+describe('nameOfItem', () => {
+  it('names a specific item, and no item at all for a plain count', () => {
+    expect(nameOfItem({ serialNumber: 'SN1', unitIndex: 2 })).toBe('SN1');
+    expect(nameOfItem({ unitIndex: 2 }, [{ index: 2, assetTag: 'PMW-0007' }])).toBe('PMW-0007');
+    expect(nameOfItem({ unitIndex: 0 })).toBe('item 1');
+    expect(nameOfItem({ unitIndex: null })).toBe('');
+    expect(nameOfItem({})).toBe('');
   });
 });

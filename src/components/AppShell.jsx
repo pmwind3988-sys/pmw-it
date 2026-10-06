@@ -10,6 +10,7 @@ import { AccountBadge } from './ui/Badges';
 import Button from './ui/Button';
 import {
   LayoutDashboard,
+  ScanLine,
   ClipboardList,
   CheckSquare,
   Menu,
@@ -39,6 +40,7 @@ const NAV_ITEMS = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/requests', label: 'Requests', icon: ClipboardList, also: ['/it-boarding-form'] },
   { to: '/devices', label: 'Device list', icon: Laptop },
+  { to: '/assets/till', label: 'Till', icon: ScanLine },
   { to: '/assets', label: 'Asset inventory', icon: Package },
   { to: '/assets/people', label: 'Who has what', icon: Users },
   { to: '/semantic-analysis', label: 'Semantic Analysis', icon: BarChart3 },

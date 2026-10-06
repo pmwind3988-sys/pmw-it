@@ -91,6 +91,7 @@ pmw-it/
 | `/assets/handover` | Pick a person, fill a basket by search or camera, hand it over |
 | `/assets/people` | Everyone currently holding something, overdue first |
 | `/assets/people/:email` | One person, everything they hold, and returning it |
+| `/assets/till` | The till: stock in / hand out / take back on one screen (`?mode=in\|out\|back`). Scan or type onto a receipt, one button to finish |
 | `/semantic-analysis` | Drop a Microsoft Forms export and land on a finished screen. It reads the file name for the subject, parks the form's bookkeeping columns, charts the rest, reads the written answers with a local model, sorts them into categories (internet, SAP, digitization, paperwork…) and charts those too. Tapping any mark filters the response list below — email, submitted, department, then every answer — and a response opens in full. Nothing is uploaded and nothing is saved: no SharePoint, no IndexedDB. Charts export as PNG, responses as CSV. Lazy route; `/data-studio` redirects here. |
 
 ## WHERE TO LOOK
@@ -152,6 +153,10 @@ pmw-it/
 | Owned vs out vs available | `src/features/assets/handover/availability.js` |
 | What a handover writes or refuses | `src/features/assets/handover/planHandover.js` |
 | What a return writes | `src/features/assets/handover/planReturn.js` |
+| What one scan does at the till, per mode | `src/features/assets/till/stockIn.js`, `handOut.js`, `takeBack.js` |
+| Type-to-find and the desk's quick keys | `src/features/assets/till/tillSearch.js` |
+| Why a box held in front of the camera counts once | `src/features/assets/till/cooldown.js` |
+| The till page and its sheets | `src/pages/AssetTillPage.jsx`, `src/features/assets/till/ui/`, `src/styles/till.css` |
 | Finding a person in the directory | `src/features/assets/people/peopleSearch.js` |
 | Handover SharePoint schema | `src/features/assets/sharepoint/handoverSchema.js` |
 | The handover and return writes | `src/features/assets/sharepoint/writeHandover.js` |
@@ -492,6 +497,27 @@ remembered per browser under `fold:<id>`, and the header ALWAYS says what is
 inside while it is shut -- a hidden filter is a page lying about what it shows.
 Both tables scroll in their own box, sideways and up-down, with a sticky header,
 so the horizontal bar stays on screen instead of parking below the fold.
+
+**The till is a cashier, not a new data model.** `/assets/till` puts stock in,
+hand out and take back on one screen: scan or type onto a receipt, one button
+to finish. Its receipts ARE the existing objects -- a delivery batch (kept in
+IndexedDB, id in localStorage `tillBatchId`, so it survives a reload and shows
+in the unsaved-deliveries banner), a handover basket, and `commitReturn`
+entries -- and checkout calls the existing writers. What it adds is in
+`features/assets/till/`, pure and tested: a repeat scan of a BULK line's part
+number counts up (only a unit's own serial or label picks out one item); a
+tracked serial already in the register is refused at stock-in rather than
+re-saved from what a barcode knows; a tracked part number is "another of this
+model" waiting for its serial, and the next serial-shaped code fills it; a
+refusal shows on its line the moment it is scanned; a return finds its holder
+and ASKS when several people hold the same bulk line. The camera reports a
+code every frame, so `cooldown.js` counts a code again only after it has been
+out of sight -- without it one box of mice becomes thirty. Checkout is held
+while any delivery line needs an answer (`holdOf`). "Can't scan?" offers the
+label reader, type-to-find, and (stock in only) "nothing on it", which gives a
+tracked thing the next free `PMW-NNNN` (`nextTag`). The old scan, batch and
+handover screens still work; the batch page is where a held delivery is
+finished in detail.
 
 **"Who has it" is one line per PERSON.** `groupHolders` in
 `handover/availability.js` gathers the open handovers on an item by email:

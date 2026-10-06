@@ -244,7 +244,8 @@ export default function AssetsPage() {
           <Button variant="secondary" icon={Users} onClick={() => navigate('/assets/handover')}>
             Hand over
           </Button>
-          <Button icon={ScanLine} onClick={() => navigate('/assets/scan')}>Scan a delivery</Button>
+          <Button variant="secondary" icon={ScanLine} onClick={() => navigate('/assets/scan')}>Scan a delivery</Button>
+          <Button icon={ScanLine} onClick={() => navigate('/assets/till')}>Open till</Button>
         </>
       )}
     >

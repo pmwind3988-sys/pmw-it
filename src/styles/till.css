@@ -1,0 +1,629 @@
+/* The asset till (/assets/till).
+ *
+ * The scan area is dark in both themes — it frames a camera picture, and a
+ * till's scanner end reads as one thing. The checkout button is the one
+ * strong colour on the page: the thing to press when the receipt is right.
+ * Everything else sits on the portal's own tokens so light and dark both work.
+ */
+
+.till {
+  --till-dark: #111317;
+  --till-dark-2: #1b1e24;
+  --till-dark-line: #2e333c;
+  --till-dark-ink: #f2f4f7;
+  --till-dark-soft: #c9ced6;
+  --till-key: #ffd23f;
+  --till-key-ink: #111317;
+  --till-ask: #fff7d6;
+  --till-ask-ink: #6b4e00;
+  --till-bad: var(--it-danger-wash);
+  --till-bad-ink: #9a3412;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+[data-theme='dark'] .till {
+  --till-ask: #2a2410;
+  --till-ask-ink: #fcd34d;
+  --till-bad-ink: #fdba74;
+}
+
+.till-mono { font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+.till-kicker {
+  margin: 0;
+  font: 600 11px/1.2 'IBM Plex Mono', ui-monospace, monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--it-ink-soft);
+}
+
+.till-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--it-brand);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+/* ── Modes ─────────────────────────────────────────────────────────────── */
+
+.till-modes {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--till-dark);
+}
+
+.till-mode {
+  flex: 1;
+  min-height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--till-dark-soft);
+  font-weight: 600; font-size: 15px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.till-mode.on { background: var(--till-key); color: var(--till-key-ink); }
+.till-mode:focus-visible { outline: 2px solid var(--till-key); outline-offset: 2px; }
+
+.till-count {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  box-sizing: border-box;
+  border-radius: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  background: var(--till-dark-line);
+  color: var(--till-dark-ink);
+}
+.till-mode.on .till-count { background: var(--till-key-ink); color: var(--till-key); }
+
+/* ── Layout ────────────────────────────────────────────────────────────── */
+
+.till-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.till-left, .till-right {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  .till-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(380px, 480px);
+    align-items: start;
+    gap: 20px;
+  }
+  .till-right {
+    position: sticky;
+    top: 76px;
+  }
+}
+
+/* ── Scan area ─────────────────────────────────────────────────────────── */
+
+.till-scan {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--till-dark);
+  color: var(--till-dark-ink);
+}
+
+.till-viewfinder.as-viewfinder {
+  aspect-ratio: auto;
+  height: clamp(180px, 30vh, 300px);
+  border-radius: 10px;
+}
+
+.till-entry {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+}
+
+.till-entry input {
+  flex: 1;
+  min-width: 0;
+  height: 52px;
+  padding: 0 14px;
+  box-sizing: border-box;
+  border: 2px solid var(--till-key);
+  border-radius: 10px;
+  background: #0b0c0f;
+  color: var(--till-dark-ink);
+  /* 16px or more: iOS zooms the whole page into an input smaller than that. */
+  font: 500 18px 'IBM Plex Mono', ui-monospace, monospace;
+}
+.till-entry input::placeholder { color: #8a919c; font-size: 15px; }
+.till-entry input:focus { outline: none; box-shadow: 0 0 0 3px rgba(255, 210, 63, 0.35); }
+
+.till-add, .till-cant {
+  height: 52px;
+  padding: 0 14px;
+  border-radius: 10px;
+  font-weight: 600; font-size: 15px;
+  font-family: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.till-add { border: 0; background: var(--till-key); color: var(--till-key-ink); }
+.till-cant { border: 1px solid var(--till-dark-line); background: var(--till-dark-2); color: var(--till-dark-soft); }
+.till-cant.on { border-color: var(--till-key); background: var(--till-key); color: var(--till-key-ink); }
+
+@media (max-width: 420px) {
+  .till-add { padding: 0 12px; }
+  .till-cant { padding: 0 10px; font-size: 13px; }
+}
+
+.till-flash {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 15px;
+}
+.till-flash-inline { position: static; }
+.till-flash-ok { background: var(--till-key); color: var(--till-key-ink); }
+.till-flash-ask { background: var(--till-dark-ink); color: var(--till-dark); }
+.till-flash-bad { background: #fdba8c; color: #431407; }
+
+.till-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--it-panel);
+  color: var(--it-ink);
+}
+.till-results button {
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 14px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--it-line);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.till-results button:hover, .till-results button:focus-visible { background: var(--it-brand-wash); outline: none; }
+.till-results .till-mono { font-size: 12px; color: var(--it-ink-soft); }
+.till-results-foot { padding: 8px 14px; font-size: 12px; color: var(--it-ink-soft); }
+
+.till-scan-foot { display: flex; justify-content: flex-end; }
+.till-scan-foot .till-link { color: var(--till-dark-soft); font-weight: 500; font-size: 14px; }
+
+/* ── Quick keys and "out right now": a desk has room, a phone does not ─── */
+
+.till-keys { display: none; flex-direction: column; gap: 8px; }
+@media (min-width: 1024px) { .till-keys { display: flex; } }
+
+.till-keys-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.till-key {
+  min-height: 92px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  border: 1px solid var(--it-line);
+  border-radius: 12px;
+  background: var(--it-panel);
+  color: var(--it-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: var(--it-card-shadow);
+}
+.till-key:hover { border-color: var(--it-brand); }
+.till-key .till-mono { font-size: 12px; color: var(--it-ink-soft); }
+.till-key strong { font-size: 15px; line-height: 1.25; }
+.till-key > span:last-child { font-size: 13px; color: var(--it-ink-soft); }
+.till-key.empty { opacity: 0.55; cursor: not-allowed; box-shadow: none; border-style: dashed; }
+
+.till-outnow {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--it-line);
+  border-radius: 12px;
+  background: var(--it-panel);
+  overflow: hidden;
+}
+.till-outnow li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--it-line);
+}
+.till-outnow li > span { display: flex; flex-direction: column; min-width: 0; }
+.till-outnow li > span > span { font-size: 13px; color: var(--it-ink-soft); }
+
+/* ── Context (delivery / person / condition) ───────────────────────────── */
+
+.till-context {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--it-line);
+  border-radius: 12px;
+  background: var(--it-panel);
+}
+
+.till-context-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--it-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.till-context-sum { flex: 1; min-width: 0; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.till-context-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.till-span { grid-column: 1 / -1; }
+
+.till-field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--it-ink-soft); }
+.till-field input, .till-inline {
+  height: 44px;
+  padding: 0 12px;
+  box-sizing: border-box;
+  border: 1px solid var(--it-line);
+  border-radius: 8px;
+  background: var(--it-panel);
+  color: var(--it-ink);
+  font-weight: 400; font-size: 16px;
+  font-family: inherit;
+}
+.till-field-row { flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; font-size: 15px; color: var(--it-ink); }
+.till-field-row input { width: 110px; }
+.till-check { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--it-ink); }
+.till-check input { width: 20px; height: 20px; }
+
+.till-who {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 2px dashed var(--it-ink-soft);
+  border-radius: 12px;
+  background: none;
+  color: var(--it-ink);
+  font-weight: 600; font-size: 16px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.till-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.till-chip {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--it-line);
+  border-radius: 19px;
+  background: var(--it-panel);
+  color: var(--it-ink);
+  font-weight: 600; font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+}
+select.till-chip { padding-right: 8px; }
+.till-chip.on { border-color: var(--it-ink); background: var(--it-ink); color: var(--it-panel); }
+.till-chip-gap { width: 1px; height: 24px; margin: 0 2px; background: var(--it-line); }
+
+/* ── Receipt ───────────────────────────────────────────────────────────── */
+
+.till-receipt {
+  border: 1px solid var(--it-line);
+  border-radius: 12px 12px 0 0;
+  background: var(--it-panel);
+  overflow: hidden;
+}
+
+.till-receipt-head {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px dashed var(--it-line);
+  font: 600 11px 'IBM Plex Mono', ui-monospace, monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--it-ink-soft);
+}
+
+.till-receipt-empty { margin: 0; padding: 36px 24px; text-align: center; color: var(--it-ink-soft); line-height: 1.5; }
+
+.till-lines { list-style: none; margin: 0; padding: 0; }
+@media (min-width: 1024px) { .till-lines { max-height: 46vh; overflow-y: auto; } }
+
+.till-line { padding: 10px 6px 10px 14px; border-bottom: 1px solid var(--it-line); }
+.till-line-ask { background: var(--till-ask); }
+.till-line-bad { background: var(--till-bad); }
+
+.till-line-main { display: flex; align-items: flex-start; gap: 10px; }
+
+.till-badge {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--it-canvas);
+  color: var(--it-ink);
+  font: 600 12px 'IBM Plex Mono', ui-monospace, monospace;
+}
+.till-line-ask .till-badge { background: var(--till-key); color: var(--till-key-ink); }
+.till-line-bad .till-badge { background: #fed7aa; color: #7c2d12; }
+
+.till-line-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; padding-top: 2px; }
+.till-line-text strong { font-size: 15px; line-height: 1.25; overflow-wrap: anywhere; }
+.till-line-text .till-mono { font-size: 12px; color: var(--it-ink-soft); overflow-wrap: anywhere; }
+.till-note { display: flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 500; color: var(--till-ask-ink); }
+.till-line-bad .till-note { color: var(--till-bad-ink); }
+
+.till-stepper {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--it-line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.till-stepper button {
+  width: 40px;
+  height: 44px;
+  border: 0;
+  background: var(--it-canvas);
+  color: var(--it-ink);
+  font: 600 20px 'IBM Plex Mono', ui-monospace, monospace;
+  cursor: pointer;
+}
+.till-stepper .till-mono { min-width: 32px; text-align: center; font-weight: 600; font-size: 16px; }
+.till-qty { height: 44px; display: flex; align-items: center; padding: 0 6px; font-weight: 600; font-size: 16px; }
+
+.till-remove {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: none;
+  color: var(--it-ink-soft);
+  cursor: pointer;
+}
+
+.till-line-extra { margin-top: 8px; padding-left: 46px; }
+.till-fix { display: flex; flex-direction: column; gap: 8px; }
+.till-inline { width: 100%; max-width: 320px; }
+
+/* ── Footer and checkout ───────────────────────────────────────────────── */
+
+.till-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: -12px;
+  padding: 12px 14px calc(14px + env(safe-area-inset-bottom));
+  border: 1px solid var(--it-line);
+  border-top: 1px dashed var(--it-line);
+  border-radius: 0 0 12px 12px;
+  background: var(--it-panel);
+}
+
+.till-total { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; }
+.till-total strong { font-size: 32px; line-height: 1; }
+.till-foot-note { flex: 1 1 160px; text-align: right; font-size: 13px; color: var(--it-ink-soft); }
+.till-foot-note.bad { color: var(--till-bad-ink); }
+
+.ui-btn.till-cta {
+  width: 100%;
+  min-height: 58px;
+  justify-content: center;
+  border: 0;
+  border-radius: 14px;
+  background: var(--till-key);
+  color: var(--till-key-ink);
+  font-size: 17px;
+  font-weight: 700;
+}
+.ui-btn.till-cta:hover:not(:disabled) { filter: brightness(0.96); }
+.ui-btn.till-cta:disabled { background: var(--it-line); color: var(--it-ink-soft); opacity: 1; }
+
+/* ── Sheets ────────────────────────────────────────────────────────────── */
+
+.till-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(11, 12, 15, 0.55);
+}
+
+.till-sheet {
+  width: 100%;
+  max-height: 92dvh;
+  overflow-y: auto;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 16px calc(20px + env(safe-area-inset-bottom));
+  border-radius: 20px 20px 0 0;
+  background: var(--it-panel);
+  color: var(--it-ink);
+}
+
+@media (min-width: 720px) {
+  .till-scrim { align-items: center; padding: 24px; }
+  .till-sheet { max-width: 600px; border-radius: 18px; padding: 22px; }
+  .till-sheet-wide { max-width: 760px; }
+}
+
+.till-sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.till-sheet-head h2 { margin: 0; font-size: 19px; }
+.till-sheet-lede { margin: 0; color: var(--it-ink-soft); }
+.till-sheet-error { margin: 0; padding: 10px 12px; border-radius: 10px; background: var(--till-bad); color: var(--till-bad-ink); font-weight: 500; }
+
+.till-options { display: flex; flex-direction: column; gap: 10px; }
+.till-option {
+  min-height: 72px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--it-line);
+  border-radius: 14px;
+  background: var(--it-panel);
+  color: var(--it-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.till-option:hover { border-color: var(--it-brand); }
+.till-option-n {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--till-dark);
+  color: var(--till-key);
+  font-weight: 600;
+}
+.till-option-text { display: flex; flex-direction: column; gap: 2px; }
+.till-option-text strong { font-size: 16px; }
+.till-option-text span { font-size: 14px; color: var(--it-ink-soft); }
+
+.till-fieldset { margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 8px; }
+.till-fieldset legend { padding: 0; margin-bottom: 8px; font-weight: 600; font-size: 14px; }
+
+.till-newtag {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 14px;
+  border: 2px dashed var(--it-ink);
+  border-radius: 12px;
+}
+.till-newtag .till-mono { font-size: 26px; font-weight: 600; }
+.till-newtag span:last-child { flex: 1 1 220px; font-size: 13px; color: var(--it-ink-soft); }
+
+.till-sign-list { list-style: none; margin: 0; padding: 4px 0; border: 1px solid var(--it-line); border-radius: 12px; max-height: 30vh; overflow-y: auto; }
+.till-sign-list li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 14px; }
+.till-sign-list li > span:first-child { display: flex; flex-direction: column; }
+.till-sign-list .till-mono { font-size: 12px; color: var(--it-ink-soft); }
+
+/* ── Done ──────────────────────────────────────────────────────────────── */
+
+.till-done {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 16px;
+  border-radius: 14px;
+  background: var(--till-dark);
+  color: var(--till-dark-ink);
+}
+
+.till-done-head { display: flex; align-items: center; gap: 12px; }
+.till-done-head > span:last-child { display: flex; flex-direction: column; }
+.till-done-head strong { font-size: 20px; }
+.till-done-head > span:last-child > span { font-size: 14px; color: var(--till-dark-soft); }
+.till-done-tick {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--till-key);
+  color: var(--till-key-ink);
+}
+
+.till-paper { border-radius: 4px; background: #ffffff; color: #15171a; overflow: hidden; }
+.till-done-meta { margin: 0; padding: 14px 16px 10px; display: flex; flex-direction: column; gap: 4px; font-size: 12px; border-bottom: 1px dashed #9aa1ad; }
+.till-done-meta div { display: flex; justify-content: space-between; gap: 12px; }
+.till-done-meta dt { color: #3f4550; }
+.till-done-meta dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
+.till-done-rows { list-style: none; margin: 0; padding: 6px 0; max-height: 40vh; overflow-y: auto; }
+.till-done-rows li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 16px; }
+.till-done-rows li > span:first-child { display: flex; flex-direction: column; min-width: 0; }
+.till-done-rows .till-mono { font-size: 12px; color: #5b6270; }
+.till-done-total { display: flex; justify-content: space-between; padding: 12px 16px; border-top: 1px dashed #9aa1ad; font-weight: 600; font-size: 16px; }
+.till-done-warning { margin: 0; padding: 10px 16px; background: #fff4ec; color: #9a3412; font-weight: 500; }
+.till-done-link { align-self: center; color: var(--till-dark-soft); }
+
+/* The people picker was built for a row; in a column sheet its search box
+   would otherwise stretch to fill the sheet. */
+.till-sheet .as-searchbox { flex: none; height: auto; }

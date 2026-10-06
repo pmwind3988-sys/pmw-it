@@ -21,7 +21,7 @@ export default function PartTable({ device }) {
               return (
                 <tr key={key}>
                   <th scope="row">{label}</th>
-                  <td>{part.value}</td>
+                  <td>{part.value || '—'}</td>
                   <td><span className={`pc-chip g-${GRADE_SLUG[part.grade]}`}>{part.grade}</span></td>
                   <td>{part.reason}</td>
                 </tr>

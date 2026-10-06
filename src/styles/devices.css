@@ -1850,8 +1850,7 @@ a.mt:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--it-brand-line); 
 /* --- Part chips and the part table ------------------------------------- */
 .pc { display: flex; flex-wrap: wrap; gap: 4px; }
 .pc-chip { display: inline-flex; align-items: center; min-height: 24px; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
-.mc .mc-bar-fill { background: var(--grade-unknown); }
-.mc .mc-bar-fill[class*="g-"] { color: transparent; }
+.mc .mc-bar-fill:not([class*="g-"]) { background: var(--grade-unknown); }
 .pt-scroll { overflow-x: auto; }
 .pt { width: 100%; border-collapse: collapse; font-size: 14px; }
 .pt th, .pt td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--it-line); vertical-align: top; }

@@ -1,7 +1,8 @@
 import { officeLicense } from './officeLicense.js';
 import { gpuClass } from './gpuClass.js';
 import { serverDependency } from './serverDependency.js';
-import { deviceFit } from './deviceFit.js';
+import { partGrades } from './partGrades.js';
+import { DEFAULT_STANDARD } from '../standards/defaultStandard.js';
 
 /**
  * The persona layer, laid over a record the moment it is read.
@@ -23,5 +24,7 @@ export function enrichFit(record) {
     ...serverDependency(record),
   };
 
-  return { ...withFacts, ...deviceFit(withFacts) };
+  // Graded against the DEFAULT standard here, so a record is never ungraded;
+  // useDevices regrades it with the saved standard as soon as that is loaded.
+  return { ...withFacts, ...partGrades(withFacts, DEFAULT_STANDARD) };
 }

@@ -15,13 +15,16 @@ describe('enrichFit', () => {
       osSupported: true,
       cpuAgeBand: 'Current',
       cpuGenerationRank: 12,
+      storageTotalGB: 512,
+      windowsMajor: 11,
+      windowsVersion: 'Microsoft Windows 11 Pro',
       scanComplete: true,
     });
 
     expect(row.licenseStatus).toBe('Authentic');
     expect(row.dedicatedGpu).toBe(false);
     expect(row.serverDependent).toBe(true);
-    expect(row.fitStatus).toBe('Critical');
+    expect(row.gradeRam).toBe('Moderate');
     expect(row.personaLabel).toMatch(/Engineering/);
   });
 

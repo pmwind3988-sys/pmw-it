@@ -57,6 +57,7 @@ export default function DeviceDetailPage() {
   const getToken = useSharePointToken();
   const [acting, setActing] = useState(false);
   const [actionError, setActionError] = useState('');
+  const [actionNote, setActionNote] = useState('');
   const [pending, setPending] = useState([]);
 
   useEffect(() => {
@@ -88,6 +89,7 @@ export default function DeviceDetailPage() {
   const act = async (action, input) => {
     setActing(true);
     setActionError('');
+    setActionNote('');
     try {
       const tokenRes = await getToken();
       const outcome = await performLifecycle({
@@ -96,6 +98,7 @@ export default function DeviceDetailPage() {
       });
       setPending(outcome.pendingStints);
       if (outcome.pendingStints.length) setActionError('The machine moved, but its owner history could not be written.');
+      else if (outcome.logFailed) setActionNote('Saved, but the change history could not be recorded.');
     } catch (failure) {
       setActionError(failure.message);
     } finally {
@@ -173,6 +176,7 @@ export default function DeviceDetailPage() {
               </span>
               <LifecycleActions device={device} owners={owners} locations={locations} departments={departments} onAction={act} busy={acting} />
             </div>
+            {actionNote && !actionError && <p className="dd-note" role="status">{actionNote}</p>}
             {actionError && <ErrorBanner message={actionError} busy={acting} onRetry={pending.length ? retry : undefined} />}
           </Card>
 

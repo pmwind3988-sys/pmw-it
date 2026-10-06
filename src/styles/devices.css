@@ -1802,6 +1802,7 @@ a.mt:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--it-brand-line); 
 .dd-life-head { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
 .dd-life-who { display: flex; flex-direction: column; gap: 2px; flex: 1 1 260px; font-size: 15px; }
 .dd-life-serial { font-size: 13px; color: var(--it-ink-soft); font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace; }
+.dd-note { margin: 8px 0 0; font-size: 14px; color: var(--it-ink-soft); }
 .dd-status { font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; }
 .dd-status-in-use { background: var(--it-good-wash); color: var(--it-good); }
 .dd-status-in-repair { background: var(--it-accent-wash); color: var(--it-ink); }

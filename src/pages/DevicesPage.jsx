@@ -269,18 +269,23 @@ export default function DevicesPage() {
     const moved = OWNERSHIP.some((key) => {
       if (!(key in edits)) return false;
       if (key === 'location') return cleanLocation(edits[key]) !== cleanLocation(device[key]);
-      return trimmed(edits[key]) !== trimmed(device[key]);
+      // A capitalisation-only edit is not a change of hands; the lifecycle
+      // write refuses it, so it goes through the plain edit below.
+      return trimmed(edits[key]).toUpperCase() !== trimmed(device[key]).toUpperCase();
     });
     const owner = trimmed('owner' in edits ? edits.owner : device.owner);
     let existing = device;
     let rest = edits;
+    // logFailed is deliberately not an error here: the move happened.
 
-    if (moved && owner && inFleet(device)) {
+    if (moved && owner) {
+      // A machine in the stash or the graveyard being given an owner is an
+      // assignment: the plain edit would leave a Spare machine with an owner.
       const { plan, pendingStints } = await performLifecycle({
         siteUrl: SHAREPOINT_SITE_URL,
         token: tokenRes.accessToken,
         deviceId: device.id,
-        action: ACTIONS.CHANGE_OWNER,
+        action: inFleet(device) ? ACTIONS.CHANGE_OWNER : ACTIONS.ASSIGN,
         input: {
           owner,
           location: 'location' in edits ? edits.location : device.location,

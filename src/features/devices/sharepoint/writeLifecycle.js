@@ -8,12 +8,27 @@ import { readDevice } from './readDevices.js';
 import { readAssignments } from './readAssignments.js';
 import { logChanges } from './updateDevice.js';
 import { planLifecycle } from '../lifecycle/planLifecycle.js';
+import { provisionLists } from './provisionLists.js';
 
 const MERGE = { 'X-HTTP-Method': 'MERGE', 'IF-MATCH': '*' };
 
 const TEXT_COLUMN = {
   owner: 'Owner', location: 'Location', department: 'Department', ownerSource: 'OwnerSource', status: 'Status',
 };
+
+// The columns these writes name only exist once an import has provisioned them,
+// and the map -> machine -> action path can be the very first thing anyone does.
+// One run per page load; a failed run is forgotten so the next press retries.
+let provisioning = null;
+function ensureProvisioned(siteUrl, token) {
+  if (!provisioning) {
+    provisioning = provisionLists(siteUrl, token).catch((failure) => {
+      provisioning = null;
+      throw failure;
+    });
+  }
+  return provisioning;
+}
 
 /** A PARTIAL write: only the columns the action changed. Never toListItem. */
 export function lifecycleItem(fields) {
@@ -49,10 +64,17 @@ export async function writeStints({ siteUrl, token, digest, writes }) {
     const path = write.id === null
       ? `${listPath(ASSIGNMENT_LIST_NAME)}/items`
       : `${listPath(ASSIGNMENT_LIST_NAME)}/items(${write.id})`;
-    const response = await withRetry(() => spFetch(siteUrl, path, {
-      token, digest, method: 'POST', accept: ITEM_ACCEPT, body: write.body,
-      ...(write.id === null ? {} : { headers: MERGE }),
-    }));
+    let response;
+    try {
+      response = await withRetry(() => spFetch(siteUrl, path, {
+        token, digest, method: 'POST', accept: ITEM_ACCEPT, body: write.body,
+        ...(write.id === null ? {} : { headers: MERGE }),
+      }));
+    } catch (thrown) {
+      // Offline: spFetch throws instead of answering. Same rule as below.
+      thrown.remaining = writes.slice(index);
+      throw thrown;
+    }
     if (!response.ok) {
       const failure = new Error(`Could not record the owner history (${response.status})`);
       // Only what has not landed is retried: re-posting an ended legacy stint
@@ -72,7 +94,7 @@ export async function writeStints({ siteUrl, token, digest, writes }) {
 export async function performLifecycle({
   siteUrl, token, deviceId, action, input, expectedStatus, recordedBy = '', now = Date.now(),
 }) {
-  const digest = await getFormDigest(siteUrl, token);
+  const digest = (await ensureProvisioned(siteUrl, token)) ?? await getFormDigest(siteUrl, token);
   const device = await readDevice(siteUrl, token, deviceId);
   if (!device) throw new Error('That machine is no longer in the register.');
   const stints = await readAssignments(siteUrl, token, { deviceId });
@@ -92,7 +114,13 @@ export async function performLifecycle({
     pendingStints = failure.remaining ?? stintWrites(plan);
   }
 
-  await logChanges(siteUrl, token, digest, device, plan.changes, recordedBy);
+  // The move happened. A history line that would not write must not turn it
+  // into an error that invites a second press.
+  try {
+    await logChanges(siteUrl, token, digest, device, plan.changes, recordedBy);
+  } catch {
+    return { plan, pendingStints, logFailed: true };
+  }
   return { plan, pendingStints };
 }
 

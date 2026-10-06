@@ -47,7 +47,7 @@ const IDLE_SAVE = {
 const FILTER_KEYS = [
   'risk', 'attention', 'type', 'department', 'os', 'av',
   'storage', 'ram', 'cpu', 'windows', 'stale', 'q',
-  'fit', 'persona', 'license', 'server', 'formfit', 'status', 'location',
+  'part', 'critical', 'persona', 'license', 'server', 'formfit', 'status', 'location',
 ];
 
 export default function DevicesPage() {
@@ -475,12 +475,12 @@ export default function DevicesPage() {
             />
             <StatCard
               icon={AlertTriangle}
-              label="Not fit for the work"
+              label="Machines with a critical part"
               value={compliance.criticalPct ?? '—'}
               unit={`% · ${compliance.critical} machines`}
               color="var(--it-danger)"
               loading={loading}
-              onClick={() => openRegister('fit', 'Critical')}
+              onClick={() => openRegister('critical', '1')}
             />
             <StatCard
               icon={ShieldCheck}
@@ -527,9 +527,9 @@ export default function DevicesPage() {
             <>
               <DepartmentHeatmap
                 devices={scoped}
-                onSelect={(name, level) => {
+                onSelect={(name, part) => {
                   setParam('department', name);
-                  openRegister('fit', level);
+                  openRegister('part', `${part}:Critical`);
                 }}
               />
               <DeviceCharts devices={scoped} onFilter={openRegister} />

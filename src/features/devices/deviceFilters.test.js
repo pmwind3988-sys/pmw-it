@@ -142,27 +142,23 @@ describe('toCsv', () => {
 describe('the persona filters', () => {
   const rows = [
     {
-      computerName: 'A', fitStatus: 'Critical', personaLabel: 'Engineering / Technical / Media',
+      computerName: 'A', personaLabel: 'Engineering / Technical / Media',
       licenseStatus: 'Unlicensed', serverDependent: true, networkRisk: 'Severe',
       formFactorMatches: true,
     },
     {
-      computerName: 'B', fitStatus: 'Optimal', personaLabel: 'Executive / Field',
+      computerName: 'B', personaLabel: 'Executive / Field',
       licenseStatus: 'Authentic', serverDependent: true, networkRisk: 'Fine',
       formFactorMatches: false,
     },
     {
-      computerName: 'C', fitStatus: 'Moderate', personaLabel: 'Logistics / Operations / Desk',
+      computerName: 'C', personaLabel: 'Logistics / Operations / Desk',
       licenseStatus: 'Authentic', serverDependent: false, networkRisk: 'None',
       formFactorMatches: true,
     },
   ];
 
   const names = (params) => applyFilters(rows, params).map((row) => row.computerName);
-
-  it('finds the machines at one fit level', () => {
-    expect(names({ fit: 'Critical' })).toEqual(['A']);
-  });
 
   it('finds every machine judged against one workload profile', () => {
     expect(names({ persona: 'Executive / Field' })).toEqual(['B']);
@@ -179,6 +175,22 @@ describe('the persona filters', () => {
 
   it('finds the machines whose form factor does not suit the role', () => {
     expect(names({ formfit: '1' })).toEqual(['B']);
+  });
+});
+
+describe('part filters', () => {
+  const rows = [
+    { computerName: 'A', parts: { ram: { grade: 'Critical' } }, criticalParts: ['ram'] },
+    { computerName: 'B', parts: { ram: { grade: 'Optimal' } }, criticalParts: [] },
+  ];
+  it('filters by one part’s grade', () => {
+    expect(applyFilters(rows, { part: 'ram:Critical' }).map((r) => r.computerName)).toEqual(['A']);
+  });
+  it('filters to machines with any critical part', () => {
+    expect(applyFilters(rows, { critical: '1' }).map((r) => r.computerName)).toEqual(['A']);
+  });
+  it('ignores an old fit link instead of failing', () => {
+    expect(applyFilters(rows, { fit: 'Critical' })).toHaveLength(2);
   });
 });
 

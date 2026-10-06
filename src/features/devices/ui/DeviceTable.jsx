@@ -15,6 +15,7 @@ import ValueCell from './ValueCell';
 import { applyFilters, toCsv } from '../deviceFilters';
 import { EDITABLE_FIELDS } from '../sharepoint/updateDevice';
 import { DEVICE_COLUMNS } from '../sharepoint/deviceSchema';
+import { GRADE_SLUG } from '../standards/gradeColors';
 import {
   describeSelection, headerState, isSelectable, selectedDevices,
   toggleAll, toggleId, visibleSelection,
@@ -27,7 +28,7 @@ import {
  * hidden here is a field nobody knows was collected.
  */
 const LEAD_KEYS = [
-  'computerName', 'status', 'owner', 'location', 'department', 'personaLabel', 'fitStatus', 'actionRequired',
+  'computerName', 'status', 'owner', 'location', 'department', 'personaLabel', 'gradeCpu', 'gradeRam', 'gradeStorage', 'gradeGraphics', 'gradeWindows', 'actionRequired',
   'suggestedFormFactor', 'deviceType', 'licenseStatus', 'computerModel', 'cpuModel',
   'installedRamGB', 'storageTotalGB', 'storageType', 'windowsVersion',
   'antivirusStatus', 'riskScore', 'riskLevel',
@@ -40,9 +41,12 @@ const LEAD_KEYS = [
  */
 const CALCULATED_COLUMNS = [
   { key: 'personaLabel', label: 'Workload Profile' },
-  { key: 'fitStatus', label: 'Device Health' },
+  { key: 'gradeCpu', label: 'CPU Grade' },
+  { key: 'gradeRam', label: 'RAM Grade' },
+  { key: 'gradeStorage', label: 'Storage Grade' },
+  { key: 'gradeGraphics', label: 'Graphics Grade' },
+  { key: 'gradeWindows', label: 'Windows Grade' },
   { key: 'actionRequired', label: 'Action Required' },
-  { key: 'fitReasons', label: 'Why' },
   { key: 'suggestedFormFactor', label: 'Suggested Form Factor' },
   { key: 'licenseStatus', label: 'Office Licence' },
   { key: 'licenseNote', label: 'Licence Detail' },
@@ -110,7 +114,7 @@ const FILTER_LABELS = {
   status: 'Status', location: 'Location',
   os: 'OS', av: 'Antivirus', storage: 'Storage', ram: 'RAM', cpu: 'CPU age',
   windows: 'Windows', stale: 'Stale scans', q: 'Search',
-  fit: 'Device health', persona: 'Workload profile', license: 'Office licence',
+  part: 'Part grade', critical: 'Has a critical part', persona: 'Workload profile', license: 'Office licence',
   server: 'Server link', formfit: 'Form factor mismatch',
 };
 
@@ -118,7 +122,7 @@ const FILTER_LABELS = {
  * The on/off filters carry no value worth reading -- their chip is the label
  * alone, not "Needs attention: 1".
  */
-const FLAG_FILTERS = new Set(['attention', 'stale', 'formfit']);
+const FLAG_FILTERS = new Set(['attention', 'stale', 'formfit', 'critical']);
 
 const chipText = (key, value) =>
   (FLAG_FILTERS.has(key)
@@ -136,21 +140,12 @@ function download(name, text) {
 
 const TYPE_OPTIONS = ['Laptop', 'Desktop', 'Unknown'];
 
-/**
- * The two verdict columns are the only coloured ones. They share the risk
- * palette rather than a second one of their own: red is "go and look", amber is
- * "put it on the list", green is "leave it alone", whichever column says it.
- */
-const FIT_TONE = {
-  Critical: 'critical',
-  'Needs Attention': 'watch',
-  Optimal: 'ok',
-};
+const GRADE_KEYS = new Set(['gradeCpu', 'gradeRam', 'gradeStorage', 'gradeGraphics', 'gradeWindows']);
 
 const toneClassFor = (device, key) => {
   if (key === 'riskLevel') return `rg-risk rg-risk-${String(device.riskLevel).toLowerCase()}`;
-  const tone = key === 'fitStatus' ? FIT_TONE[device.fitStatus] : null;
-  return tone ? `rg-risk rg-risk-${tone}` : undefined;
+  if (GRADE_KEYS.has(key)) return `dt-grade g-${GRADE_SLUG[device[key]] ?? 'unknown'}`;
+  return undefined;
 };
 
 export default function DeviceTable({

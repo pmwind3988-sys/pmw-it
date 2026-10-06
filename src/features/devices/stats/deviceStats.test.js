@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
-  fleetSummary, countBy, scansByMonth, leaderboards, complianceSummary, fitByDepartment,
+  fleetSummary, countBy, scansByMonth, leaderboards, complianceSummary, criticalPartsByDepartment,
 } from './deviceStats.js';
+import { partGrades } from '../derive/partGrades.js';
+import { defaultStandard } from '../standards/defaultStandard.js';
 
 const NOW = Date.UTC(2026, 7, 21);
 const DAY = 86_400_000;
@@ -127,19 +129,11 @@ describe('leaderboards', () => {
 
 describe('complianceSummary', () => {
   const rows = [
-    { fitStatus: 'Critical', licenseStatus: 'Unlicensed', serverDependent: true, networkRisk: 'Severe' },
-    { fitStatus: 'Optimal', licenseStatus: 'Authentic', serverDependent: true, networkRisk: 'Fine' },
-    { fitStatus: 'Moderate', licenseStatus: 'Authentic', serverDependent: false, networkRisk: 'None', formFactorMatches: false },
-    { fitStatus: 'Unknown', licenseStatus: 'Undefined', scanComplete: false },
+    { licenseStatus: 'Unlicensed', serverDependent: true, networkRisk: 'Severe' },
+    { licenseStatus: 'Authentic', serverDependent: true, networkRisk: 'Fine' },
+    { licenseStatus: 'Authentic', serverDependent: false, networkRisk: 'None', formFactorMatches: false },
+    { licenseStatus: 'Undefined', scanComplete: false },
   ];
-
-  it('counts the fleet the cards report on, leaving failed scans out', () => {
-    const summary = complianceSummary(rows);
-    expect(summary.total).toBe(3);
-    expect(summary.graded).toBe(3);
-    expect(summary.critical).toBe(1);
-    expect(summary.criticalPct).toBe(33);
-  });
 
   it('reports licensing as a rate and a count of what to fix', () => {
     const summary = complianceSummary(rows);
@@ -158,23 +152,36 @@ describe('complianceSummary', () => {
   });
 });
 
-describe('fitByDepartment', () => {
-  const rows = [
-    { department: 'ENGINEERING', fitStatus: 'Critical', personaLabel: 'Engineering / Technical / Media' },
-    { department: 'ENGINEERING', fitStatus: 'Optimal', personaLabel: 'Engineering / Technical / Media' },
-    { department: 'FINANCE', fitStatus: 'Moderate', personaLabel: 'Logistics / Operations / Desk' },
-    { department: 'FINANCE', fitStatus: 'Moderate', personaLabel: 'Logistics / Operations / Desk' },
-  ];
+describe('complianceSummary — critical parts', () => {
+  const S = defaultStandard();
+  const graded = (over) => {
+    const base = { department: 'HR', scanComplete: true, cpuGenerationRank: 12, installedRamGB: 16, storageTotalGB: 512,
+      storageType: 'SSD only', dedicatedGpu: false, osSupported: true, windowsMajor: 11, ...over };
+    return { ...base, ...partGrades(base, S) };
+  };
 
-  it('puts the department in the most trouble at the top', () => {
-    const [first] = fitByDepartment(rows);
-    expect(first.department).toBe('ENGINEERING');
-    expect(first.riskIndex).toBe(50);
+  it('counts machines with any critical part, as a share of machines graded at all', () => {
+    const s = complianceSummary([graded({ installedRamGB: 4 }), graded(), graded({ scanComplete: false })]);
+    expect(s.critical).toBe(1);
+    expect(s.judged).toBe(2);
+    expect(s.criticalPct).toBe(50);
   });
+});
 
-  it('keeps a healthy department at nought', () => {
-    const finance = fitByDepartment(rows).find((row) => row.department === 'FINANCE');
-    expect(finance.riskIndex).toBe(0);
-    expect(finance.total).toBe(2);
+describe('criticalPartsByDepartment', () => {
+  const S = defaultStandard();
+  const graded = (over) => {
+    const base = { department: 'HR', scanComplete: true, cpuGenerationRank: 12, installedRamGB: 16, storageTotalGB: 512,
+      storageType: 'SSD only', dedicatedGpu: false, osSupported: true, windowsMajor: 11, ...over };
+    return { ...base, ...partGrades(base, S) };
+  };
+
+  it('counts critical machines per part per department, worst department first', () => {
+    const rows = criticalPartsByDepartment([
+      graded({ department: 'HR', installedRamGB: 4 }), graded({ department: 'HR' }),
+      graded({ department: 'SALES', installedRamGB: 4, storageType: 'HDD only' }),
+    ]);
+    expect(rows[0]).toMatchObject({ department: 'SALES', total: 1, criticalMachines: 1, ram: 1, storage: 1, cpu: 0 });
+    expect(rows[1]).toMatchObject({ department: 'HR', total: 2, criticalMachines: 1, ram: 1 });
   });
 });

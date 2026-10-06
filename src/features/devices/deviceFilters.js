@@ -41,7 +41,12 @@ const MATCHERS = {
   // read is unknown, not unprotected, and must not land in either bucket.
   av: (device, value) =>
     (value === 'Unprotected' ? device.avProtected === false : device.avProtected === true),
-  fit: (device, value) => device.fitStatus === value,
+  part: (device, value) => {
+    const [key, grade] = String(value).split(':');
+    return device.parts?.[key]?.grade === grade;
+  },
+  critical: (device) => (device.criticalParts?.length ?? 0) > 0,
+  fit: () => true,
   persona: (device, value) => labelOf(device.personaLabel) === value,
   license: (device, value) => labelOf(device.licenseStatus) === value,
   // Two different questions, one key: 'Dependent' is everyone whose work lives

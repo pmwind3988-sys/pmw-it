@@ -1855,3 +1855,12 @@ a.mt:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--it-brand-line); 
 .pt { width: 100%; border-collapse: collapse; font-size: 14px; }
 .pt th, .pt td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--it-line); vertical-align: top; }
 .pt thead th { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--it-ink-soft); }
+
+/* --- Part heatmap and register grade cells ------------------------------ */
+.hm-scroll { overflow-x: auto; }
+.hm { width: 100%; border-collapse: collapse; font-size: 14px; }
+.hm th, .hm td { padding: 8px 10px; border-bottom: 1px solid var(--it-line); text-align: center; }
+.hm th[scope="row"], .hm thead th:first-child { text-align: left; }
+.hm-cell { min-width: 44px; min-height: 36px; border: 0; border-radius: 8px; font: inherit; font-weight: 700; cursor: pointer; }
+.hm-zero { color: var(--it-ink-soft); }
+.dt-grade { font-weight: 700; }

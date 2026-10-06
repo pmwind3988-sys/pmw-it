@@ -1,6 +1,7 @@
 import { BarChart, ColumnChart } from '../../../components/ui/Charts';
 import { countBy, scansByMonth } from '../stats/deviceStats';
 import { ramBucket } from '../deviceFilters';
+import { PARTS } from '../standards/defaultStandard';
 
 /**
  * Colour is a signal here, not decoration: anything that means "act on this"
@@ -8,14 +9,6 @@ import { ramBucket } from '../deviceFilters';
  * `--it-good`, and everything neutral is the brand colour.
  */
 const token = (name) => `var(${name})`;
-
-const FIT_COLOUR = {
-  Critical: token('--it-danger'),
-  'Needs Attention': token('--it-accent'),
-  Moderate: token('--it-brand'),
-  Optimal: token('--it-good'),
-  Unknown: token('--it-ink-soft'),
-};
 
 const LICENSE_COLOUR = {
   Authentic: token('--it-good'),
@@ -40,10 +33,19 @@ export default function DeviceCharts({ devices, onFilter }) {
   return (
     <div className="chart-grid">
       <BarChart
-        title="Fit for the work"
-        blurb="Each machine measured against what its department actually does."
-        rows={paint(countBy(devices, (d) => d.fitStatus), (label) => FIT_COLOUR[label])}
-        onSelect={select('fit')}
+        title="Critical parts"
+        blurb="How many machines are Critical on each part."
+        rows={paint(
+          PARTS.map(({ key, label }) => ({
+            label,
+            count: devices.filter((d) => d.parts?.[key]?.grade === 'Critical').length,
+          })),
+          () => 'var(--grade-critical)',
+        )}
+        onSelect={(row) => {
+          const part = PARTS.find((p) => p.label === row.label);
+          if (part) onFilter('part', `${part.key}:Critical`);
+        }}
         emptyText="No devices imported yet."
       />
 

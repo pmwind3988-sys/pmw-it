@@ -8,33 +8,13 @@ import { readDevice } from './readDevices.js';
 import { readAssignments } from './readAssignments.js';
 import { logChanges } from './updateDevice.js';
 import { planLifecycle } from '../lifecycle/planLifecycle.js';
-import { provisionLists } from './provisionLists.js';
+import { ensureProvisioned } from './ensureProvisioned.js';
 
 const MERGE = { 'X-HTTP-Method': 'MERGE', 'IF-MATCH': '*' };
 
 const TEXT_COLUMN = {
   owner: 'Owner', location: 'Location', department: 'Department', ownerSource: 'OwnerSource', status: 'Status',
 };
-
-// The columns these writes name only exist once an import has provisioned them,
-// and the map -> machine -> action path can be the very first thing anyone does.
-// One run per page load; a failed run is forgotten so the next press retries.
-let provisioning = null;
-// Resolves to the digest provisioning obtained only for the call that ran it;
-// later calls get null and fetch their own, because a digest expires (~30 min)
-// and a page left open must not keep sending a dead one.
-async function ensureProvisioned(siteUrl, token) {
-  if (provisioning) {
-    await provisioning;
-    return null;
-  }
-  const run = provisionLists(siteUrl, token);
-  provisioning = run.catch((failure) => {
-    provisioning = null;
-    throw failure;
-  });
-  return (await provisioning, await run);
-}
 
 /** A PARTIAL write: only the columns the action changed. Never toListItem. */
 export function lifecycleItem(fields) {

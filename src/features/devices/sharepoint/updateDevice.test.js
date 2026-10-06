@@ -5,6 +5,8 @@ import {
   planEdit, updateDevice, deleteDevice, deleteDevices, EDITABLE_FIELDS,
 } from './updateDevice.js';
 
+vi.mock('./provisionLists.js', () => ({ provisionLists: vi.fn(async () => 'D') }));
+
 const SITE = 'https://contoso.sharepoint.com/sites/it';
 
 const row = (overrides) => ({

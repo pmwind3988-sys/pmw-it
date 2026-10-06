@@ -5,6 +5,7 @@ import { DEVICE_LIST_NAME, CHANGE_LIST_NAME } from './deviceSchema.js';
 import { runPool, withRetry } from '../../sharepoint/writePool.js';
 import { formatMYT } from '../../../utils/malaysiaTime.js';
 import { cleanLocation } from '../map/locations.js';
+import { ensureProvisioned } from './ensureProvisioned.js';
 
 /**
  * The only fields the register lets somebody retype. They are exactly the ones
@@ -102,7 +103,9 @@ export async function updateDevice({
   const { changes, manualFields } = planEdit(existing, edits);
   if (!changes.length) return { changes: [] };
 
-  const digest = await getFormDigest(siteUrl, token);
+  // Location (and the other columns) may predate the list: a machine page can
+  // be the first thing anybody writes through.
+  const digest = (await ensureProvisioned(siteUrl, token)) ?? await getFormDigest(siteUrl, token);
 
   const response = await withRetry(() =>
     spFetch(siteUrl, `${listPath(DEVICE_LIST_NAME)}/items(${existing.id})`, {

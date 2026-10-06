@@ -1,7 +1,10 @@
 import { useId, useState } from 'react';
 import Button from '../../../components/ui/Button';
 
+// Owner is corrected, never filled: a machine with nobody on it gets somebody
+// through Change owner / Assign, which is what starts an owner-history entry.
 const FIELDS = [
+  { key: 'owner', label: 'Owner', placeholder: '', fillable: false },
   { key: 'location', label: 'Location', placeholder: 'e.g. F1' },
   { key: 'department', label: 'Department', placeholder: '' },
 ];
@@ -9,13 +12,16 @@ const FIELDS = [
 const textOf = (value) => String(value ?? '').trim();
 
 /**
- * A machine's location and department, set or corrected in place. A blank
- * field opens as a box; a set one shows its value and a Change button. Saving
- * is a correction of the record, written as a manual edit so the next import
- * leaves it alone -- a machine actually going to somebody else still goes
- * through Change owner, which is what the owner history records.
+ * A machine's owner name, location and department, set or corrected in place.
+ * A blank location or department opens as a box; a set field shows its value
+ * and a Change button. Saving is a correction of the record -- a misspelt
+ * name, a wrong site -- written as a manual edit so the next import leaves it
+ * alone. A machine actually going to somebody else still goes through Change
+ * owner, which is what ends one owner-history entry and starts the next.
  */
-export default function PlaceFill({ device, locations, departments, onSave, busy }) {
+export default function PlaceFill({
+  device, owners, locations, departments, onSave, busy,
+}) {
   const id = useId();
   const [opened, setOpened] = useState([]);
   const [values, setValues] = useState({});
@@ -26,7 +32,8 @@ export default function PlaceFill({ device, locations, departments, onSave, busy
   const [note, setNote] = useState('');
 
   const current = (key) => (key in saved ? saved[key] : textOf(device[key]));
-  const editing = FIELDS.filter(({ key }) => !current(key) || opened.includes(key)).map(({ key }) => key);
+  const shown = FIELDS.filter(({ key, fillable = true }) => fillable || current(key));
+  const editing = shown.filter(({ key }) => !current(key) || opened.includes(key)).map(({ key }) => key);
   const valueOf = (key) => (key in values ? values[key] : current(key));
 
   const edits = Object.fromEntries(editing
@@ -51,19 +58,19 @@ export default function PlaceFill({ device, locations, departments, onSave, busy
     event.preventDefault();
     if (!Object.keys(edits).length) return;
     if (await onSave(edits)) {
-      const shown = { ...edits };
-      if ('location' in shown) shown.location = shown.location.toUpperCase();
-      setSaved((list) => ({ ...list, ...shown }));
+      const now = { ...edits };
+      if ('location' in now) now.location = now.location.toUpperCase();
+      setSaved((list) => ({ ...list, ...now }));
       close();
       setNote('Saved.');
     }
   };
 
-  const options = { location: locations, department: departments };
+  const options = { owner: owners, location: locations, department: departments };
 
   return (
     <form className="dd-place" onSubmit={submit}>
-      {FIELDS.map(({ key, label, placeholder }) => (editing.includes(key) ? (
+      {shown.map(({ key, label, placeholder }) => (editing.includes(key) ? (
         <label className="ad-field" key={key}>
           <span>{label}</span>
           <input list={`${id}-${key}`} value={valueOf(key)} onChange={set(key)}

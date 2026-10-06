@@ -16,7 +16,7 @@ import { useDeviceHistory } from '../features/devices/useDeviceHistory';
 import LifecycleActions from '../features/devices/ui/LifecycleActions';
 import OwnerHistory from '../features/devices/ui/OwnerHistory';
 import SpecHistory from '../features/devices/ui/SpecHistory';
-import { performLifecycle, retryStints } from '../features/devices/sharepoint/writeLifecycle';
+import { performLifecycle, retryStints, correctOpenStint } from '../features/devices/sharepoint/writeLifecycle';
 import { statusOf } from '../features/devices/lifecycle/status';
 import { locationsIn } from '../features/devices/map/locations';
 import { labelOf } from '../features/devices/deviceFilters';
@@ -103,8 +103,9 @@ export default function DeviceDetailPage() {
     }
   };
 
-  // A blank location or department filled in by hand: a correction, written as
-  // a manual edit so the next import leaves it alone.
+  // An owner, location or department set or corrected by hand: a manual edit
+  // so the next import leaves it alone, carried onto the current owner-history
+  // entry so the history does not keep the old spelling. Not a move.
   const fillPlace = async (edits) => {
     setPlacing(true);
     setActionError('');
@@ -115,6 +116,14 @@ export default function DeviceDetailPage() {
         siteUrl: SHAREPOINT_SITE_URL, token: tokenRes.accessToken, existing: device, edits,
         changedBy: tokenRes.account?.username ?? '',
       });
+      try {
+        await correctOpenStint({
+          siteUrl: SHAREPOINT_SITE_URL, token: tokenRes.accessToken, deviceId: device.id, fields: edits,
+        });
+      } catch {
+        // The machine is corrected either way; only the history line lags.
+        setActionNote('Saved, but the owner history still shows the old value.');
+      }
       return true;
     } catch (failure) {
       setActionError(failure.message);
@@ -199,7 +208,8 @@ export default function DeviceDetailPage() {
                 </span>
                 <LifecycleActions device={device} owners={owners} locations={locations} departments={departments} onAction={act} busy={acting} />
               </div>
-              <PlaceFill key={`${device.id}|${device.location ?? ''}|${device.department ?? ''}`} device={device} locations={locations} departments={departments}
+              <PlaceFill key={`${device.id}|${device.owner ?? ''}|${device.location ?? ''}|${device.department ?? ''}`} device={device}
+                owners={owners} locations={locations} departments={departments}
                 onSave={fillPlace} busy={placing} />
               {actionNote && !actionError && <p className="dd-note" role="status">{actionNote}</p>}
               {actionError && <ErrorBanner message={actionError} busy={acting} onRetry={pending.length ? retry : undefined} />}

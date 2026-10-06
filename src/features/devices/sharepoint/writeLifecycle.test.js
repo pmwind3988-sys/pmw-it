@@ -1,5 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { lifecycleItem, stintWrites, performLifecycle } from './writeLifecycle.js';
+import {
+  lifecycleItem, stintWrites, performLifecycle, correctOpenStint,
+} from './writeLifecycle.js';
 
 vi.mock('./provisionLists.js', () => ({ provisionLists: vi.fn(async () => 'D') }));
 
@@ -163,5 +165,40 @@ describe('performLifecycle', () => {
     await expect(fresh(move)).rejects.toThrow('offline');
     await fresh(move);
     expect(provisionLists).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('correctOpenStint', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const stub = (stints) => {
+    const calls = [];
+    vi.stubGlobal('fetch', async (url, init = {}) => {
+      calls.push({ url, method: init.method, headers: init.headers ?? {}, body: init.body ? JSON.parse(init.body) : undefined });
+      const ok = (body = {}) => ({ ok: true, status: 200, json: async () => body, text: async () => '', headers: { get: () => null } });
+      if (url.endsWith('/_api/contextinfo')) return ok({ d: { GetContextWebInformation: { FormDigestValue: 'D' } } });
+      if (url.includes('/items?')) return ok({ d: { results: stints } });
+      return ok();
+    });
+    return calls;
+  };
+
+  it('renames the open stint in place, without ending it', async () => {
+    const calls = stub([
+      { Id: 11, DeviceId: 4, Owner: 'Old', EndedOn: '2026-01-01T00:00:00Z' },
+      { Id: 12, DeviceId: 4, Owner: 'Genral Stockyard', EndedOn: null },
+    ]);
+    const wrote = await correctOpenStint({ siteUrl: SITE, token: 't', deviceId: 4, fields: { owner: 'General Stockyard', location: 'f2' } });
+    expect(wrote).toBe(true);
+    const merge = calls.find((c) => c.url.includes('items(12)'));
+    expect(merge.headers['X-HTTP-Method']).toBe('MERGE');
+    expect(merge.body).toEqual({ Owner: 'General Stockyard', Location: 'F2' });
+    expect(calls.some((c) => c.url.includes('items(11)'))).toBe(false);
+  });
+
+  it('writes nothing when no stint is open', async () => {
+    const calls = stub([]);
+    expect(await correctOpenStint({ siteUrl: SITE, token: 't', deviceId: 4, fields: { owner: 'X' } })).toBe(false);
+    expect(calls.filter((c) => c.method === 'POST')).toHaveLength(0);
   });
 });

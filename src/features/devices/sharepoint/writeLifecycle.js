@@ -9,6 +9,8 @@ import { readAssignments } from './readAssignments.js';
 import { logChanges } from './updateDevice.js';
 import { planLifecycle } from '../lifecycle/planLifecycle.js';
 import { ensureProvisioned } from './ensureProvisioned.js';
+import { openStintOf } from '../lifecycle/stints.js';
+import { cleanLocation } from '../map/locations.js';
 
 const MERGE = { 'X-HTTP-Method': 'MERGE', 'IF-MATCH': '*' };
 
@@ -114,4 +116,29 @@ export async function performLifecycle({
 export async function retryStints({ siteUrl, token, writes }) {
   const digest = await getFormDigest(siteUrl, token);
   await writeStints({ siteUrl, token, digest, writes });
+}
+
+const STINT_COLUMN = { owner: 'Owner', location: 'Location', department: 'Department' };
+
+/**
+ * A spelling corrected on the machine is corrected on the stint it is in now,
+ * or the owner history would go on showing the name as it was mistyped. This
+ * is NOT a move: no stint ends and none begins. A machine with no open stint
+ * has nothing written -- its history is still read off the device row.
+ * Returns whether a stint was written.
+ */
+export async function correctOpenStint({ siteUrl, token, deviceId, fields }) {
+  const body = {};
+  for (const [key, column] of Object.entries(STINT_COLUMN)) {
+    if (!(key in fields)) continue;
+    body[column] = (key === 'location' ? cleanLocation(fields[key]) : fields[key]) ?? '';
+  }
+  if (!Object.keys(body).length) return false;
+
+  const open = openStintOf(Number(deviceId), await readAssignments(siteUrl, token, { deviceId }));
+  if (!open?.id) return false;
+
+  const digest = await getFormDigest(siteUrl, token);
+  await writeStints({ siteUrl, token, digest, writes: [{ id: open.id, body }] });
+  return true;
 }

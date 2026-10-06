@@ -137,137 +137,137 @@ export default function DeviceDetailPage() {
           <p className="dv-standard-note" role="status">{standards.note || standards.error}</p>
         )}
 
-        {error && <ErrorBanner message={error} onRetry={reload} />}
+          {error && <ErrorBanner message={error} onRetry={reload} />}
 
-      {!device ? (
-        <Card>
-          <EmptyState>
-            {loading
-              ? 'Loading the register…'
-              : 'No device with that id is in the register any more.'}
-            {!loading && (
-              <>
-                {' '}
-                <Link to="/devices">Back to the map</Link>
-              </>
-            )}
-          </EmptyState>
-        </Card>
-      ) : (
-        <>
-          <nav className="dm-crumbs" aria-label="Breadcrumb">
-            <Link to={mapHref()}>Map</Link>
-            {device.location && (<><span aria-hidden="true">›</span><Link to={mapHref({ location: device.location })}>{device.location}</Link></>)}
-            {device.location && (<><span aria-hidden="true">›</span><Link to={mapHref({ location: device.location, department: labelOf(device.department) })}>{labelOf(device.department)}</Link></>)}
-            <span aria-hidden="true">›</span><span aria-current="page">{device.computerName}</span>
-          </nav>
-
-          <Card className="dd-life">
-            <div className="dd-life-head">
-              <span className={`dd-status dd-status-${statusOf(device).replace(' ', '-').toLowerCase()}`}>{statusOf(device)}</span>
-              <span className="dd-life-who">
-                {device.owner
-                  ? <>With <strong>{device.owner}</strong>{[device.location, device.department].filter(Boolean).map((v) => ` · ${v}`).join('')}</>
-                  : 'Nobody has it'}
-                {device.serialNumber && <span className="dd-life-serial">Serial {device.serialNumber}</span>}
-              </span>
-              <LifecycleActions device={device} owners={owners} locations={locations} departments={departments} onAction={act} busy={acting} />
-            </div>
-            {actionNote && !actionError && <p className="dd-note" role="status">{actionNote}</p>}
-            {actionError && <ErrorBanner message={actionError} busy={acting} onRetry={pending.length ? retry : undefined} />}
-          </Card>
-
-          <div className="dd-histories">
-            <OwnerHistory device={device} stints={history.stints} loading={history.loading} />
-            <SpecHistory changes={history.changes} loading={history.loading} />
-          </div>
-          {history.error && <ErrorBanner message={history.error} onRetry={history.reload} />}
-
-          <div className="dd-summary">
-            <span className={`dd-risk rg-risk-${String(device.riskLevel).toLowerCase()}`}>
-              {device.riskLevel ?? 'Unknown'}
-              {typeof device.riskScore === 'number' && (
-                <span className="dd-risk-score">{device.riskScore}</span>
+        {!device ? (
+          <Card>
+            <EmptyState>
+              {loading
+                ? 'Loading the register…'
+                : 'No device with that id is in the register any more.'}
+              {!loading && (
+                <>
+                  {' '}
+                  <Link to="/devices">Back to the map</Link>
+                </>
               )}
-            </span>
-            <span className="dd-scanned">
-              Scanned {formatMYT(device.scannedOn, 'datetime12')}
-              <span className="dd-scanned-zone"> Malaysia time</span>
-            </span>
-            <label className="dd-toggle">
-              <input
-                type="checkbox"
-                checked={showEmpty}
-                onChange={(event) => setShowEmpty(event.target.checked)}
-              />
-              Show the fields the scan left blank
-            </label>
-            <label className="dd-toggle dd-toggle-tones">
-              <input
-                type="checkbox"
-                checked={showTones}
-                onChange={(event) => setShowTones(event.target.checked)}
-              />
-              Colour the risks red and the healthy values green
-            </label>
-          </div>
+            </EmptyState>
+          </Card>
+        ) : (
+          <>
+            <nav className="dm-crumbs" aria-label="Breadcrumb">
+              <Link to={mapHref()}>Map</Link>
+              {device.location && (<><span aria-hidden="true">›</span><Link to={mapHref({ location: device.location })}>{device.location}</Link></>)}
+              {device.location && (<><span aria-hidden="true">›</span><Link to={mapHref({ location: device.location, department: labelOf(device.department) })}>{labelOf(device.department)}</Link></>)}
+              <span aria-hidden="true">›</span><span aria-current="page">{device.computerName}</span>
+            </nav>
 
-          <PartTable device={device} />
-
-          <div className="dd-groups">
-            {groups.map((group) => (
-              <Card key={group.id} className="dd-group">
-                <h2 className="dd-group-title">
-                  {group.title}
-                  {group.hint && <span className="dd-group-hint">{group.hint}</span>}
-                </h2>
-                <dl className="dd-fields">
-                  {group.fields.map((field) => (
-                    <div className="dd-field" key={field.key}>
-                      <dt>
-                        {field.label}
-                        {manual.has(field.key) && (
-                          <span className="dt-manual" title="Set by hand — imports leave this alone">
-                            edited
-                          </span>
-                        )}
-                      </dt>
-                      <dd>
-                        <ValueCell
-                          value={device[field.key]}
-                          fieldKey={field.key}
-                          kind={field.kind}
-                          tone={showTones ? toneForField(device, field.key) : null}
-                          entryTone={showTones && hasEntryTones(field.key)
-                            ? (text) => toneForEntry(field.key, text)
-                            : undefined}
-                        />
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
-              </Card>
-            ))}
-          </div>
-
-          {device[RAW_REPORT_KEY] && (
-            <Card className="dd-raw">
-              <button
-                type="button"
-                className="dd-raw-toggle"
-                onClick={() => setShowRaw((open) => !open)}
-                aria-expanded={showRaw}
-              >
-                {showRaw ? 'Hide' : 'Show'} the scan report
-                {device.sourceFileName && (
-                  <span className="dd-raw-file">{formatScalar(device.sourceFileName)}</span>
-                )}
-              </button>
-              {showRaw && <pre className="dd-raw-text">{device[RAW_REPORT_KEY]}</pre>}
+            <Card className="dd-life">
+              <div className="dd-life-head">
+                <span className={`dd-status dd-status-${statusOf(device).replace(' ', '-').toLowerCase()}`}>{statusOf(device)}</span>
+                <span className="dd-life-who">
+                  {device.owner
+                    ? <>With <strong>{device.owner}</strong>{[device.location, device.department].filter(Boolean).map((v) => ` · ${v}`).join('')}</>
+                    : 'Nobody has it'}
+                  {device.serialNumber && <span className="dd-life-serial">Serial {device.serialNumber}</span>}
+                </span>
+                <LifecycleActions device={device} owners={owners} locations={locations} departments={departments} onAction={act} busy={acting} />
+              </div>
+              {actionNote && !actionError && <p className="dd-note" role="status">{actionNote}</p>}
+              {actionError && <ErrorBanner message={actionError} busy={acting} onRetry={pending.length ? retry : undefined} />}
             </Card>
-          )}
-        </>
-      )}
+
+            <div className="dd-histories">
+              <OwnerHistory device={device} stints={history.stints} loading={history.loading} />
+              <SpecHistory changes={history.changes} loading={history.loading} />
+            </div>
+            {history.error && <ErrorBanner message={history.error} onRetry={history.reload} />}
+
+            <div className="dd-summary">
+              <span className={`dd-risk rg-risk-${String(device.riskLevel).toLowerCase()}`}>
+                {device.riskLevel ?? 'Unknown'}
+                {typeof device.riskScore === 'number' && (
+                  <span className="dd-risk-score">{device.riskScore}</span>
+                )}
+              </span>
+              <span className="dd-scanned">
+                Scanned {formatMYT(device.scannedOn, 'datetime12')}
+                <span className="dd-scanned-zone"> Malaysia time</span>
+              </span>
+              <label className="dd-toggle">
+                <input
+                  type="checkbox"
+                  checked={showEmpty}
+                  onChange={(event) => setShowEmpty(event.target.checked)}
+                />
+                Show the fields the scan left blank
+              </label>
+              <label className="dd-toggle dd-toggle-tones">
+                <input
+                  type="checkbox"
+                  checked={showTones}
+                  onChange={(event) => setShowTones(event.target.checked)}
+                />
+                Colour the risks red and the healthy values green
+              </label>
+            </div>
+
+            <PartTable device={device} />
+
+            <div className="dd-groups">
+              {groups.map((group) => (
+                <Card key={group.id} className="dd-group">
+                  <h2 className="dd-group-title">
+                    {group.title}
+                    {group.hint && <span className="dd-group-hint">{group.hint}</span>}
+                  </h2>
+                  <dl className="dd-fields">
+                    {group.fields.map((field) => (
+                      <div className="dd-field" key={field.key}>
+                        <dt>
+                          {field.label}
+                          {manual.has(field.key) && (
+                            <span className="dt-manual" title="Set by hand — imports leave this alone">
+                              edited
+                            </span>
+                          )}
+                        </dt>
+                        <dd>
+                          <ValueCell
+                            value={device[field.key]}
+                            fieldKey={field.key}
+                            kind={field.kind}
+                            tone={showTones ? toneForField(device, field.key) : null}
+                            entryTone={showTones && hasEntryTones(field.key)
+                              ? (text) => toneForEntry(field.key, text)
+                              : undefined}
+                          />
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </Card>
+              ))}
+            </div>
+
+            {device[RAW_REPORT_KEY] && (
+              <Card className="dd-raw">
+                <button
+                  type="button"
+                  className="dd-raw-toggle"
+                  onClick={() => setShowRaw((open) => !open)}
+                  aria-expanded={showRaw}
+                >
+                  {showRaw ? 'Hide' : 'Show'} the scan report
+                  {device.sourceFileName && (
+                    <span className="dd-raw-file">{formatScalar(device.sourceFileName)}</span>
+                  )}
+                </button>
+                {showRaw && <pre className="dd-raw-text">{device[RAW_REPORT_KEY]}</pre>}
+              </Card>
+            )}
+          </>
+        )}
       </div>
     </AppShell>
   );

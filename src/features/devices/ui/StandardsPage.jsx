@@ -6,7 +6,7 @@ import { useSharePointToken } from '../../../hooks/useRequests';
 import { formatMYT } from '../../../utils/malaysiaTime';
 import { labelOf, UNASSIGNED } from '../deviceFilters';
 import {
-  cloneStandard, PROFILE_KEYS, PROFILE_SHORT, GRADES, UNKNOWN, STORAGE_TYPES, DEFAULT_COLORS,
+  cloneStandard, PROFILE_KEYS, PROFILE_SHORT, GRADES, UNKNOWN, STORAGE_TYPES, DEFAULT_COLORS, PARTS,
 } from '../standards/defaultStandard';
 import { validateStandard } from '../standards/validateStandard';
 import { diffStandard, summaryOf } from '../standards/diffStandard';
@@ -14,6 +14,8 @@ import { previewChanges } from '../standards/previewChanges';
 import { inkFor, tooSimilar, GRADE_SLUG } from '../standards/gradeColors';
 import { saveStandard } from '../sharepoint/saveStandard';
 
+const HEX = /^#[0-9a-f]{6}$/i;
+const without = (map, key) => Object.fromEntries(Object.entries(map).filter(([k]) => k !== key));
 const SITE = import.meta.env.VITE_SHAREPOINT_SITE_URL || 'https://pmwgroupcom.sharepoint.com/sites/IThelpdesk';
 
 const NUMERIC = [
@@ -48,6 +50,8 @@ export default function StandardsPage({ devices, standards }) {
   const [draft, setDraft] = useState(null);
   const [saving, setSaving] = useState(null);
   const [saveError, setSaveError] = useState('');
+  const [hexText, setHexText] = useState({});
+  const [lastSave, setLastSave] = useState(null);
 
   const base = standards.standard;
   const current = draft ?? base;
@@ -57,33 +61,60 @@ export default function StandardsPage({ devices, standards }) {
   const errorAt = (path) => check.errors.find((e) => e.path === path)?.message;
   const lines = diffStandard(base, current);
   const preview = useMemo(() => previewChanges(devices, base, current), [devices, base, current]);
-  const departments = useMemo(() => [...new Set(devices.map((d) => labelOf(d.department).toUpperCase()))]
+  const departments = useMemo(() => [...new Set(devices.map((d) => labelOf(d.department).trim().toUpperCase()))]
     .filter((d) => d !== UNASSIGNED.toUpperCase()).sort(), [devices]);
   const readOnly = !standards.canEdit;
 
-  const save = async (standard, summary, key) => {
-    const yes = await ask({
-      title: 'Save this standard?',
-      body: `${summary}. ${preview.length ? `${preview.reduce((n, p) => n + p.count, 0)} part grades change across the fleet.` : 'No machine changes grade.'}`,
-      confirmLabel: 'Save standard',
-      cancelLabel: 'Keep editing',
-    });
-    if (!yes) return;
+  // A save or restore in flight, or the list still re-reading after one, must not start another.
+  const busy = Boolean(saving) || standards.loading;
+
+  const perform = async (standard, summary, key) => {
+    setLastSave({ standard, summary, key });
     setSaving(key);
     setSaveError('');
     try {
       const tokenRes = await getToken();
+      // The next number follows the highest ever saved, not the one in force: a broken newest row would reuse it.
+      const version = Math.max(0, ...standards.history.map((h) => h.version ?? 0)) + 1;
       await saveStandard({
-        siteUrl: SITE, token: tokenRes.accessToken, standard, version: standards.version + 1,
+        siteUrl: SITE, token: tokenRes.accessToken, standard, version,
         summary, savedBy: tokenRes.account?.username ?? '',
       });
       setDraft(null);
+      setHexText({});
       standards.reload();
     } catch (failure) {
       setSaveError(failure.message);
     } finally {
       setSaving(null);
     }
+  };
+
+  const save = async (standard, summary, key) => {
+    // What THIS standard would do, not what the editor's draft would: a restore is not the draft.
+    const moves = previewChanges(devices, base, standard);
+    const byPart = new Map();
+    for (const move of moves) {
+      const id = `${move.part}|${move.to}`;
+      byPart.set(id, (byPart.get(id) ?? 0) + move.count);
+    }
+    const counts = [...byPart].map(([id, count]) => {
+      const [part, to] = id.split('|');
+      return `${PARTS.find((p) => p.key === part)?.label ?? part}: ${count} → ${to}`;
+    });
+    const dropsDraft = key.startsWith('restore') && Boolean(draft);
+    const yes = await ask({
+      title: 'Save this standard?',
+      body: [
+        `${summary}.`,
+        counts.length ? `${counts.join('; ')}.` : 'No machine changes grade.',
+        dropsDraft ? 'Your unsaved changes will be dropped.' : '',
+      ].filter(Boolean).join(' '),
+      confirmLabel: 'Save standard',
+      cancelLabel: 'Keep editing',
+    });
+    if (!yes) return;
+    await perform(standard, summary, key);
   };
 
   return (
@@ -98,10 +129,10 @@ export default function StandardsPage({ devices, standards }) {
           </p>
         </div>
         <div className="sd-actions">
-          <Button variant="secondary" disabled={!draft || Boolean(saving)} onClick={() => setDraft(null)}>Discard changes</Button>
+          <Button variant="secondary" disabled={!draft || Boolean(saving)} onClick={() => { setDraft(null); setHexText({}); }}>Discard changes</Button>
           <Button
             loading={saving === 'save'}
-            disabled={readOnly || !draft || !check.ok || lines.length === 0}
+            disabled={readOnly || busy || !draft || !check.ok || lines.length === 0}
             onClick={() => save(current, summaryOf(lines), 'save')}
           >
             {check.ok ? `Save standard${lines.length ? ` · ${lines.length} change${lines.length === 1 ? '' : 's'}` : ''}` : 'Fix the order to save'}
@@ -109,7 +140,13 @@ export default function StandardsPage({ devices, standards }) {
         </div>
       </header>
 
-      {saveError && <ErrorBanner message={saveError} />}
+      {saveError && (
+        <ErrorBanner
+          message={saveError}
+          onRetry={lastSave ? () => perform(lastSave.standard, lastSave.summary, lastSave.key) : undefined}
+          busy={Boolean(saving)}
+        />
+      )}
 
       <div className="sd-body">
         <fieldset className="sd-main" disabled={readOnly || Boolean(saving)}>
@@ -215,20 +252,44 @@ export default function StandardsPage({ devices, standards }) {
                 <h3>Grade colours</h3>
                 <p className="dm-sub">Used for every part chip, bar and badge in the device section. Colour only ever means a grade.</p>
               </div>
-              <Button variant="secondary" onClick={() => edit((s) => { s.colors = { ...DEFAULT_COLORS }; })}>Reset to defaults</Button>
+              <Button variant="secondary" onClick={() => { edit((s) => { s.colors = { ...DEFAULT_COLORS }; }); setHexText({}); }}>Reset to defaults</Button>
             </div>
             <div className="sd-colors">
               {[...GRADES, UNKNOWN].map((grade) => (
-                <label key={grade} className="sd-color">
+                <div key={grade} className="sd-color">
                   <input
                     type="color"
                     value={current.colors[grade]}
                     aria-label={`${grade} colour`}
-                    onChange={(event) => edit((s) => { s.colors[grade] = event.target.value; })}
+                    onChange={(event) => {
+                      setHexText((was) => without(was, grade));
+                      edit((s) => { s.colors[grade] = event.target.value; });
+                    }}
                   />
-                  <span><strong>{grade}</strong><small>{current.colors[grade]}</small></span>
+                  <div className="sd-color-main">
+                    <strong>{grade}</strong>
+                    <input
+                      type="text"
+                      className="sd-hex"
+                      aria-label={`${grade} hex`}
+                      aria-invalid={hexText[grade] !== undefined}
+                      spellCheck={false}
+                      maxLength={7}
+                      value={hexText[grade] ?? current.colors[grade]}
+                      onChange={(event) => {
+                        const typed = event.target.value.trim();
+                        if (HEX.test(typed)) {
+                          setHexText((was) => without(was, grade));
+                          edit((s) => { s.colors[grade] = typed.toLowerCase(); });
+                        } else {
+                          setHexText((was) => ({ ...was, [grade]: typed }));
+                        }
+                      }}
+                    />
+                    {hexText[grade] !== undefined && <small role="alert" className="sd-error">Use a colour like #1a88de</small>}
+                  </div>
                   <span className="pc-chip" style={{ background: current.colors[grade], color: inkFor(current.colors[grade]) }}>RAM · {grade}</span>
-                </label>
+                </div>
               ))}
             </div>
             {tooSimilar(current.colors) && <p role="alert" className="sd-warn">Two grade colours are hard to tell apart. You can still save, but people may misread a grade.</p>}
@@ -270,7 +331,7 @@ export default function StandardsPage({ devices, standards }) {
                     variant="secondary"
                     size="sm"
                     loading={saving === `restore-${h.id}`}
-                    disabled={readOnly || !h.valid || Boolean(saving) || h.version === standards.version}
+                    disabled={readOnly || busy || !h.valid || h.id === standards.inForceId}
                     onClick={() => save(h.standard, `Restored version ${h.version}`, `restore-${h.id}`)}
                   >
                     Restore

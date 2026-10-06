@@ -136,10 +136,14 @@ export default function DevicesPage() {
   }, [setParams]);
 
   /** Open the register, optionally filtered. `key` null means "no filter". */
-  const openRegister = useCallback((key, value) => {
+  const openRegister = useCallback((key, value, extra) => {
     setParams((current) => {
       const next = new URLSearchParams(current);
       next.set('view', 'register');
+      for (const [name, wanted] of Object.entries(extra ?? {})) {
+        if (wanted) next.set(name, wanted);
+        else next.delete(name);
+      }
       // Always default to In use + In repair, but let an explicit status key override it
       if (key !== 'status') next.set('status', IN_FLEET);
       if (!key || key === 'view') return next;
@@ -423,215 +427,214 @@ export default function DevicesPage() {
 
         {tabs}
 
-      {error && <ErrorBanner message={error} onRetry={reload} />}
+        {error && <ErrorBanner message={error} onRetry={reload} />}
 
-      {view === 'map' && <DeviceMap devices={saved} loading={loading} params={params} standard={standards.standard} />}
+        {view === 'map' && <DeviceMap devices={saved} loading={loading} params={params} standard={standards.standard} />}
 
-      {view === 'dashboard' && (
-        <>
-          <div className="stat-grid">
-            <StatCard
-              icon={Laptop}
-              label="Devices"
-              value={summary.total}
-              loading={loading}
-              onClick={() => openRegister(null, null)}
-            />
-            <StatCard
-              icon={AlertTriangle}
-              label="Need attention"
-              value={summary.needsAttention}
-              color="var(--it-danger)"
-              loading={loading}
-              onClick={() => openRegister('attention', '1')}
-            />
-            <StatCard
-              icon={ShieldCheck}
-              label="Unsupported OS"
-              value={summary.unsupportedOs}
-              color="var(--it-danger)"
-              loading={loading}
-              onClick={() => openRegister('os', 'Unsupported')}
-            />
-            <StatCard
-              icon={ShieldCheck}
-              label="Unprotected"
-              value={summary.unprotected}
-              color="var(--it-accent)"
-              loading={loading}
-              onClick={() => openRegister('av', 'Unprotected')}
-            />
-            <StatCard
-              icon={MemoryStick}
-              label="Average RAM"
-              value={summary.avgRamGB ?? '—'}
-              unit="GB"
-              loading={loading}
-            />
-            <StatCard
-              icon={Clock}
-              label="Stale scans"
-              value={summary.staleScans}
-              loading={loading}
-              onClick={() => openRegister('stale', '1')}
-            />
-            <StatCard
-              icon={AlertTriangle}
-              label="Machines with a critical part"
-              value={compliance.criticalPct ?? '—'}
-              unit={`% · ${compliance.critical} machines`}
-              color="var(--it-danger)"
-              loading={loading}
-              onClick={() => openRegister('critical', '1')}
-            />
-            <StatCard
-              icon={ShieldCheck}
-              label="Office compliance"
-              value={compliance.complianceRate ?? '—'}
-              unit="%"
-              color={compliance.unlicensed ? 'var(--it-danger)' : 'var(--it-good)'}
-              loading={loading}
-              onClick={() => openRegister('license', 'Unlicensed')}
-            />
-            <StatCard
-              icon={Archive}
-              label="In IT Stash"
-              value={spareCount}
-              loading={loading}
-              onClick={() => navigate(mapHref({ place: PLACES.STASH }))}
-            />
-            <StatCard
-              icon={WifiOff}
-              label="Server over Wi-Fi"
-              value={compliance.networkBottlenecks}
-              color="var(--it-danger)"
-              loading={loading}
-              onClick={() => openRegister('server', 'Bottleneck')}
-            />
-            <StatCard
-              icon={Tag}
-              label="Form factor mismatch"
-              value={compliance.mismatchedFormFactor}
-              loading={loading}
-              onClick={() => openRegister('formfit', '1')}
-            />
-          </div>
-
-          {!loading && scoped.length === 0 ? (
-            <Card>
-              <EmptyState>
-                {saved.length === 0
-                  ? 'Nothing in the register yet. Open the Import tab and drop your scan reports.'
-                  : `No devices are recorded against ${department}.`}
-              </EmptyState>
-            </Card>
-          ) : (
-            <>
-              <DepartmentHeatmap
-                devices={scoped}
-                onSelect={(name, part) => {
-                  setParam('department', name);
-                  openRegister('part', `${part}:Critical`);
-                }}
+        {view === 'dashboard' && (
+          <>
+            <div className="stat-grid">
+              <StatCard
+                icon={Laptop}
+                label="Devices"
+                value={summary.total}
+                loading={loading}
+                onClick={() => openRegister(null, null)}
               />
-              <DeviceCharts devices={scoped} onFilter={openRegister} />
-              <Leaderboards devices={scoped} />
-            </>
-          )}
-        </>
-      )}
-
-      {view === 'register' && (
-        <>
-          {rowError && <ErrorBanner message={rowError} onRetry={() => setRowError('')} />}
-          <div className="dv-register-scope">
-            <label className="dv-scope">
-              <span>Location</span>
-              <select value={filters.location} onChange={(event) => setParam('location', event.target.value)}>
-                <option value="">All locations</option>
-                {locationOptions.map((code) => <option key={code} value={code}>{code}</option>)}
-                <option value="Unassigned">No location yet</option>
-              </select>
-            </label>
-            <label className="dv-scope">
-              <span>Status</span>
-              <select value={filters.status} onChange={(event) => setParam('status', event.target.value)}>
-                <option value="">All but retired</option>
-                <option value={IN_FLEET}>In use or in repair</option>
-                {STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
-              </select>
-            </label>
-            {!filters.status && (
-              <button type="button" className="dv-linkish" onClick={() => setParam('status', RETIRED)}>
-                Retired machines are hidden. Show them
-              </button>
-            )}
-          </div>
-          <DeviceTable
-            devices={registerRows}
-            filters={filters}
-            onFilterChange={setParam}
-            onSave={handleRowSave}
-            onDelete={handleRowDelete}
-            onDeleteMany={handleRowDeleteMany}
-            busy={rowBusy}
-          />
-        </>
-      )}
-
-      {view === 'import' && stage === 'drop' && (
-        <Card className="dz-card">
-          <DropZone onFiles={handleFiles} busy={busy} />
-          {rejectedList}
-        </Card>
-      )}
-
-      {view === 'import' && stage === 'review' && (
-        <Card className="rg-card">
-          <div className="review-head">
-            <p className="review-summary">
-              {included} of {merged.length} selected
-              {flagged > 0 && <span className="review-flagged"> · {flagged} need attention</span>}
-              {waiting > 0 && <span className="review-flagged"> · {waiting} replacement{waiting === 1 ? '' : 's'} to answer</span>}
-            </p>
-            <div className="review-actions">
-              <Button variant="secondary" size="sm" onClick={resetImport}>Start over</Button>
-              <Button size="sm" disabled={included === 0 || waiting > 0} onClick={() => handleSave(null)}>
-                {waiting > 0
-                  ? `Save — ${waiting} replacement${waiting === 1 ? '' : 's'} need${waiting === 1 ? 's' : ''} an answer`
-                  : `Save ${included} to SharePoint`}
-              </Button>
+              <StatCard
+                icon={AlertTriangle}
+                label="Need attention"
+                value={summary.needsAttention}
+                color="var(--it-danger)"
+                loading={loading}
+                onClick={() => openRegister('attention', '1')}
+              />
+              <StatCard
+                icon={ShieldCheck}
+                label="Unsupported OS"
+                value={summary.unsupportedOs}
+                color="var(--it-danger)"
+                loading={loading}
+                onClick={() => openRegister('os', 'Unsupported')}
+              />
+              <StatCard
+                icon={ShieldCheck}
+                label="Unprotected"
+                value={summary.unprotected}
+                color="var(--it-accent)"
+                loading={loading}
+                onClick={() => openRegister('av', 'Unprotected')}
+              />
+              <StatCard
+                icon={MemoryStick}
+                label="Average RAM"
+                value={summary.avgRamGB ?? '—'}
+                unit="GB"
+                loading={loading}
+              />
+              <StatCard
+                icon={Clock}
+                label="Stale scans"
+                value={summary.staleScans}
+                loading={loading}
+                onClick={() => openRegister('stale', '1')}
+              />
+              <StatCard
+                icon={AlertTriangle}
+                label="Machines with a critical part"
+                value={compliance.criticalPct ?? '—'}
+                unit={`% · ${compliance.critical} machines`}
+                color="var(--grade-critical)"
+                loading={loading}
+                onClick={() => openRegister('critical', '1')}
+              />
+              <StatCard
+                icon={ShieldCheck}
+                label="Office compliance"
+                value={compliance.complianceRate ?? '—'}
+                unit="%"
+                color={compliance.unlicensed ? 'var(--it-danger)' : 'var(--it-good)'}
+                loading={loading}
+                onClick={() => openRegister('license', 'Unlicensed')}
+              />
+              <StatCard
+                icon={Archive}
+                label="In IT Stash"
+                value={spareCount}
+                loading={loading}
+                onClick={() => navigate(mapHref({ place: PLACES.STASH }))}
+              />
+              <StatCard
+                icon={WifiOff}
+                label="Server over Wi-Fi"
+                value={compliance.networkBottlenecks}
+                color="var(--it-danger)"
+                loading={loading}
+                onClick={() => openRegister('server', 'Bottleneck')}
+              />
+              <StatCard
+                icon={Tag}
+                label="Form factor mismatch"
+                value={compliance.mismatchedFormFactor}
+                loading={loading}
+                onClick={() => openRegister('formfit', '1')}
+              />
             </div>
-          </div>
 
-          {merged.length === 0 ? (
-            <EmptyState>Nothing to review.</EmptyState>
-          ) : (
-            <ReviewGrid
-              devices={merged}
-              excluded={excluded}
-              onChange={handleChange}
-              onToggleRow={handleToggleRow}
-              prompts={prompts}
-              answers={answers}
-              notices={notices}
-              onAnswer={(key, value) => setAnswers((current) => ({ ...current, [key]: value }))}
+            {!loading && scoped.length === 0 ? (
+              <Card>
+                <EmptyState>
+                  {saved.length === 0
+                    ? 'Nothing in the register yet. Open the Import tab and drop your scan reports.'
+                    : `No devices are recorded against ${department}.`}
+                </EmptyState>
+              </Card>
+            ) : (
+              <>
+                <DepartmentHeatmap
+                  devices={scoped}
+                  onSelect={(name, part) => {
+                    openRegister('part', `${part}:Critical`, { department: name });
+                  }}
+                />
+                <DeviceCharts devices={scoped} onFilter={openRegister} />
+                <Leaderboards devices={scoped} />
+              </>
+            )}
+          </>
+        )}
+
+        {view === 'register' && (
+          <>
+            {rowError && <ErrorBanner message={rowError} onRetry={() => setRowError('')} />}
+            <div className="dv-register-scope">
+              <label className="dv-scope">
+                <span>Location</span>
+                <select value={filters.location} onChange={(event) => setParam('location', event.target.value)}>
+                  <option value="">All locations</option>
+                  {locationOptions.map((code) => <option key={code} value={code}>{code}</option>)}
+                  <option value="Unassigned">No location yet</option>
+                </select>
+              </label>
+              <label className="dv-scope">
+                <span>Status</span>
+                <select value={filters.status} onChange={(event) => setParam('status', event.target.value)}>
+                  <option value="">All but retired</option>
+                  <option value={IN_FLEET}>In use or in repair</option>
+                  {STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
+                </select>
+              </label>
+              {!filters.status && (
+                <button type="button" className="dv-linkish" onClick={() => setParam('status', RETIRED)}>
+                  Retired machines are hidden. Show them
+                </button>
+              )}
+            </div>
+            <DeviceTable
+              devices={registerRows}
+              filters={filters}
+              onFilterChange={setParam}
+              onSave={handleRowSave}
+              onDelete={handleRowDelete}
+              onDeleteMany={handleRowDeleteMany}
+              busy={rowBusy}
             />
-          )}
+          </>
+        )}
 
-          <DropZone onFiles={handleFiles} busy={busy} compact />
+        {view === 'import' && stage === 'drop' && (
+          <Card className="dz-card">
+            <DropZone onFiles={handleFiles} busy={busy} />
+            {rejectedList}
+          </Card>
+        )}
 
-          {rejectedList}
-        </Card>
-      )}
+        {view === 'import' && stage === 'review' && (
+          <Card className="rg-card">
+            <div className="review-head">
+              <p className="review-summary">
+                {included} of {merged.length} selected
+                {flagged > 0 && <span className="review-flagged"> · {flagged} need attention</span>}
+                {waiting > 0 && <span className="review-flagged"> · {waiting} replacement{waiting === 1 ? '' : 's'} to answer</span>}
+              </p>
+              <div className="review-actions">
+                <Button variant="secondary" size="sm" onClick={resetImport}>Start over</Button>
+                <Button size="sm" disabled={included === 0 || waiting > 0} onClick={() => handleSave(null)}>
+                  {waiting > 0
+                    ? `Save — ${waiting} replacement${waiting === 1 ? '' : 's'} need${waiting === 1 ? 's' : ''} an answer`
+                    : `Save ${included} to SharePoint`}
+                </Button>
+              </div>
+            </div>
 
-      {view === 'import' && stage === 'save' && (
-        <Card>
-          <SaveProgress state={save} onRetry={handleSave} onDone={resetImport} />
-        </Card>
-      )}
+            {merged.length === 0 ? (
+              <EmptyState>Nothing to review.</EmptyState>
+            ) : (
+              <ReviewGrid
+                devices={merged}
+                excluded={excluded}
+                onChange={handleChange}
+                onToggleRow={handleToggleRow}
+                prompts={prompts}
+                answers={answers}
+                notices={notices}
+                onAnswer={(key, value) => setAnswers((current) => ({ ...current, [key]: value }))}
+              />
+            )}
 
-      {view === 'standards' && <StandardsPage devices={saved} standards={standards} />}
+            <DropZone onFiles={handleFiles} busy={busy} compact />
+
+            {rejectedList}
+          </Card>
+        )}
+
+        {view === 'import' && stage === 'save' && (
+          <Card>
+            <SaveProgress state={save} onRetry={handleSave} onDone={resetImport} />
+          </Card>
+        )}
+
+        {view === 'standards' && <StandardsPage devices={saved} standards={standards} />}
       </div>
     </AppShell>
   );

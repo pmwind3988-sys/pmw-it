@@ -16,6 +16,7 @@ import { applyFilters, toCsv } from '../deviceFilters';
 import { EDITABLE_FIELDS } from '../sharepoint/updateDevice';
 import { DEVICE_COLUMNS } from '../sharepoint/deviceSchema';
 import { GRADE_SLUG } from '../standards/gradeColors';
+import { GRADES, UNKNOWN, PARTS } from '../standards/defaultStandard';
 import {
   describeSelection, headerState, isSelectable, selectedDevices,
   toggleAll, toggleId, visibleSelection,
@@ -124,10 +125,16 @@ const FILTER_LABELS = {
  */
 const FLAG_FILTERS = new Set(['attention', 'stale', 'formfit', 'critical']);
 
-const chipText = (key, value) =>
-  (FLAG_FILTERS.has(key)
-    ? (FILTER_LABELS[key] ?? key)
-    : `${FILTER_LABELS[key] ?? key}: ${value}`);
+const chipText = (key, value) => {
+  if (FLAG_FILTERS.has(key)) return FILTER_LABELS[key] ?? key;
+  if (key === 'part') {
+    // "ram:Critical" reads "RAM: Critical"
+    const [part, grade] = String(value).split(':');
+    const label = PARTS.find((p) => p.key === part)?.label;
+    if (label && grade) return `${label}: ${grade}`;
+  }
+  return `${FILTER_LABELS[key] ?? key}: ${value}`;
+};
 
 function download(name, text) {
   const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8;' }));
@@ -142,9 +149,15 @@ const TYPE_OPTIONS = ['Laptop', 'Desktop', 'Unknown'];
 
 const GRADE_KEYS = new Set(['gradeCpu', 'gradeRam', 'gradeStorage', 'gradeGraphics', 'gradeWindows']);
 
+// Severity order, worst first, so sorting a grade column groups the machines that need work.
+const GRADE_ORDER = [...GRADES, UNKNOWN];
+const severityOf = (grade) => {
+  const at = GRADE_ORDER.indexOf(grade);
+  return at === -1 ? GRADE_ORDER.length : at;
+};
+
 const toneClassFor = (device, key) => {
   if (key === 'riskLevel') return `rg-risk rg-risk-${String(device.riskLevel).toLowerCase()}`;
-  if (GRADE_KEYS.has(key)) return `dt-grade g-${GRADE_SLUG[device[key]] ?? 'unknown'}`;
   return undefined;
 };
 
@@ -188,9 +201,10 @@ export default function DeviceTable({
       if (left === null || left === undefined) return 1;
       if (right === null || right === undefined) return -1;
 
-      const compared = column?.numeric
-        ? left - right
-        : String(left).localeCompare(String(right));
+      let compared;
+      if (GRADE_KEYS.has(sort.key)) compared = severityOf(left) - severityOf(right);
+      else if (column?.numeric) compared = left - right;
+      else compared = String(left).localeCompare(String(right));
       return sort.dir === 'asc' ? compared : -compared;
     });
   }, [devices, filters, sort]);
@@ -479,12 +493,16 @@ export default function DeviceTable({
 
                       return (
                         <td key={column.key} className={toneClassFor(device, column.key)}>
-                          <ValueCell
-                            value={device[column.key]}
-                            fieldKey={column.key}
-                            kind={column.kind}
-                            limit={CELL_ENTRIES}
-                          />
+                          {GRADE_KEYS.has(column.key) ? (
+                            <span className={`pc-chip g-${GRADE_SLUG[device[column.key]] ?? 'unknown'}`}>{device[column.key] ?? UNKNOWN}</span>
+                          ) : (
+                            <ValueCell
+                              value={device[column.key]}
+                              fieldKey={column.key}
+                              kind={column.kind}
+                              limit={CELL_ENTRIES}
+                            />
+                          )}
                           {manual.has(column.key) && (
                             <span className="dt-manual" title="Set by hand — imports leave this alone">
                               edited

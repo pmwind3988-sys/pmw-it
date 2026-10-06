@@ -322,7 +322,13 @@ silently. Grades are computed on read (`useDevices` → `regrade`) and nothing o
 them is stored, so a saved standard regrades the fleet on the next render with
 no re-scan. Colour in the device section only ever means a grade, and comes from
 the standard's five colours through `--grade-*` CSS variables -- never a
-hard-coded red.
+hard-coded red. Two colours are "too alike" by colour difference (redmean RGB
+distance), not by contrast: two greys can each read fine on white and still be
+the same grade to the eye.
+
+`riskScore.js` sits BESIDE part grading, unchanged and department-blind: risk
+asks "is this machine dangerous?", the grades ask "is each part right for this
+desk?".
 
 The portability suggestion is a label, never a fault: a desktop in a field role
 is tagged and counted, and does not on its own move a machine out of Moderate.

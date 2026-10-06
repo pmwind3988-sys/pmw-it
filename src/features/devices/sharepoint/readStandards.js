@@ -15,6 +15,7 @@ export function pickStandard(rows) {
   return {
     standard: inForce ? inForce.standard : DEFAULT_STANDARD,
     version: inForce?.version ?? 0,
+    inForceId: inForce?.id ?? null,
     savedBy: inForce?.savedBy ?? null,
     savedOn: inForce?.savedOn ?? null,
     history,

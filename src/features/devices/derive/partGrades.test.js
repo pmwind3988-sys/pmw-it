@@ -23,6 +23,14 @@ describe('cutoffGrade', () => {
 });
 
 describe('partGrades', () => {
+  it('suggests no form factor for a machine with no department', () => {
+    const g = partGrades(machine({ department: '  ', installedRamGB: 8 }), S);
+    expect(g.formFactorMatches).toBeNull();
+    expect(g.suggestedFormFactor).toBeNull();
+    expect(g.personaLabel).toBe('Unclassified');
+    expect(g.gradeRam).toBe(partGrades(machine({ department: 'NOWHERE', installedRamGB: 8 }), S).gradeRam);
+  });
+
   it('grades a well-specified engineering machine Optimal on every part', () => {
     const g = partGrades(machine(), S);
     expect([g.gradeCpu, g.gradeRam, g.gradeStorage, g.gradeGraphics, g.gradeWindows]).toEqual(Array(5).fill('Optimal'));

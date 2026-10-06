@@ -16,7 +16,10 @@ export function useStandards() {
   const getToken = useSharePointToken();
   const [state, setState] = useState({ loaded: pickStandard([]), canEdit: false, loading: true, error: '' });
   const [nonce, setNonce] = useState(0);
-  const reload = useCallback(() => setNonce((n) => n + 1), []);
+  const reload = useCallback(() => {
+    setState((current) => ({ ...current, loading: true }));
+    setNonce((n) => n + 1);
+  }, []);
 
   useEffect(() => {
     if (!isAuthenticated) return undefined;

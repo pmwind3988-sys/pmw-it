@@ -1,3 +1,4 @@
+import { PERSONAS } from './persona.js';
 import { GRADES, UNKNOWN, PARTS, profileKeyFor } from '../standards/defaultStandard.js';
 
 /**
@@ -127,6 +128,8 @@ export function partGrades(device, standard) {
   const personaKey = profileKeyFor(standard, device.department);
   const profile = standard.profiles[personaKey];
   const incomplete = device.scanComplete === false;
+  // No department: graded against Desk, but nothing is suggested or labelled for a desk it does not have.
+  const unassigned = !String(device.department ?? '').trim();
 
   const parts = incomplete
     ? Object.fromEntries(PARTS.map(({ key }) => [key, unknown('—', 'Scan incomplete — nothing to judge')]))
@@ -148,9 +151,9 @@ export function partGrades(device, standard) {
 
   return {
     personaKey,
-    personaLabel: profile.label,
-    personaBlurb: profile.blurb,
-    ...portability(device, profile),
+    personaLabel: unassigned ? PERSONAS.UNKNOWN.label : profile.label,
+    personaBlurb: unassigned ? PERSONAS.UNKNOWN.blurb : profile.blurb,
+    ...portability(device, unassigned ? { prefers: null } : profile),
     parts,
     gradeCpu: parts.cpu.grade,
     gradeRam: parts.ram.grade,

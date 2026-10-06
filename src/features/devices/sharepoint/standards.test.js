@@ -34,6 +34,12 @@ describe('pickStandard', () => {
     expect(picked.note).toBe('Version 6 could not be used, so version 5 is in force.');
   });
 
+  it('names the row in force, which is not always the newest', () => {
+    const bad = { ...defaultStandard(), schema: 9 };
+    expect(pickStandard([row(6, bad), row(5, defaultStandard())].map(fromStandardItem)).inForceId).toBe(5);
+    expect(pickStandard([]).inForceId).toBeNull();
+  });
+
   it('falls back to the default standard with nothing saved', () => {
     expect(pickStandard([])).toMatchObject({ standard: DEFAULT_STANDARD, version: 0, note: null });
   });

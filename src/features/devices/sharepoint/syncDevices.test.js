@@ -248,6 +248,11 @@ describe('planImport — lifecycle', () => {
     expect(plan.retirements).toHaveLength(0);
   });
 
+  it('stores a location typed in the review grid as an upper-case code', () => {
+    const plan = planImport([scan({ location: ' kl2 ' })], [], { now: NOW });
+    expect(plan.inserts[0].body.Location).toBe('KL2');
+  });
+
   it('skips the second of two reports with one serial', () => {
     const plan = planImport([scan(), scan({ computerName: 'PC2', sourceFileName: 'x.txt' })], []);
     expect(plan.inserts).toHaveLength(1);

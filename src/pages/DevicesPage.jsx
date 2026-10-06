@@ -27,6 +27,7 @@ import { provisionLists } from '../features/devices/sharepoint/provisionLists';
 import { matchIncoming, noticeFor } from '../features/devices/lifecycle/matchIncoming';
 import { replacementsFor, unanswered } from '../features/devices/lifecycle/replacements';
 import { locationsIn, cleanLocation } from '../features/devices/map/locations';
+import { fileNameLocations } from '../features/devices/map/fileNameLocations';
 import { inFleet, statusOf, STATUSES, RETIRED, SPARE } from '../features/devices/lifecycle/status';
 import { performLifecycle } from '../features/devices/sharepoint/writeLifecycle';
 import { ACTIONS } from '../features/devices/lifecycle/planLifecycle';
@@ -152,7 +153,7 @@ export default function DevicesPage() {
   const handleFiles = useCallback(async (files) => {
     setBusy(true);
     try {
-      const incoming = await importFiles(files, { knownLocations: locationsIn(saved) });
+      const incoming = await importFiles(files, { knownLocations: fileNameLocations(saved) });
       // A second drop adds to the review rather than starting it over, so a
       // batch that arrives in several goes still ends up as one save. Edits
       // already made are keyed by file name and survive untouched.

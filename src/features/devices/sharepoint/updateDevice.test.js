@@ -29,6 +29,13 @@ describe('planEdit', () => {
     expect(planEdit(row(), { owner: 'Ashraf' }).changes).toEqual([]);
   });
 
+  it('stores a typed location as an upper-case code', () => {
+    const result = planEdit(row(), { location: ' f3 ' });
+    expect(result.changes).toEqual([
+      { fieldName: 'location', oldValue: '', newValue: 'F3', changeType: 'Added' },
+    ]);
+  });
+
   it('records an edit and marks the field as hand-set', () => {
     const result = planEdit(row(), { owner: 'Ashraf Azahari' });
     expect(result.changes).toEqual([

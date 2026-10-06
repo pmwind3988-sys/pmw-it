@@ -12,6 +12,7 @@ import { replacementsFor, ANSWERS } from '../lifecycle/replacements.js';
 import { planLifecycle, ACTIONS } from '../lifecycle/planLifecycle.js';
 import { currentStint } from '../lifecycle/stints.js';
 import { inFleet, IN_USE } from '../lifecycle/status.js';
+import { cleanLocation } from '../map/locations.js';
 
 /**
  * A field somebody corrected by hand outranks what the scan file says about
@@ -57,7 +58,9 @@ export function planImport(incoming, existing, {
     .map((prompt) => prompt.sourceFileName));
 
   for (const match of matches) {
-    const { device, existing: row, kind } = match;
+    const { existing: row, kind } = match;
+    // A location typed in the review grid is stored as an upper-case code.
+    const device = { ...match.device, location: cleanLocation(match.device.location) };
     const on = device.scannedOn ?? now;
     const holder = { owner: device.owner, location: device.location ?? null, department: device.department ?? null };
 

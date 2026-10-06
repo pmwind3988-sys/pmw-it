@@ -4,6 +4,7 @@ import {
 import { DEVICE_LIST_NAME, CHANGE_LIST_NAME } from './deviceSchema.js';
 import { runPool, withRetry } from '../../sharepoint/writePool.js';
 import { formatMYT } from '../../../utils/malaysiaTime.js';
+import { cleanLocation } from '../map/locations.js';
 
 /**
  * The only fields the register lets somebody retype. They are exactly the ones
@@ -16,6 +17,8 @@ export const EDITABLE_FIELDS = ['owner', 'department', 'deviceType', 'location']
 const COLUMN_FOR = { owner: 'Owner', department: 'Department', deviceType: 'DeviceType', location: 'Location' };
 
 const asText = (value) => (value === null || value === undefined ? '' : String(value));
+// Locations are stored as upper-case codes, however they were typed.
+const editedText = (field, value) => (field === 'location' ? asText(cleanLocation(value)) : asText(value));
 
 /**
  * Pure: what an edit changes, and what the row's manual list becomes.
@@ -33,7 +36,7 @@ export function planEdit(existing, edits) {
     if (!(field in edits)) continue;
 
     const before = asText(existing[field]);
-    const after = asText(edits[field]);
+    const after = editedText(field, edits[field]);
     if (before === after) continue;
 
     let changeType = 'Updated';
@@ -53,7 +56,7 @@ function itemBody(edits, manualFields) {
   const body = { ManualFields: manualFields.join('\n') };
 
   for (const field of EDITABLE_FIELDS) {
-    if (field in edits) body[COLUMN_FOR[field]] = asText(edits[field]);
+    if (field in edits) body[COLUMN_FOR[field]] = editedText(field, edits[field]);
   }
 
   // Owner Source stops claiming the value came from the scan once it did not.

@@ -31,7 +31,7 @@ pmw-it/
 │   ├── features/
 │   │   ├── semantic/         # ingest/ profile/ clean/ engine/ canvas/
 │   │   │                     # intent/ suggest/ text/ export/ worker/
-│   │   ├── devices/          # parse/ derive/ sharepoint/ stats/ ui/
+│   │   ├── devices/          # parse/ derive/ lifecycle/ map/ sharepoint/ stats/ ui/
 │   │   ├── forms/            # the two forms' fields, validation and writes
 │   │   ├── assets/           # scan/ draft/ handover/ people/ store/
 │   │   │                     # sharepoint/ stats/ ui/
@@ -211,7 +211,7 @@ is `--bg`.
 **Dashboard ↔ records**: every dashboard figure links into `/requests` with a
 query string (`?type=`, `?entity=`, `?department=`, `?range=`, `?equipment=`).
 Both screens read the same `useRequests()` fetch, so a card and the list it opens
-cannot disagree. Every dashboard card opens the register filtered to `In fleet` (In use or In repair), the same machines it counted -- the register's own default hides only Retired, so without that a card would open a list with spares in it.
+cannot disagree.
 
 **Navigation**: use `window.location.replace()` instead of React Router
 `navigate()` *inside `useEffect`*. WHY: navigate causes a state update →
@@ -340,7 +340,7 @@ no stints, and its first change writes the outgoing owner in "since at least"
 its creation date. Every lifecycle write re-reads the machine first and goes
 device row → stints → change log, so a failure leaves a status the history
 cannot yet explain (retryable), never history describing a move that did not
-happen.
+happen. Every device-dashboard card opens the register filtered to `In fleet` (In use or In repair), the same machines it counted -- the register's own default hides only Retired, so without that a card would open a list with spares in it.
 
 **Location comes first in the file name's bracket.** `[F1 ENGINEERING] X.txt`
 is location F1, department ENGINEERING; `[ENGINEERING] X.txt` still reads as it
@@ -357,7 +357,7 @@ belong to. An unknown label owns the lines beneath it, so a field the scan scrip
 adds later surfaces in review rather than contaminating its predecessor.
 
 **A hand-edited device field outranks the scan file.** The register lets the
-three DERIVED fields be retyped (owner, department, device type) and records
+four fields be retyped (owner, department, device type, location) and records
 which ones in `ManualFields`. `applyManualOverrides` in `syncDevices.js` then
 holds those back on re-import — from the diff AND from the body, or updating
 anything else would overwrite them as a side effect. Clearing a field is how

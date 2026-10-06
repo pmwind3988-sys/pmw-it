@@ -82,7 +82,8 @@ pmw-it/
 | `/asset-checklist/links` | Every shared link: waiting / signed / expired / cancelled; copy, open, change expiry, expire now, cancel, reopen, delete |
 | `/asset-checklist/links/:id` | IT correcting a SIGNED checklist; the record then says "Edited by … after signing" |
 | `/c/:code` | **Public, no sign-in.** A separate page (`checklist.html`), not a portal route: the employee fills and signs; afterwards the same link is the locked, printable copy |
-| `/devices` | Device list: fleet dashboard, register and scan-report import (`?view=`) |
+| `/devices` | Device list. `?view=map` (default): locations → departments → machines, with the IT Stash and the Graveyard; `?location=`, `&department=`, `?place=stash\|graveyard\|nolocation`. Also `dashboard`, `register`, `import` |
+| `/devices/:id` | One machine: status, change owner / repair / stash / retire / bring back, owner history, spec history, every scanned field |
 | `/assets` | Asset inventory: what IT owns, its figures, and the deliveries still unsaved on this device (`?category=`, `?status=`, `?condition=`, `?location=`, `?unlabelled=1`) |
 | `/assets/scan` | Purchase details, then the camera. Scans become a batch on this device — nothing reaches SharePoint here |
 | `/assets/batch/:id` | Review a scanned delivery and save it |
@@ -158,6 +159,15 @@ pmw-it/
 | Removing several device rows at once | `deleteDevices` in `src/features/devices/sharepoint/updateDevice.js` |
 | What the register has ticked | `src/features/devices/selection.js` |
 | Device fleet statistics | `src/features/devices/stats/deviceStats.js` |
+| A machine's status, and what counts in the fleet | `src/features/devices/lifecycle/status.js` |
+| What a change of owner, repair, stash, retire or bring-back writes | `src/features/devices/lifecycle/planLifecycle.js`, `sharepoint/writeLifecycle.js` |
+| Owner history (stints) and its list | `lifecycle/stints.js`, `sharepoint/assignmentSchema.js` |
+| How an import recognises a machine (serial, then name) | `src/features/devices/lifecycle/matchIncoming.js` |
+| "Is this a replacement?" during import | `lifecycle/replacements.js`, `ui/ReplacementPrompt.jsx` |
+| Location out of the scan file name | `derive/deriveLocation.js`, `map/locations.js` |
+| The map's numbers and layout | `map/zones.js`, `map/mapLayout.js`, `map/mapLinks.js` |
+| Which buttons spin while work runs | `src/components/ui/Button.jsx` (`loading`), `src/components/ui/Spinner.jsx` |
+| Why a dashboard card opens the register at "In use or in repair" | `IN_FLEET` in `src/features/devices/deviceFilters.js`, `openRegister` in `src/pages/DevicesPage.jsx` |
 | Bar and column charts | `src/components/ui/Charts.jsx` (shared by both dashboards) |
 | SharePoint writes | `src/services/sharePointService.js` |
 | Theme | `src/context/ThemeContext.jsx`; toggle lives in the shell's bar |
@@ -201,12 +211,17 @@ is `--bg`.
 **Dashboard ↔ records**: every dashboard figure links into `/requests` with a
 query string (`?type=`, `?entity=`, `?department=`, `?range=`, `?equipment=`).
 Both screens read the same `useRequests()` fetch, so a card and the list it opens
-cannot disagree.
+cannot disagree. Every dashboard card opens the register filtered to `In fleet` (In use or In repair), the same machines it counted -- the register's own default hides only Retired, so without that a card would open a list with spares in it.
 
 **Navigation**: use `window.location.replace()` instead of React Router
 `navigate()` *inside `useEffect`*. WHY: navigate causes a state update →
 re-render → effect runs again → infinite loop. In event handlers `navigate()` is
 correct and is what the shell and pages use.
+
+**A button that starts work shows it.** `<Button loading>` swaps the icon for
+`Spinner`, keeps the label and blocks a second press; raw buttons put `<Spinner />`
+in place of their icon. Only the pressed button spins, and buttons that start
+nothing (Cancel, an opener, a tab) never do.
 
 **MSAL redirect handling**: always await `handleRedirectPromise()` before
 rendering. Silent `no_token_request_cache_error` is normal on fresh load.
@@ -310,6 +325,30 @@ and only for fields with a settled right answer. A RAM discrepancy, a static IP
 and a free memory slot stay the colour of the rest of the page on purpose:
 colour that appears everywhere says nothing. The toggle sits in the page header
 and is remembered per browser under `deviceValueTones`.
+
+**A machine is known by its serial, and it has a life.** The scan script writes
+`Serial Number: $((Get-CimInstance Win32_BIOS).SerialNumber)`; `matchIncoming`
+matches on it first and on the computer name second, so renaming a PC on
+reassignment keeps its history. BIOS filler (`Default string`, `To be filled by
+O.E.M.`, `0`, one character repeated) is no serial at all -- matching on it
+would merge every home-built desktop into one row. Every machine has a status
+(`In use`, `In repair`, `Spare`, `Retired`; blank reads In use, no migration),
+and only In use and In repair count in any figure. Who had it lives in
+`IT Device Assignments`, one row per stint, tied by `DeviceId`; the device row's
+owner is only the present. A machine nobody has touched since this landed has
+no stints, and its first change writes the outgoing owner in "since at least"
+its creation date. Every lifecycle write re-reads the machine first and goes
+device row → stints → change log, so a failure leaves a status the history
+cannot yet explain (retryable), never history describing a move that did not
+happen.
+
+**Location comes first in the file name's bracket.** `[F1 ENGINEERING] X.txt`
+is location F1, department ENGINEERING; `[ENGINEERING] X.txt` still reads as it
+always did. `STOCKYARDF1` and `PML GUARDHOUSE` split into location and
+department. Locations are a TEXT column of upper-case codes -- built-in F1, F3,
+PML plus whatever a row uses -- so a new site needs no column change. A
+location typed by hand is in `ManualFields` and beats the file; an older report
+with no location never clears one.
 
 **Device report parsing keys off a known-label whitelist** (`parse/labels.js`). A
 generic `^Word:` split reads `Total Slots: 2 | Used Slots: 2` and
@@ -971,7 +1010,4 @@ npm run preview  # Preview production build
 - Vite port 5173 is for local dev; Vercel ignores this
 - MSAL handles Azure AD login flow + token caching
 - Forms are plain React over `src/components/form/`
-- `npm run lint` reports ONE remaining error, in `ThemeContext.jsx`
-  (a non-component export breaking Fast Refresh). The FormPage,
-  AssetChecklistPage and SignatureDialog errors are gone — they were SurveyJS
-  model mutation inside hooks and unused imports, cleared by the rewrite.
+- `npx eslint src` reports two pre-existing errors: `ThemeContext.jsx` (a non-component export) and `SemanticContext.jsx` (`set-state-in-effect`). `npm run lint` also scans the downloaded, git-ignored OCR engine under `public/ocr/`.

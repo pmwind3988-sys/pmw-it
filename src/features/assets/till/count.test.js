@@ -99,3 +99,11 @@ describe('details read off the box', () => {
     expect(draft.specSummary).toBe('Black · Wired');
   });
 });
+
+describe('a count run’s shop barcode', () => {
+  it('is kept on the line as the model’s', () => {
+    const { draft } = addCounted(newCount(), { category: 'Mouse', manufacturer: 'Logitech', model: 'M90', location: 'F1', serials: ['A1'], boxCodes: ['5099206092372'] });
+    expect(draft.additionalCodes).toEqual(['5099206092372']);
+    expect(parseUnits(draft.units).map((unit) => unit.serialNumber)).toEqual(['A1']);
+  });
+});

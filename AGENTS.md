@@ -557,6 +557,19 @@ already counted (`addSerialsTo`, `count.addCounted`, and `coalesce` now carries
 a draft's own `units`). Sheets are portalled outside `.till`, so the `--till-*`
 colours are declared on `.till-scrim` too.
 
+A SHOP BARCODE (12–14 digits, `isShopCode`) names the model, never an item.
+In a serial run it, or any barcode the line is already known by, is set aside
+as `run.boxCodes` and lands in the line's `additionalCodes`, never as a serial.
+On an unnamed stock-in line, a box's serial and shop barcode read one after the
+other (either order) pair onto ONE line (`scanIn` step 1b), and a shop barcode
+the register knows names the line outright. When a line becomes counted,
+`asCounted` moves its row serial/label/MAC onto item 1 and its part number into
+`additionalCodes` -- otherwise the first box's serial titles the whole line, is
+not counted, and is dropped on save. The serial-run sheet lists the line's
+existing serials first, then the run's, numbered by item. The register page
+(`/assets`) no longer offers "Add by hand" or "Scan a delivery": the till does
+both; `/assets/scan` still exists but nothing links to it.
+
 **A box sweep reads the packaging, and only suggests.** `till/boxSweep.js`
 (pure) turns each pass of the text reader into votes: a known make starting a
 line and the model after it ("Logitech M90 Wireless Mouse" → Logitech, M90,

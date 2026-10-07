@@ -30,6 +30,7 @@ import { newBasket, removeLine, setQuantity, isUnitLine } from '../features/asse
 import { isOverdue, isOpen } from '../features/assets/handover/availability';
 import { categoriesIn } from '../features/assets/categories';
 import { assetTitle } from '../features/assets/identity';
+import { parseUnits } from '../features/assets/units';
 import { TRACKED, CONDITIONS } from '../features/assets/assetKinds';
 import {
   scanIn, addModel, setKind, setLineField, needsKind, needsSerial, holdsFor, nextTag, matchRegister,
@@ -586,6 +587,19 @@ export default function AssetTillPage() {
       ),
     };
   });
+  /** What a serial run opens with: the serials and barcodes the line already has. */
+  const lineFor = (target) => (target.which === 'count' ? countBatch : batch).drafts.find((draft) => draft.localId === target.localId);
+  const serialsOn = (target) => {
+    const draft = lineFor(target);
+    if (!draft) return [];
+    const items = parseUnits(draft.units).map((unit) => unit.serialNumber).filter(Boolean);
+    return draft.serialNumber ? [draft.serialNumber, ...items] : items;
+  };
+  const boxCodesOf = (target) => {
+    const draft = lineFor(target);
+    return draft ? [draft.partNumber, ...(draft.additionalCodes ?? [])].filter(Boolean) : [];
+  };
+
   const rowsIn = draftRows(batch, setBatch, holds, 'in');
   const rowsCount = draftRows(countBatch, setCountBatch, countHolds, 'count');
 
@@ -980,10 +994,12 @@ export default function AssetTillPage() {
           title={runFor.title}
           assets={assets}
           drafts={(runFor.which === 'count' ? countBatch : batch).drafts}
+          existing={serialsOn(runFor)}
+          boxCodes={boxCodesOf(runFor)}
           onCancel={() => setRunFor(null)}
           onDone={(run) => {
             const setTarget = runFor.which === 'count' ? setCountBatch : setBatch;
-            setTarget((current) => addSerialsTo(current, runFor.localId, run.serials, run.without));
+            setTarget((current) => addSerialsTo(current, runFor.localId, run.serials, run.without, run.boxCodes));
             setRunFor(null);
             say('ok', `${run.serials.length + run.without} items recorded`);
           }}

@@ -8,6 +8,7 @@ import TextScanSheet from '../../ui/TextScanSheet';
 import SerialRunSheet from './SerialRunSheet';
 import BoxSweepSheet from './BoxSweepSheet';
 import { detailLine } from '../boxSweep';
+import { parseUnits } from '../../units';
 import { recentModels, knownLocations, COUNT_RESULT } from '../count';
 
 /**
@@ -56,6 +57,16 @@ export default function CountPanel({ assets, drafts, categories, onAdd }) {
     setPhotoId(null);
     setDetails('');
   };
+
+  // The line this model already has in this room, if any: a serial run shows
+  // its serials first and knows its barcodes.
+  const sameLine = drafts.find((draft) => draft.trackingMode !== TRACKED
+    && draft.category === category
+    && String(draft.manufacturer ?? '').toLowerCase() === manufacturer.trim().toLowerCase()
+    && String(draft.model ?? '').toLowerCase() === model.trim().toLowerCase()
+    && String(draft.location ?? '').toLowerCase() === location.trim().toLowerCase());
+  const sameSerials = sameLine ? parseUnits(sameLine.units).map((unit) => unit.serialNumber).filter(Boolean) : [];
+  const sameBoxCodes = sameLine ? (sameLine.additionalCodes ?? []) : [];
 
   const ready = Boolean(category && model.trim() && (!tracked || serial.trim() || noSerial));
 
@@ -236,11 +247,13 @@ export default function CountPanel({ assets, drafts, categories, onAdd }) {
           title={`Serials · ${[manufacturer, model].filter(Boolean).join(' ')}`}
           assets={assets}
           drafts={drafts}
+          existing={sameSerials}
+          boxCodes={sameBoxCodes}
           onCancel={() => setSheet(null)}
           onDone={(run) => {
             setSheet(null);
             onAdd({
-              category, manufacturer, model, location, specSummary: details, serials: run.serials, without: run.without,
+              category, manufacturer, model, location, specSummary: details, serials: run.serials, without: run.without, boxCodes: run.boxCodes,
             });
           }}
         />

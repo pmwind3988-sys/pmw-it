@@ -111,12 +111,15 @@ export function addCounted(batch, entry, assets = []) {
         // The new serials take the positions after everything already counted.
         units: runUnits ? mergeUnits(existing.units, runUnits, existing.quantity) : existing.units,
         specSummary: existing.specSummary || String(entry.specSummary ?? '').trim(),
+        additionalCodes: [...new Set([...(existing.additionalCodes ?? []), ...(entry.boxCodes ?? [])])],
       };
       return { batch: replaceDraft(batch, next), result: COUNT_RESULT.COUNTED, draft: next };
     }
     const draft = newDraft({
       category, trackingMode, manufacturer, model, quantity, location, units: runUnits,
       specSummary: String(entry.specSummary ?? '').trim(),
+      // Shop barcodes seen during a serial run: the model's, kept on the line.
+      additionalCodes: [...new Set(entry.boxCodes ?? [])],
       scanSource: 'Manual', remarks: COUNT_REMARK, manualFields: ['category', 'model'],
     });
     return { batch: addDraft(batch, draft), result: COUNT_RESULT.ADDED, draft };

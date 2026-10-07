@@ -12,10 +12,17 @@ import {
 /**
  * Ten of the same thing, each with its own serial: scan them one after
  * another and the count is how many were scanned. The camera here is told it
- * wants SERIALS, so the shop barcode on each box is passed over without
- * asking. A thing with its sticker gone is one tap, and still counts.
+ * wants SERIALS, and a shop barcode (or one this line is already known by) is
+ * set aside as the model's, never counted as an item. A thing with its sticker
+ * gone is one tap, and still counts.
+ *
+ * `existing` are the serials the line already holds, listed first so the
+ * person can see what is already there; `boxCodes` are the barcodes the line
+ * is known by.
  */
-export default function SerialRunSheet({ title, assets, drafts, onCancel, onDone }) {
+export default function SerialRunSheet({
+  title, assets, drafts, existing = [], boxCodes = [], onCancel, onDone,
+}) {
   const [run, setRun] = useState(newRun);
   const [typed, setTyped] = useState('');
   const [flash, setFlash] = useState(null);
@@ -28,19 +35,21 @@ export default function SerialRunSheet({ title, assets, drafts, onCancel, onDone
     if (kind === 'ok') signalAccepted(); else signalDuplicate();
     setFlash({ kind, text });
     clearTimeout(timer.current);
-    timer.current = setTimeout(() => setFlash(null), 1600);
+    timer.current = setTimeout(() => setFlash(null), 1800);
   }, []);
 
   const take = useCallback((raw) => {
-    const out = addToRun(runRef.current, raw, { assets, drafts });
+    const out = addToRun(runRef.current, raw, { assets, drafts, boxCodes });
+    runRef.current = out.run;
+    setRun(out.run);
     if (out.result === RUN_RESULT.ADDED) {
-      runRef.current = out.run;
-      setRun(out.run);
-      say('ok', `${runSize(out.run)} · ${out.run.serials[out.run.serials.length - 1]}`);
-    } else if (out.result === RUN_RESULT.REPEAT) say('ask', 'Already scanned in this run');
+      const serial = out.run.serials[out.run.serials.length - 1];
+      say('ok', `Item ${existing.length + runSize(out.run)} · ${serial}`);
+    } else if (out.result === RUN_RESULT.BOX_CODE) say('ask', 'Shop barcode — kept for the model, not a serial');
+    else if (out.result === RUN_RESULT.REPEAT) say('ask', 'Already scanned in this run');
     else if (out.result === RUN_RESULT.ON_RECEIPT) say('bad', 'That serial is already on the receipt');
     else if (out.result === RUN_RESULT.REGISTERED) say('bad', `Already registered: ${out.asset.title || 'that serial'}`);
-  }, [assets, drafts, say]);
+  }, [assets, drafts, boxCodes, existing.length, say]);
 
   const onCodes = useCallback((codes, meta = {}) => {
     const { accept, choices: unsure } = gateRef.current(codes, { aimed: Boolean(meta.aimed), expect: 'serial' });
@@ -51,9 +60,17 @@ export default function SerialRunSheet({ title, assets, drafts, onCancel, onDone
   const change = (next) => { runRef.current = next; setRun(next); };
   const count = runSize(run);
 
+  // Everything on the line, item by item: what was already there, then this
+  // run's serials and the ones counted without, newest at the top.
+  const listed = [
+    ...existing.map((serial, i) => ({ id: `old:${serial}`, n: i + 1, serial, old: true })),
+    ...run.serials.map((serial, i) => ({ id: `new:${serial}`, n: existing.length + i + 1, serial, old: false })),
+    ...Array.from({ length: run.without }, (_, i) => ({ id: `none:${i}`, n: existing.length + run.serials.length + i + 1, serial: '', old: false })),
+  ].reverse();
+
   return (
     <TillSheet title={title} onClose={onCancel} wide>
-      <p className="till-sheet-lede">Scan each one’s serial. The count is how many you scan.</p>
+      <p className="till-sheet-lede">Scan each one’s serial. The count is how many you scan. Shop barcodes are skipped.</p>
       <div className="till-scan">
         <TillCamera
           active
@@ -75,18 +92,30 @@ export default function SerialRunSheet({ title, assets, drafts, onCancel, onDone
 
       <div className="till-run-bar">
         <strong className="till-mono">{count}</strong>
-        <span>{run.serials.length} with a serial{run.without ? ` · ${run.without} without` : ''}</span>
+        <span>
+          new{run.serials.length ? ` · ${run.serials.length} with a serial` : ''}{run.without ? ` · ${run.without} without` : ''}
+          {existing.length ? ` · ${existing.length} already on this line` : ''}
+        </span>
         <span className="till-run-actions">
           <button type="button" className="till-chip" onClick={() => change(withoutSerial(run))}>One without a serial</button>
           <button type="button" className="till-chip" onClick={() => change(undoLast(run))} disabled={!count}>Undo last</button>
         </span>
       </div>
 
-      {run.serials.length > 0 && (
-        <ol className="till-run-list till-mono" reversed>
-          {[...run.serials].reverse().slice(0, 8).map((serial) => <li key={serial}>{serial}</li>)}
-          {run.serials.length > 8 && <li className="till-run-more">and {run.serials.length - 8} more</li>}
-        </ol>
+      {listed.length > 0 && (
+        <ul className="till-run-list" aria-label="Serials on this line">
+          {listed.map((item) => (
+            <li key={item.id} className={item.old ? 'till-run-old' : 'till-run-new'}>
+              <span className="till-run-n till-mono">{item.n}</span>
+              <span className="till-mono">{item.serial || 'no serial'}</span>
+              <span className="till-run-where">{item.old ? 'already on this line' : 'this run'}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {run.boxCodes.length > 0 && (
+        <p className="till-run-box">Model barcode kept: <span className="till-mono">{run.boxCodes.join(', ')}</span></p>
       )}
 
       <Button icon={Check} className="till-cta" disabled={!count} onClick={() => onDone(run)}>

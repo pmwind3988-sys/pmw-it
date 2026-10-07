@@ -17,12 +17,22 @@ export const RUN_RESULT = {
   ADDED: 'added',
   REPEAT: 'repeat',
   ON_RECEIPT: 'on-receipt',
+  BOX_CODE: 'box-code',
   REGISTERED: 'registered',
   EMPTY: 'empty',
 };
 
 export function newRun() {
-  return { serials: [], without: 0 };
+  return { serials: [], without: 0, boxCodes: [] };
+}
+
+/**
+ * Not a serial: a shop barcode (12 to 14 digits, the same on every identical
+ * box) or a barcode this line is already known by. It names the MODEL, so it
+ * is kept once for the line and never becomes one item's serial.
+ */
+function isModelCode(code, known) {
+  return /^\d{12,14}$/.test(code) || known.includes(code);
 }
 
 function inRegister(assets, code) {
@@ -39,9 +49,14 @@ function onReceipt(drafts, code) {
     || parseUnits(draft.units).some((unit) => normaliseCode(unit.serialNumber) === code)) ?? null;
 }
 
-export function addToRun(run, raw, { assets = [], drafts = [] } = {}) {
+export function addToRun(run, raw, { assets = [], drafts = [], boxCodes = [] } = {}) {
   const code = normaliseCode(raw);
   if (!code) return { run, result: RUN_RESULT.EMPTY };
+  const known = [...boxCodes, ...(run.boxCodes ?? [])].map(normaliseCode);
+  if (isModelCode(code, known)) {
+    const kept = known.includes(code);
+    return { run: kept ? run : { ...run, boxCodes: [...(run.boxCodes ?? []), code] }, result: RUN_RESULT.BOX_CODE, code };
+  }
   if (run.serials.includes(code)) return { run, result: RUN_RESULT.REPEAT };
   const draft = onReceipt(drafts, code);
   if (draft) return { run, result: RUN_RESULT.ON_RECEIPT, draft };

@@ -5,7 +5,7 @@ import { parseUnits } from '../units.js';
 import { assetTitle } from '../identity.js';
 import {
   scanIn, addModel, STOCK_RESULT, matchRegister, needsKind, needsSerial, setKind, nextTag,
-  linkToModel, addSerialsTo, serialCount, applySweep, asCounted,
+  linkToModel, addSerialsTo, serialCount, applySweep, asCounted, isShopCode,
   noCodeDraft, holdsFor, itemCount,
 } from './stockIn.js';
 
@@ -244,5 +244,47 @@ describe('the first box scanned before the line became a counted one', () => {
   it('leaves a tracked line alone', () => {
     const laptop = { trackingMode: TRACKED, serialNumber: 'X1' };
     expect(asCounted(laptop)).toBe(laptop);
+  });
+});
+
+describe('one box: its serial and its shop barcode', () => {
+  const items = (draft) => parseUnits(draft.units).map((unit) => unit.serialNumber);
+
+  it('keeps them on one line, serial first, and splits them when it becomes a mouse', () => {
+    let { batch } = scanIn(newBatch(), '2140LZ0B1', []);
+    const paired = scanIn(batch, '4710886123456', []);
+    expect(paired.result).toBe(STOCK_RESULT.FILLED);
+    expect(paired.batch.drafts).toHaveLength(1);
+    batch = setKind(paired.batch, paired.draft.localId, 'Mouse');
+    expect(items(batch.drafts[0])).toEqual(['2140LZ0B1']);
+    expect(batch.drafts[0].additionalCodes).toContain('4710886123456');
+    expect(batch.drafts[0].serialNumber).toBe('');
+  });
+
+  it('keeps them on one line in the other order too', () => {
+    const { batch } = scanIn(newBatch(), '4710886123456', []);
+    const paired = scanIn(batch, '2140LZ0B1', []);
+    expect(paired.batch.drafts).toHaveLength(1);
+    expect(paired.draft).toMatchObject({ partNumber: '4710886123456', serialNumber: '2140LZ0B1' });
+  });
+
+  it('names the line outright when the register knows the shop barcode', () => {
+    const { batch } = scanIn(newBatch(), '2140LZ0B1', REGISTER);
+    const paired = scanIn(batch, '5099206092372', REGISTER);
+    expect(paired.batch.drafts).toHaveLength(1);
+    expect(paired.draft).toMatchObject({ model: 'M90', category: 'Mouse' });
+    expect(items(paired.draft)).toEqual(['2140LZ0B1']);
+  });
+
+  it('carries a run’s shop barcode onto the line, not onto an item', () => {
+    const { batch, draft } = scanIn(newBatch(), '5099206092372', REGISTER);
+    const run = addSerialsTo(batch, draft.localId, ['S1'], 0, ['9999999999999']).drafts[0];
+    expect(run.additionalCodes).toContain('9999999999999');
+    expect(items(run)).toEqual(['S1']);
+  });
+
+  it('knows what a shop barcode looks like', () => {
+    expect(isShopCode('5099206092372')).toBe(true);
+    expect(isShopCode('2140LZ0B1')).toBe(false);
   });
 });

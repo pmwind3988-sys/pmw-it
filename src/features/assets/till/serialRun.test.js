@@ -25,3 +25,21 @@ describe('serial run', () => {
     expect(addToRun(run, 'LAPTOP1', { assets: REGISTER }).result).toBe(RUN_RESULT.REGISTERED);
   });
 });
+
+describe('shop barcodes in a serial run', () => {
+  it('sets a shop barcode aside as the model’s, once, and never counts it', () => {
+    let out = addToRun(newRun(), '5099206092372');
+    expect(out.result).toBe(RUN_RESULT.BOX_CODE);
+    expect(out.run.serials).toEqual([]);
+    expect(out.run.boxCodes).toEqual(['5099206092372']);
+    out = addToRun(out.run, '5099206092372');
+    expect(out.run.boxCodes).toEqual(['5099206092372']);
+    expect(runSize(out.run)).toBe(0);
+  });
+
+  it('treats a barcode the line is already known by the same way', () => {
+    const out = addToRun(newRun(), 'MOUSEBOX2', { boxCodes: ['MOUSEBOX2'] });
+    expect(out.result).toBe(RUN_RESULT.BOX_CODE);
+    expect(out.run.boxCodes).toEqual([]);
+  });
+});

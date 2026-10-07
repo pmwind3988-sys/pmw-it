@@ -174,6 +174,21 @@ function looksLikeSerial(raw) {
 }
 
 /**
+ * A shop barcode (EAN/UPC): 12 to 14 digits, printed on every identical box.
+ * It names the MODEL, never one item, so it is never anybody's serial.
+ */
+export function isShopCode(raw) {
+  return /^\d{12,14}$/.test(normaliseCode(raw));
+}
+
+/** A barcode the model is known by, remembered on a counted line. */
+export function rememberBoxCode(batch, localId, code) {
+  const draft = batch.drafts.find((entry) => entry.localId === localId);
+  if (!draft || !normaliseCode(code)) return batch;
+  return replaceDraft(batch, { ...draft, additionalCodes: union(draft.additionalCodes ?? [], [normaliseCode(code)]) });
+}
+
+/**
  * One code onto the receipt. Returns the new batch, what happened, and the
  * draft it happened to, so the page can say so in one line.
  */
@@ -195,6 +210,27 @@ export function scanIn(batch, raw, assets = [], format = '') {
 
     const next = setDraftField(draft, 'quantity', (draft.quantity ?? 1) + 1);
     return { batch: replaceDraft(batch, next), result: STOCK_RESULT.COUNTED, draft: next };
+  }
+
+  // 1b. A box nobody has named yet, read twice over: its serial and its shop
+  //     barcode, one after the other, are ONE thing — the serial is that
+  //     item's, the shop barcode the model's — in whichever order they come.
+  //     A shop barcode the register knows names the line outright.
+  const last = batch.drafts[batch.drafts.length - 1];
+  if (last && needsKind(last)) {
+    const hasSerial = Boolean(String(last.serialNumber ?? '').trim());
+    const hasBox = Boolean(String(last.partNumber ?? '').trim());
+    if (hasSerial && !hasBox && isShopCode(code)) {
+      const paired = replaceDraft(batch, { ...last, partNumber: code });
+      const known = matchRegister(assets, code);
+      const next = known && known.by === 'part' ? linkToModel(paired, last.localId, known.asset) : paired;
+      const draft = next.drafts.find((entry) => entry.localId === last.localId);
+      return { batch: next, result: STOCK_RESULT.FILLED, draft };
+    }
+    if (hasBox && !hasSerial && !isShopCode(code) && looksLikeSerial(raw) && !matchRegister(assets, raw)) {
+      const next = { ...last, serialNumber: code };
+      return { batch: replaceDraft(batch, next), result: STOCK_RESULT.FILLED, draft: next };
+    }
   }
 
   // 2. Known to the register.
@@ -223,11 +259,11 @@ export function scanIn(batch, raw, assets = [], format = '') {
 
   // 3. The serial of the machine whose part number was just read. A laptop box
   //    carries both, and reading them one after the other is one machine.
-  const last = batch.drafts[batch.drafts.length - 1];
   if (last && needsSerial(last) && !needsKind(last) && looksLikeSerial(raw)) {
     const next = { ...last, serialNumber: code };
     return { batch: replaceDraft(batch, next), result: STOCK_RESULT.FILLED, draft: next };
   }
+
 
   // 4. Unknown.
   const draft = draftFromCodes([{ rawValue: String(raw).trim(), format }]);
@@ -401,7 +437,7 @@ export function linkToModel(batch, localId, asset) {
  * becomes at least what was scanned — scanning twelve serials off a line of
  * ten boxes means twelve.
  */
-export function addSerialsTo(batch, localId, serials = [], without = 0) {
+export function addSerialsTo(batch, localId, serials = [], without = 0, boxCodes = []) {
   const found = batch.drafts.find((entry) => entry.localId === localId);
   if (!found || found.trackingMode === TRACKED) return batch;
   // The box scanned before the run started is item 1, not the line's name.
@@ -417,6 +453,8 @@ export function addSerialsTo(batch, localId, serials = [], without = 0) {
   const recorded = units.length + added.length + Math.max(0, without);
   return replaceDraft(batch, {
     ...draft,
+    // Shop barcodes seen during the run belong to the model, not to an item.
+    additionalCodes: union(draft.additionalCodes ?? [], boxCodes),
     units: serialiseUnits([...units, ...added]),
     quantity: Math.max(draft.quantity ?? 1, recorded),
   });

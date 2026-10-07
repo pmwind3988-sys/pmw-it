@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { newBatch } from '../draft/batch.js';
 import { TRACKED, BULK } from '../assetKinds.js';
+import { parseUnits } from '../units.js';
+import { assetTitle } from '../identity.js';
 import {
   scanIn, addModel, STOCK_RESULT, matchRegister, needsKind, needsSerial, setKind, nextTag,
-  linkToModel, addSerialsTo, serialCount, applySweep,
+  linkToModel, addSerialsTo, serialCount, applySweep, asCounted,
   noCodeDraft, holdsFor, itemCount,
 } from './stockIn.js';
 
@@ -144,23 +146,23 @@ describe('new stock of a model already counted', () => {
   });
 
   it('turns an unknown code into a model we have, and counts the next box on sight', () => {
-    let { batch, draft } = scanIn(newBatch(), 'NEWBOX123', [SAVED_MICE]);
+    let { batch, draft } = scanIn(newBatch(), '4710886123456', [SAVED_MICE]);
     batch = linkToModel(batch, draft.localId, SAVED_MICE);
     expect(batch.drafts[0]).toMatchObject({ model: 'M90', manufacturer: 'Logitech', quantity: 1 });
-    expect(batch.drafts[0].additionalCodes).toContain('NEWBOX123');
-    const again = scanIn(batch, 'NEWBOX123', [SAVED_MICE]);
+    expect(batch.drafts[0].additionalCodes).toContain('4710886123456');
+    const again = scanIn(batch, '4710886123456', [SAVED_MICE]);
     expect(again.result).toBe(STOCK_RESULT.COUNTED);
     expect(again.batch.drafts).toHaveLength(1);
   });
 
   it('counts a box with the model’s other barcode onto the same line', () => {
-    let { batch, draft } = scanIn(newBatch(), 'NEWBOX123', [SAVED_MICE]);
+    let { batch, draft } = scanIn(newBatch(), '4710886123456', [SAVED_MICE]);
     batch = linkToModel(batch, draft.localId, SAVED_MICE);
     const out = scanIn(batch, '5099206092372', [SAVED_MICE]);
     expect(out.result).toBe(STOCK_RESULT.COUNTED);
     expect(out.batch.drafts).toHaveLength(1);
     expect(out.draft.quantity).toBe(2);
-    expect(out.draft.additionalCodes).toEqual(expect.arrayContaining(['NEWBOX123', '5099206092372']));
+    expect(out.draft.additionalCodes).toEqual(expect.arrayContaining(['4710886123456', '5099206092372']));
   });
 
   it('links an unknown laptop code as its serial', () => {
@@ -191,5 +193,56 @@ describe('applySweep', () => {
 
     const again = applySweep(swept, draft.localId, { model: 'M100' });
     expect(again.drafts[0].model).toBe('M90');
+  });
+});
+
+describe('the first box scanned before the line became a counted one', () => {
+  const firstMouse = () => {
+    const { batch, draft } = scanIn(newBatch(), '2140LZ0B1', []);
+    expect(draft.serialNumber).toBe('2140LZ0B1');
+    return { batch, id: draft.localId };
+  };
+  const items = (draft) => parseUnits(draft.units).map((unit) => [unit.index, unit.serialNumber]);
+
+  it('becomes item 1 when the category is picked, and no longer names the line', () => {
+    const { batch, id } = firstMouse();
+    const named = setKind(batch, id, 'Mouse').drafts[0];
+    expect(named.serialNumber).toBe('');
+    expect(items(named)).toEqual([[0, '2140LZ0B1']]);
+    expect(named.quantity).toBe(1);
+    expect(assetTitle(named)).not.toContain('2140LZ0B1');
+  });
+
+  it('is counted, and the serial run carries on after it', () => {
+    const { batch, id } = firstMouse();
+    const run = addSerialsTo(setKind(batch, id, 'Mouse'), id, ['2140LZ0B2', '2140LZ0B3']).drafts[0];
+    expect(items(run)).toEqual([[0, '2140LZ0B1'], [1, '2140LZ0B2'], [2, '2140LZ0B3']]);
+    expect(run.quantity).toBe(3);
+  });
+
+  it('is safe even when the run starts before the line was split', () => {
+    const { batch, id } = firstMouse();
+    const kinded = { ...batch, drafts: [{ ...batch.drafts[0], category: 'Mouse', trackingMode: BULK, manualFields: ['category'] }] };
+    const run = addSerialsTo(kinded, id, ['2140LZ0B2']).drafts[0];
+    expect(items(run)).toEqual([[0, '2140LZ0B1'], [1, '2140LZ0B2']]);
+    expect(run.serialNumber).toBe('');
+  });
+
+  it('keeps its serial on item 1 when linked to a model we have', () => {
+    const { batch, id } = firstMouse();
+    const linked = linkToModel(batch, id, MICE).drafts[0];
+    expect(linked.model).toBe('M90');
+    expect(items(linked)).toEqual([[0, '2140LZ0B1']]);
+    expect(linked.additionalCodes).not.toContain('2140LZ0B1');
+  });
+
+  it('is recognised as already on the receipt when scanned again', () => {
+    const { batch, id } = firstMouse();
+    expect(scanIn(setKind(batch, id, 'Mouse'), '2140LZ0B1', []).result).toBe(STOCK_RESULT.DUPLICATE);
+  });
+
+  it('leaves a tracked line alone', () => {
+    const laptop = { trackingMode: TRACKED, serialNumber: 'X1' };
+    expect(asCounted(laptop)).toBe(laptop);
   });
 });

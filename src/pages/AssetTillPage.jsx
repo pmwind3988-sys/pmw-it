@@ -519,7 +519,10 @@ export default function AssetTillPage() {
     return {
       id: draft.localId,
       badge: unnamed ? '?' : badgeOf(draft.category),
-      name: unnamed ? 'New code' : assetTitle(draft),
+      name: unnamed ? 'New code'
+        : (!String(draft.model ?? '').trim() && !String(draft.manufacturer ?? '').trim() && bulk
+          ? `New ${String(draft.category).toLowerCase()} — make and model?`
+          : assetTitle(draft)),
       sub: [
         draft.serialNumber ? `S/N ${draft.serialNumber}` : (draft.assetTag ? `Label ${draft.assetTag}` : (draft.partNumber ? `Part ${draft.partNumber}` : '')),
         draft.noSerial && (draft.photoId ? 'No serial · photo taken' : 'No serial · no photo'),

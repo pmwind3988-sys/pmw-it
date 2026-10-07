@@ -38,6 +38,13 @@ function codesOf(draft) {
     const code = normaliseCode(extra);
     if (code) out.push({ field: 'additionalCodes', code });
   }
+  // A counted line's items: their serial read again is that item, not one more.
+  for (const unit of parseUnits(draft.units)) {
+    for (const field of ['serialNumber', 'assetTag', 'macAddress']) {
+      const code = normaliseCode(unit[field]);
+      if (code) out.push({ field: 'unit', code });
+    }
+  }
   return out;
 }
 
@@ -227,11 +234,41 @@ export function scanIn(batch, raw, assets = [], format = '') {
   return { batch: addDraft(batch, draft), result: STOCK_RESULT.NEW, draft };
 }
 
+const ITEM_CODES = ['serialNumber', 'assetTag', 'macAddress'];
+
+/**
+ * A line that has just become a COUNTED one. Whatever identified the one box
+ * that was scanned — its serial, label, MAC — belongs to that box, so it moves
+ * onto item 1 now; left on the line it would name the whole line (the line's
+ * title would be that serial), the item would not be counted, and the save
+ * would drop it, because a counted line with items keeps no serial of its own.
+ * A part number names the model, so it is remembered as one of the line's box
+ * barcodes instead.
+ */
+export function asCounted(draft) {
+  if (!draft || draft.trackingMode === TRACKED) return draft;
+  const own = Object.fromEntries(ITEM_CODES.map((field) => [field, String(draft[field] ?? '').trim()]));
+  const part = String(draft.partNumber ?? '').trim();
+  if (!Object.values(own).some(Boolean) && !part) return draft;
+
+  const units = parseUnits(draft.units);
+  const next = { ...draft, partNumber: '', additionalCodes: union(draft.additionalCodes ?? [], part ? [part] : []) };
+  if (Object.values(own).some(Boolean)) {
+    const taken = new Set(units.map((unit) => unit.index));
+    let at = 0;
+    while (taken.has(at)) at += 1;
+    next.units = serialiseUnits([...units, { index: at, ...own }]);
+    next.quantity = Math.max(next.quantity ?? 1, units.length + 1);
+  }
+  for (const field of ITEM_CODES) next[field] = '';
+  return next;
+}
+
 /** Naming an unknown line from its category chip. */
 export function setKind(batch, localId, category) {
   const draft = batch.drafts.find((entry) => entry.localId === localId);
   if (!draft) return batch;
-  return replaceDraft(batch, setDraftField(draft, 'category', category));
+  return replaceDraft(batch, asCounted(setDraftField(draft, 'category', category)));
 }
 
 /** Any one field of a line, by hand. */
@@ -344,7 +381,16 @@ export function linkToModel(batch, localId, asset) {
       ? draftOfModel(asset, { serialNumber: code, partNumber: asset.partNumber ?? '' })
       : draftOfModel(asset, { partNumber: code });
   } else {
-    next = draftRemembering(asset, code, { quantity: draft.quantity ?? 1 });
+    // The box barcode is the model's and is remembered; a serial or label read
+    // off the box is that one item's, and goes onto it.
+    const boxCode = draft.partNumber || (draft.additionalCodes ?? [])[0] || '';
+    next = asCounted({
+      ...draftRemembering(asset, boxCode, { quantity: draft.quantity ?? 1 }),
+      serialNumber: draft.serialNumber ?? '',
+      assetTag: draft.assetTag ?? '',
+      macAddress: draft.macAddress ?? '',
+      units: draft.units,
+    });
   }
   return replaceDraft(batch, { ...next, localId: draft.localId, photoId: draft.photoId ?? null });
 }
@@ -356,8 +402,10 @@ export function linkToModel(batch, localId, asset) {
  * ten boxes means twelve.
  */
 export function addSerialsTo(batch, localId, serials = [], without = 0) {
-  const draft = batch.drafts.find((entry) => entry.localId === localId);
-  if (!draft || draft.trackingMode === TRACKED) return batch;
+  const found = batch.drafts.find((entry) => entry.localId === localId);
+  if (!found || found.trackingMode === TRACKED) return batch;
+  // The box scanned before the run started is item 1, not the line's name.
+  const draft = asCounted(found);
   const units = parseUnits(draft.units);
   const taken = new Set(units.map((unit) => unit.index));
   let at = 0;
@@ -389,7 +437,7 @@ export function serialCount(draft) {
 export function applySweep(batch, localId, found = {}) {
   let draft = batch.drafts.find((entry) => entry.localId === localId);
   if (!draft) return batch;
-  if (found.category && needsKind(draft)) draft = setDraftField(draft, 'category', found.category);
+  if (found.category && needsKind(draft)) draft = asCounted(setDraftField(draft, 'category', found.category));
 
   const guessed = new Set(draft.guessed ?? []);
   const fill = (field, value) => {

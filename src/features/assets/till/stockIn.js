@@ -119,6 +119,9 @@ export function addModel(batch, asset) {
 
 /** A tracked line from a part number: one specific machine nobody has named. */
 export function needsSerial(draft) {
+  // A count line whose serial was looked for and not found says so outright;
+  // asking again for what is not there would hold the count for ever.
+  if (draft.noSerial) return false;
   return draft.trackingMode === TRACKED
     && !String(draft.serialNumber ?? '').trim()
     && !String(draft.assetTag ?? '').trim();

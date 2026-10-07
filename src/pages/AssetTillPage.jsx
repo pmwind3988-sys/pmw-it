@@ -5,7 +5,7 @@ import AppShell from '../components/AppShell';
 import Button from '../components/ui/Button';
 import { ErrorBanner } from '../components/ui/Surfaces';
 import {
-  Camera, Check, ScanLine, Truck, UserPlus, Inbox,
+  Camera, Check, ScanLine, Truck, UserPlus, Inbox, Boxes,
 } from '../components/ui/Icons';
 import { useAssets, SHAREPOINT_SITE_URL } from '../features/assets/useAssets';
 import { useHandovers } from '../features/assets/useHandovers';
@@ -16,7 +16,11 @@ import TextScanSheet from '../features/assets/ui/TextScanSheet';
 import PersonPicker from '../features/assets/ui/PersonPicker';
 import { newBatch, addDraft, replaceDraft, removeDraft } from '../features/assets/draft/batch';
 import { newDraft } from '../features/assets/draft/draftAsset';
-import { saveBatch, loadBatch, deleteBatch, loadPhoto } from '../features/assets/store/assetDb';
+import { saveBatch, loadPhoto } from '../features/assets/store/assetDb';
+import { readPref, writePref } from '../features/assets/till/prefs';
+import { newCount, addCounted, COUNT_RESULT } from '../features/assets/till/count';
+import { useStoredBatch } from '../features/assets/till/ui/useStoredBatch';
+import CountPanel from '../features/assets/till/ui/CountPanel';
 import { saveBatchToSharePoint, remainingDrafts } from '../features/assets/sharepoint/saveBatch';
 import { commitHandover, commitReturn } from '../features/assets/sharepoint/writeHandover';
 import { newBasket, removeLine, setQuantity, isUnitLine } from '../features/assets/handover/basket';
@@ -56,6 +60,7 @@ const MODES = [
   { id: 'in', label: 'Stock in', icon: Truck },
   { id: 'out', label: 'Hand out', icon: UserPlus },
   { id: 'back', label: 'Take back', icon: Inbox },
+  { id: 'count', label: 'Count', icon: Boxes },
 ];
 
 const PHASE = {
@@ -69,17 +74,21 @@ const PHASE = {
   updating: 'Updating the register',
 };
 
+const RECEIPT_TITLE = {
+  in: 'Receipt · stock in', out: 'Receipt · handover', back: 'Receipt · return', count: 'Receipt · catch-up count',
+};
+const RECEIPT_EMPTY = {
+  in: 'Scan the boxes as they come off the trolley. The same model again counts up.',
+  out: 'Scan or type what they are taking. Anything that cannot go out says why straight away.',
+  back: 'Scan whatever came back. The till finds who had it.',
+  count: 'Count what is already here, room by room. Things with no serial are fine — tick it and take a photo.',
+};
+
 const COMMON_KINDS = ['Laptop', 'Monitor', 'Mouse', 'Keyboard', 'Cable', 'Accessory'];
 const BATCH_KEY = 'tillBatchId';
+const COUNT_KEY = 'tillCountId';
 const CAMERA_KEY = 'tillCamera';
 
-const readPref = (key) => { try { return localStorage.getItem(key); } catch { return null; } };
-const writePref = (key, value) => {
-  try {
-    if (value == null) localStorage.removeItem(key);
-    else localStorage.setItem(key, value);
-  } catch { /* private mode: the till still works, it just forgets */ }
-};
 
 /** Phones scan with the camera; a desk has a scanner gun and keeps it off. */
 function cameraByDefault() {
@@ -112,10 +121,12 @@ export default function AssetTillPage() {
   const { handovers, reload: reloadHandovers } = useHandovers();
   const assetsById = useMemo(() => new Map(assets.map((asset) => [asset.id, asset])), [assets]);
 
-  // The three receipts. Each mode keeps its own, so switching tab to check
-  // something does not throw away a half-scanned delivery.
-  const [batch, setBatch] = useState(() => newBatch());
-  const [batchReady, setBatchReady] = useState(false);
+  // The receipts. Each mode keeps its own, so switching tab to check
+  // something does not throw away a half-scanned delivery. A delivery and a
+  // count are batches kept on this device; the other two need the network
+  // anyway.
+  const [batch, setBatch, finishBatch] = useStoredBatch(BATCH_KEY, newBatch);
+  const [countBatch, setCountBatch, finishCount] = useStoredBatch(COUNT_KEY, newCount);
   const [basket, setBasket] = useState(() => newBasket());
   const [missesOut, setMissesOut] = useState([]);
   const [terms, setTerms] = useState({ loan: false, dueChoice: '2w' });
@@ -146,29 +157,6 @@ export default function AssetTillPage() {
   useEffect(() => {
     live.current = { mode, batch, basket, backLines, assets, handovers };
   });
-
-  // The delivery on the receipt is a real batch, kept on this device. Pick up
-  // the one left open last time.
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      const id = readPref(BATCH_KEY);
-      const found = id ? await loadBatch(id).catch(() => null) : null;
-      if (!alive) return;
-      if (found && found.status !== 'saved') setBatch(found);
-      setBatchReady(true);
-    })();
-    return () => { alive = false; };
-  }, []);
-
-  useEffect(() => {
-    if (!batchReady || !batch.drafts.length) return;
-    writePref(BATCH_KEY, batch.id);
-    saveBatch(batch).catch(() => {
-      // Storage full or blocked: the receipt is still on screen and saving
-      // still works; it just will not survive closing the tab.
-    });
-  }, [batch, batchReady]);
 
   useEffect(() => () => clearTimeout(flashTimer.current), []);
 
@@ -227,7 +215,7 @@ export default function AssetTillPage() {
     setBackLines(out.lines);
     if (out.result === BACK_RESULT.CHOOSE) say('ask', 'Several people have these — whose is it?');
     else say('ok', `${out.result === BACK_RESULT.COUNTED ? '+1 · ' : ''}Back from ${out.line.from}`);
-  }, [say]);
+  }, [say, setBatch]);
 
   const onCodes = useCallback((codes) => {
     for (const code of codes) {
@@ -273,6 +261,25 @@ export default function AssetTillPage() {
     inputRef.current?.focus();
   };
 
+  /** One counted thing onto the count. Returns what happened, so the panel
+   *  knows whether to clear its serial and photo for the next one. */
+  const countOne = (entry) => {
+    const out = addCounted(countBatch, entry, assets);
+    const name = out.draft ? assetTitle(out.draft) : '';
+    if (out.result === COUNT_RESULT.ADDED) {
+      setCountBatch(out.batch);
+      say('ok', `Added · ${name}`);
+    } else if (out.result === COUNT_RESULT.COUNTED) {
+      setCountBatch(out.batch);
+      say('ok', `+${entry.quantity} · ${name} (now ${out.draft.quantity})`);
+    } else if (out.result === COUNT_RESULT.DUPLICATE) {
+      say('ask', 'That serial is already on this count');
+    } else if (out.result === COUNT_RESULT.KNOWN) {
+      say('ask', `${out.asset.title || 'That serial'} is already in the register`);
+    }
+    return out.result;
+  };
+
   const keys = useMemo(() => quickKeys(assets, handovers), [assets, handovers]);
   const outNow = useMemo(() => handovers
     .filter((row) => isOpen(row))
@@ -315,6 +322,7 @@ export default function AssetTillPage() {
   // ── Checkout ──────────────────────────────────────────────────────────────
 
   const holds = useMemo(() => holdsFor(batch, assets), [batch, assets]);
+  const countHolds = useMemo(() => holdsFor(countBatch, assets), [countBatch, assets]);
   const refusals = useMemo(() => refusalsFor(basket, assets), [basket, assets]);
   const busy = Boolean(progress);
   const busyLabel = progress ? `${PHASE[progress.phase] ?? 'Working'}…` : '';
@@ -335,37 +343,46 @@ export default function AssetTillPage() {
     }
   };
 
-  const saveDelivery = () => run(async () => {
-    await saveBatch(batch).catch(() => {});
+  /** A delivery or a count: both are batches, and save the same way. */
+  const saveDrafts = (kind) => run(async () => {
+    const counting = kind === 'count';
+    const target = counting ? countBatch : batch;
+    const setTarget = counting ? setCountBatch : setBatch;
+    await saveBatch(target).catch(() => {});
     const token = (await getToken()).accessToken;
     const report = await saveBatchToSharePoint({
-      siteUrl: SHAREPOINT_SITE_URL, token, batch, photoFor: loadPhoto, savedBy: who(), onProgress: setProgress,
+      siteUrl: SHAREPOINT_SITE_URL, token, batch: target, photoFor: loadPhoto, savedBy: who(), onProgress: setProgress,
     });
     reloadAssets();
 
-    const left = remainingDrafts(batch, report);
-    const savedRows = batch.drafts.filter((draft) => !left.some((keep) => keep.localId === draft.localId));
+    const left = remainingDrafts(target, report);
+    const savedRows = target.drafts.filter((draft) => !left.some((keep) => keep.localId === draft.localId));
     if (!left.length) {
-      await deleteBatch(batch.id).catch(() => {});
-      writePref(BATCH_KEY, null);
-      setBatch(newBatch({ supplier: batch.purchase.supplier }));
+      if (counting) await finishCount(target, newCount());
+      else await finishBatch(target, newBatch({ purchase: { supplier: target.purchase.supplier } }));
     } else {
-      setBatch({ ...batch, drafts: left });
+      setTarget({ ...target, drafts: left });
     }
+    const places = [...new Set(savedRows.map((draft) => draft.location).filter(Boolean))];
     signalDone();
     setDone({
-      mode: 'in',
+      mode: kind,
       title: left.length ? `Saved ${plural(savedRows.length, 'line')}` : 'Saved to the register',
       when: stamp(),
-      meta: [
-        { k: 'Supplier', v: batch.purchase.supplier || '—' },
-        { k: 'DO number', v: batch.purchase.doNumber || 'To follow' },
-      ],
+      meta: counting
+        ? [
+          { k: 'Counted in', v: places.join(', ') || '—' },
+          { k: 'Without a serial', v: String(savedRows.filter((draft) => draft.noSerial).length) },
+        ]
+        : [
+          { k: 'Supplier', v: target.purchase.supplier || '—' },
+          { k: 'DO number', v: target.purchase.doNumber || 'To follow' },
+        ],
       rows: savedRows.map((draft) => ({ id: draft.localId, name: assetTitle(draft), sub: draft.serialNumber || draft.assetTag || '', qty: draft.trackingMode === TRACKED ? 1 : draft.quantity })),
       total: savedRows.reduce((sum, draft) => sum + (draft.trackingMode === TRACKED ? 1 : draft.quantity), 0),
       warning: left.length ? `${plural(left.length, 'line')} could not be saved and are still on the receipt.` : '',
-      next: left.length ? 'Back to the receipt' : 'Next delivery',
-      link: left.length ? { to: `/assets/batch/${batch.id}`, label: 'Open the full review' } : { to: '/assets', label: 'Open the register' },
+      next: left.length ? 'Back to the receipt' : (counting ? 'Keep counting' : 'Next delivery'),
+      link: left.length ? { to: `/assets/batch/${target.id}`, label: 'Open the full review' } : { to: '/assets', label: 'Open the register' },
     });
   });
 
@@ -454,34 +471,38 @@ export default function AssetTillPage() {
 
   const categories = useMemo(() => categoriesIn(assets), [assets]);
 
-  const rowsIn = batch.drafts.map((draft) => {
+  const draftRows = (theBatch, setTheBatch, theHolds) => theBatch.drafts.map((draft) => {
     const unnamed = needsKind(draft);
-    const hold = holds.get(draft.localId);
-    const update = (field) => (event) => setBatch((current) => setLineField(current, draft.localId, field, event.target.value));
+    const hold = theHolds.get(draft.localId);
+    const update = (field) => (event) => setTheBatch((current) => setLineField(current, draft.localId, field, event.target.value));
     const bulk = draft.trackingMode !== TRACKED;
     return {
       id: draft.localId,
       badge: unnamed ? '?' : badgeOf(draft.category),
       name: unnamed ? 'New code' : assetTitle(draft),
-      sub: draft.serialNumber ? `S/N ${draft.serialNumber}` : (draft.assetTag ? `Label ${draft.assetTag}` : (draft.partNumber ? `Part ${draft.partNumber}` : '')),
+      sub: [
+        draft.serialNumber ? `S/N ${draft.serialNumber}` : (draft.assetTag ? `Label ${draft.assetTag}` : (draft.partNumber ? `Part ${draft.partNumber}` : '')),
+        draft.noSerial && (draft.photoId ? 'No serial · photo taken' : 'No serial · no photo'),
+        draft.location,
+      ].filter(Boolean).join(' · '),
       note: hold,
       tone: hold ? 'ask' : 'ok',
       qty: bulk ? draft.quantity : 1,
-      onInc: bulk && !unnamed ? () => setBatch((current) => setLineField(current, draft.localId, 'quantity', draft.quantity + 1)) : null,
-      onDec: () => setBatch((current) => setLineField(current, draft.localId, 'quantity', Math.max(1, draft.quantity - 1))),
-      onRemove: () => setBatch((current) => removeDraft(current, draft.localId)),
+      onInc: bulk && !unnamed ? () => setTheBatch((current) => setLineField(current, draft.localId, 'quantity', draft.quantity + 1)) : null,
+      onDec: () => setTheBatch((current) => setLineField(current, draft.localId, 'quantity', Math.max(1, draft.quantity - 1))),
+      onRemove: () => setTheBatch((current) => removeDraft(current, draft.localId)),
       extra: (unnamed || hold) && (
         <div className="till-fix">
           {unnamed && (
             <div className="till-chips">
               {COMMON_KINDS.map((kind) => (
-                <button key={kind} type="button" className="till-chip" onClick={() => setBatch((current) => setKind(current, draft.localId, kind))}>{kind}</button>
+                <button key={kind} type="button" className="till-chip" onClick={() => setTheBatch((current) => setKind(current, draft.localId, kind))}>{kind}</button>
               ))}
               <select
                 className="till-chip"
                 value=""
                 aria-label="Another category"
-                onChange={(event) => event.target.value && setBatch((current) => setKind(current, draft.localId, event.target.value))}
+                onChange={(event) => event.target.value && setTheBatch((current) => setKind(current, draft.localId, event.target.value))}
               >
                 <option value="">More…</option>
                 {categories.filter((name) => !COMMON_KINDS.includes(name)).map((name) => <option key={name}>{name}</option>)}
@@ -498,6 +519,8 @@ export default function AssetTillPage() {
       ),
     };
   });
+  const rowsIn = draftRows(batch, setBatch, holds);
+  const rowsCount = draftRows(countBatch, setCountBatch, countHolds);
 
   const rowsOut = [
     ...basket.lines.map((line) => {
@@ -571,7 +594,17 @@ export default function AssetTillPage() {
         : `Save ${plural(total, 'item')} to the register`;
     ctaOk = batch.drafts.length > 0 && !unanswered;
     note = 'Kept on this device until you save';
-    onCheckout = saveDelivery;
+    onCheckout = () => saveDrafts('in');
+  } else if (mode === 'count') {
+    rows = rowsCount;
+    total = itemsIn(countBatch);
+    const unanswered = countHolds.size;
+    cta = !countBatch.drafts.length ? 'Count something to start'
+      : unanswered ? `${plural(unanswered, 'line')} ${unanswered === 1 ? 'needs' : 'need'} an answer`
+        : `Save ${plural(total, 'item')} to the register`;
+    ctaOk = countBatch.drafts.length > 0 && !unanswered;
+    note = 'Kept on this device until you save — save as often as you like';
+    onCheckout = () => saveDrafts('count');
   } else if (mode === 'out') {
     rows = rowsOut;
     total = itemsOut(basket, refusals);
@@ -603,7 +636,9 @@ export default function AssetTillPage() {
     setCameraOn((on) => { writePref(CAMERA_KEY, on ? 'off' : 'on'); return !on; });
   };
 
-  const counts = { in: itemsIn(batch), out: itemsOut(basket, refusals), back: itemsBack(backLines) };
+  const counts = {
+    in: itemsIn(batch), out: itemsOut(basket, refusals), back: itemsBack(backLines), count: itemsIn(countBatch),
+  };
   const purchase = batch.purchase;
   const setPurchase = (field, value) => setBatch((current) => ({ ...current, purchase: { ...current.purchase, [field]: value } }));
 
@@ -632,6 +667,13 @@ export default function AssetTillPage() {
 
         <div className="till-grid">
           <div className="till-left">
+            {mode === 'count' ? (
+              <>
+                <CountPanel assets={assets} drafts={countBatch.drafts} categories={categories} onAdd={countOne} />
+                {flash && <div className={`till-flash till-flash-inline till-flash-${flash.kind}`} role="status">{flash.text}</div>}
+              </>
+            ) : (
+            <>
             <div className="till-scan">
               {cameraOn && !done && <TillCamera active={!sheet} onCodes={onCodes} flash={flash} onQuiet={onQuiet} />}
 
@@ -719,6 +761,8 @@ export default function AssetTillPage() {
                 </ul>
               </section>
             )}
+            </>
+            )}
           </div>
 
           <div className="till-right">
@@ -795,13 +839,9 @@ export default function AssetTillPage() {
                 )}
 
                 <TillReceipt
-                  title={mode === 'in' ? 'Receipt · stock in' : (mode === 'out' ? 'Receipt · handover' : 'Receipt · return')}
+                  title={RECEIPT_TITLE[mode]}
                   rows={rows}
-                  empty={mode === 'in'
-                    ? 'Scan the boxes as they come off the trolley. The same model again counts up.'
-                    : (mode === 'out'
-                      ? 'Scan or type what they are taking. Anything that cannot go out says why straight away.'
-                      : 'Scan whatever came back. The till finds who had it.')}
+                  empty={RECEIPT_EMPTY[mode]}
                 />
 
                 <footer className="till-foot">

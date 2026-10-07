@@ -91,7 +91,7 @@ pmw-it/
 | `/assets/handover` | Pick a person, fill a basket by search or camera, hand it over |
 | `/assets/people` | Everyone currently holding something, overdue first |
 | `/assets/people/:email` | One person, everything they hold, and returning it |
-| `/assets/till` | The till: stock in / hand out / take back on one screen (`?mode=in\|out\|back`). Scan or type onto a receipt, one button to finish |
+| `/assets/till` | The till: stock in / hand out / take back / count on one screen (`?mode=in\|out\|back\|count`). Scan or type onto a receipt, one button to finish |
 | `/semantic-analysis` | Drop a Microsoft Forms export and land on a finished screen. It reads the file name for the subject, parks the form's bookkeeping columns, charts the rest, reads the written answers with a local model, sorts them into categories (internet, SAP, digitization, paperwork…) and charts those too. Tapping any mark filters the response list below — email, submitted, department, then every answer — and a response opens in full. Nothing is uploaded and nothing is saved: no SharePoint, no IndexedDB. Charts export as PNG, responses as CSV. Lazy route; `/data-studio` redirects here. |
 
 ## WHERE TO LOOK
@@ -156,6 +156,7 @@ pmw-it/
 | What one scan does at the till, per mode | `src/features/assets/till/stockIn.js`, `handOut.js`, `takeBack.js` |
 | Type-to-find and the desk's quick keys | `src/features/assets/till/tillSearch.js` |
 | Why a box held in front of the camera counts once | `src/features/assets/till/cooldown.js` |
+| Entering the unlabelled backlog (catch-up count) | `src/features/assets/till/count.js`, `till/ui/CountPanel.jsx` |
 | The till page and its sheets | `src/pages/AssetTillPage.jsx`, `src/features/assets/till/ui/`, `src/styles/till.css` |
 | Finding a person in the directory | `src/features/assets/people/peopleSearch.js` |
 | Handover SharePoint schema | `src/features/assets/sharepoint/handoverSchema.js` |
@@ -518,6 +519,19 @@ label reader, type-to-find, and (stock in only) "nothing on it", which gives a
 tracked thing the next free `PMW-NNNN` (`nextTag`). The old scan, batch and
 handover screens still work; the batch page is where a held delivery is
 finished in detail.
+
+**The catch-up count is how the unlabelled backlog gets in.** Fourth till mode
+(`?mode=count`, `till/count.js`). Most of what IT already owns has no box, no
+barcode and no label, so a count is typed, not scanned: where you are, a
+category, a model (offered from what this count just used, then what the
+register holds most of), then a quantity for a bulk thing or a serial for a
+tracked one. Bulk is counted by model AND place -- the same mice in the same
+room add to one line. A tracked thing with no serial anywhere is accepted only
+when "no serial" is ticked (`noSerial`, which `needsSerial` honours), and its
+remarks say so; the photo is how it will be told apart. A count is its own
+batch (`tillCountId`), separate from an open delivery, with no arrival date --
+nothing arrived, so none is invented. No PMW sticker labels: the user does not
+want labels stuck on things.
 
 **"Who has it" is one line per PERSON.** `groupHolders` in
 `handover/availability.js` gathers the open handovers on an item by email:

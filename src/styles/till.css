@@ -627,3 +627,100 @@ select.till-chip { padding-right: 8px; }
 /* The people picker was built for a row; in a column sheet its search box
    would otherwise stretch to fill the sheet. */
 .till-sheet .as-searchbox { flex: none; height: auto; }
+
+/* ── Catch-up count ────────────────────────────────────────────────────── */
+
+.till-count-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 14px;
+  border: 1px solid var(--it-line);
+  border-radius: 14px;
+  background: var(--it-panel);
+}
+
+.till-count-step { display: flex; flex-direction: column; gap: 8px; }
+
+.till-count-input,
+.till-entry-light input {
+  width: 100%;
+  height: 50px;
+  padding: 0 14px;
+  box-sizing: border-box;
+  border: 1px solid var(--it-line);
+  border-radius: 10px;
+  background: var(--it-panel);
+  color: var(--it-ink);
+  font-size: 17px;
+  font-family: inherit;
+}
+.till-entry-light input { font-family: 'IBM Plex Mono', ui-monospace, monospace; letter-spacing: 0.02em; }
+.till-entry-light input:disabled { opacity: 0.5; }
+
+.till-cats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  gap: 8px;
+}
+.till-cat {
+  min-height: 60px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px;
+  border: 1px solid var(--it-line);
+  border-radius: 12px;
+  background: var(--it-panel);
+  color: var(--it-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.till-cat strong { font-size: 15px; }
+.till-cat span { font-size: 12px; color: var(--it-ink-soft); }
+.till-cat:hover { border-color: var(--it-brand); }
+.till-cat.on { border-color: var(--till-dark); background: var(--till-dark); color: var(--till-dark-ink); }
+.till-cat.on span { color: var(--till-key); }
+
+.till-count-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+
+.till-bigstep { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.till-bigstep > button:not(.till-chip) {
+  width: 56px;
+  height: 56px;
+  border: 1px solid var(--it-line);
+  border-radius: 12px;
+  background: var(--it-canvas);
+  color: var(--it-ink);
+  font-size: 26px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.till-bigstep input {
+  width: 96px;
+  height: 56px;
+  box-sizing: border-box;
+  border: 2px solid var(--it-ink);
+  border-radius: 12px;
+  background: var(--it-panel);
+  color: var(--it-ink);
+  font-size: 26px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.till-chip:disabled { opacity: 0.45; cursor: not-allowed; }
+.till-chip svg { vertical-align: -2px; margin-right: 4px; }
+
+/* Four modes on a phone: the icons go so the words fit on one line. */
+@media (max-width: 560px) {
+  .till-mode { gap: 4px; padding: 0 4px; font-size: 14px; white-space: nowrap; }
+  .till-mode svg { display: none; }
+  .till-count { min-width: 18px; height: 18px; font-size: 11px; padding: 0 4px; }
+  .till-cats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .till-cat { min-height: 54px; padding: 6px 8px; }
+  .till-cat strong { font-size: 14px; }
+}

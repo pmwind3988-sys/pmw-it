@@ -3,7 +3,7 @@ import { newBatch } from '../draft/batch.js';
 import { TRACKED, BULK } from '../assetKinds.js';
 import {
   scanIn, addModel, STOCK_RESULT, matchRegister, needsKind, needsSerial, setKind, nextTag,
-  linkToModel, addSerialsTo, serialCount,
+  linkToModel, addSerialsTo, serialCount, applySweep,
   noCodeDraft, holdsFor, itemCount,
 } from './stockIn.js';
 
@@ -174,5 +174,22 @@ describe('new stock of a model already counted', () => {
     batch = addSerialsTo(batch, draft.localId, ['S1', 'S2', 'S3'], 1);
     expect(batch.drafts[0].quantity).toBe(4);
     expect(serialCount(batch.drafts[0])).toBe(3);
+  });
+});
+
+describe('applySweep', () => {
+  it('names an unknown line from the box, and only fills what is empty', () => {
+    const { batch, draft } = scanIn(newBatch(), '4710886112233', []);
+    const swept = applySweep(batch, draft.localId, {
+      category: 'Mouse', make: 'Logitech', model: 'M90', colour: 'Black', details: ['Wired', 'USB'],
+    });
+    expect(swept.drafts[0]).toMatchObject({
+      category: 'Mouse', manufacturer: 'Logitech', model: 'M90', specSummary: 'Black · Wired · USB',
+    });
+    expect(swept.drafts[0].guessed).toEqual(expect.arrayContaining(['manufacturer', 'model', 'specSummary']));
+    expect(needsKind(swept.drafts[0])).toBe(false);
+
+    const again = applySweep(swept, draft.localId, { model: 'M100' });
+    expect(again.drafts[0].model).toBe('M90');
   });
 });

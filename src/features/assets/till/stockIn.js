@@ -378,3 +378,32 @@ export function addSerialsTo(batch, localId, serials = [], without = 0) {
 export function serialCount(draft) {
   return parseUnits(draft.units).filter((unit) => String(unit.serialNumber ?? '').trim()).length;
 }
+
+/**
+ * What a box sweep found, onto a line. The category answers "what is this?"
+ * on an unknown line; make and model fill only what is empty (a model the
+ * register already named is not overwritten by a reading of the box); colour
+ * and details join the line's details. Every field it writes is marked as
+ * guessed, because it is.
+ */
+export function applySweep(batch, localId, found = {}) {
+  let draft = batch.drafts.find((entry) => entry.localId === localId);
+  if (!draft) return batch;
+  if (found.category && needsKind(draft)) draft = setDraftField(draft, 'category', found.category);
+
+  const guessed = new Set(draft.guessed ?? []);
+  const fill = (field, value) => {
+    if (!value || String(draft[field] ?? '').trim()) return;
+    draft = { ...draft, [field]: value };
+    guessed.add(field);
+  };
+  fill('manufacturer', found.make);
+  fill('model', found.model);
+
+  const extra = [found.colour, ...(found.details ?? [])].filter(Boolean).join(' · ');
+  if (extra) {
+    draft = { ...draft, specSummary: [draft.specSummary, extra].filter(Boolean).join(' · ') };
+    guessed.add('specSummary');
+  }
+  return replaceDraft(batch, { ...draft, guessed: [...guessed] });
+}

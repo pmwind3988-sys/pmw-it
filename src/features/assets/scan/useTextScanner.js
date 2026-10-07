@@ -32,12 +32,22 @@ export const SCAN_STATE = {
   NO_READER: 'no-reader',
 };
 
-export function useTextScanner({ active = true } = {}) {
+/**
+ * `maxPasses` ends the reading on its own (a label is read in a few passes);
+ * a box sweep passes Infinity and stops when the person says so. `onLines`
+ * hears every pass's raw lines, for a caller that reasons about them itself.
+ */
+export function useTextScanner({ active = true, maxPasses = MAX_PASSES, onLines } = {}) {
   const [scan, setScan] = useState(newTextScan);
   const [reader, setReader] = useState(null);
   const [done, setDone] = useState(false);
   const scanRef = useRef(scan);
   const doneRef = useRef(false);
+  const onLinesRef = useRef(onLines);
+
+  useEffect(() => {
+    onLinesRef.current = onLines;
+  }, [onLines]);
 
   const camera = useCamera({ active });
 
@@ -88,6 +98,7 @@ export function useTextScanner({ active = true } = {}) {
         if (cancelled) return;
 
         if (lines.length) {
+          onLinesRef.current?.(lines);
           const next = recordReading(scanRef.current, readTextFields(lines));
           scanRef.current = next;
           setScan(next);
@@ -97,7 +108,7 @@ export function useTextScanner({ active = true } = {}) {
           // more, so another pass costs only battery -- and while somebody is
           // reading the list, the rest of the label is still worth picking
           // up. `MAX_PASSES` is what ends it.
-          if (next.passes >= MAX_PASSES) {
+          if (next.passes >= maxPasses) {
             doneRef.current = true;
             setDone(true);
             return;
@@ -111,7 +122,7 @@ export function useTextScanner({ active = true } = {}) {
     pass();
 
     return () => { cancelled = true; };
-  }, [ready, reader, camera.videoRef]);
+  }, [ready, reader, camera.videoRef, maxPasses]);
 
   /** Stop early and keep whatever has settled so far. */
   const finish = useCallback(() => {

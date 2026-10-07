@@ -23,6 +23,7 @@ import { useStoredBatch } from '../features/assets/till/ui/useStoredBatch';
 import CountPanel from '../features/assets/till/ui/CountPanel';
 import SerialRunSheet from '../features/assets/till/ui/SerialRunSheet';
 import SameAsSearch from '../features/assets/till/ui/SameAsSearch';
+import BoxSweepSheet from '../features/assets/till/ui/BoxSweepSheet';
 import { saveBatchToSharePoint, remainingDrafts } from '../features/assets/sharepoint/saveBatch';
 import { commitHandover, commitReturn } from '../features/assets/sharepoint/writeHandover';
 import { newBasket, removeLine, setQuantity, isUnitLine } from '../features/assets/handover/basket';
@@ -32,7 +33,7 @@ import { assetTitle } from '../features/assets/identity';
 import { TRACKED, CONDITIONS } from '../features/assets/assetKinds';
 import {
   scanIn, addModel, setKind, setLineField, needsKind, needsSerial, holdsFor, nextTag, matchRegister,
-  noCodeDraft, itemCount as itemsIn, STOCK_RESULT, linkToModel, addSerialsTo, serialCount,
+  noCodeDraft, itemCount as itemsIn, STOCK_RESULT, linkToModel, addSerialsTo, serialCount, applySweep,
 } from '../features/assets/till/stockIn';
 import {
   scanOut, addAsset, refusalsFor, sendable, itemCount as itemsOut, withTerms, DUE_CHOICES, OUT_RESULT,
@@ -156,6 +157,8 @@ export default function AssetTillPage() {
   const [choices, setChoices] = useState([]);
   // A serial run onto one counted line: { localId, which: 'in' | 'count', title }.
   const [runFor, setRunFor] = useState(null);
+  // A box sweep onto one line: { localId, which }.
+  const [sweepFor, setSweepFor] = useState(null);
 
   // What the scan handlers read. A camera frame can carry several codes, and
   // each must see the receipt the previous one left — not the one this render
@@ -548,6 +551,11 @@ export default function AssetTillPage() {
             </div>
           )}
           {unnamed && (
+            <button type="button" className="till-link till-link-small" onClick={() => setSweepFor({ localId: draft.localId, which })}>
+              Sweep the box — read what it is off the packaging
+            </button>
+          )}
+          {unnamed && (
             <SameAsSearch
               assets={assets}
               onPick={(asset) => {
@@ -734,7 +742,7 @@ export default function AssetTillPage() {
             <div className="till-scan">
               {cameraOn && !done && (
                 <TillCamera
-                  active={!sheet && !runFor}
+                  active={!sheet && !runFor && !sweepFor}
                   onCodes={onCodes}
                   flash={flash}
                   onQuiet={onQuiet}
@@ -950,6 +958,18 @@ export default function AssetTillPage() {
 
       {sheet === 'label' && (
         <TextScanSheet title="Read the label or screen" onCancel={closeLabel} onUse={takeLabel} />
+      )}
+
+      {sweepFor && (
+        <BoxSweepSheet
+          onCancel={() => setSweepFor(null)}
+          onUse={(found) => {
+            const setTarget = sweepFor.which === 'count' ? setCountBatch : setBatch;
+            setTarget((current) => applySweep(current, sweepFor.localId, found));
+            setSweepFor(null);
+            say('ok', 'Filled in from the box — marked as guessed');
+          }}
+        />
       )}
 
       {runFor && (

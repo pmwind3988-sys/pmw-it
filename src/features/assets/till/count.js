@@ -110,11 +110,13 @@ export function addCounted(batch, entry, assets = []) {
         quantity: existing.quantity + quantity,
         // The new serials take the positions after everything already counted.
         units: runUnits ? mergeUnits(existing.units, runUnits, existing.quantity) : existing.units,
+        specSummary: existing.specSummary || String(entry.specSummary ?? '').trim(),
       };
       return { batch: replaceDraft(batch, next), result: COUNT_RESULT.COUNTED, draft: next };
     }
     const draft = newDraft({
       category, trackingMode, manufacturer, model, quantity, location, units: runUnits,
+      specSummary: String(entry.specSummary ?? '').trim(),
       scanSource: 'Manual', remarks: COUNT_REMARK, manualFields: ['category', 'model'],
     });
     return { batch: addDraft(batch, draft), result: COUNT_RESULT.ADDED, draft };
@@ -142,6 +144,7 @@ export function addCounted(batch, entry, assets = []) {
     location,
     condition: entry.condition || 'Good',
     photoId: entry.photoId ?? null,
+    specSummary: String(entry.specSummary ?? '').trim(),
     scanSource: 'Manual',
     noSerial: !serialNumber,
     remarks: serialNumber ? COUNT_REMARK : `${COUNT_REMARK}. No serial could be found on it.`,

@@ -557,6 +557,20 @@ already counted (`addSerialsTo`, `count.addCounted`, and `coalesce` now carries
 a draft's own `units`). Sheets are portalled outside `.till`, so the `--till-*`
 colours are declared on `.till-scrim` too.
 
+**A box sweep reads the packaging, and only suggests.** `till/boxSweep.js`
+(pure) turns each pass of the text reader into votes: a known make starting a
+line and the model after it ("Logitech M90 Wireless Mouse" → Logitech, M90,
+trimmed at the first generic word and any screen size), what kind of thing it
+is from words like mouse/monitor/dock, a printed colour, and details by shape
+(connection, connector, length, capacity, screen, resolution, wattage). A value
+counts once per pass and is offered only at TWO passes, most-seen winning;
+low-confidence lines are ignored. Colour is never guessed from artwork.
+`ui/BoxSweepSheet.jsx` runs `useTextScanner` with `maxPasses: Infinity` and an
+`onLines` hook, and every suggestion can be switched off; `applySweep` fills
+only EMPTY make/model, appends colour and details to `specSummary`, and marks
+them guessed. Offered on an unknown stock-in line and at the Count tab's model
+step. No machine-learning image recognition: the user decided against it.
+
 **"Who has it" is one line per PERSON.** `groupHolders` in
 `handover/availability.js` gathers the open handovers on an item by email:
 somebody who took five cables on Monday and one more on Wednesday is two

@@ -90,3 +90,12 @@ describe('a serial run in a count', () => {
     expect(parseUnits(draft.units).map((unit) => [unit.index, unit.serialNumber])).toEqual([[0, 'A1'], [1, 'A2'], [3, 'B1']]);
   });
 });
+
+describe('details read off the box', () => {
+  it('go with the counted line, and a later count keeps the first ones', () => {
+    let { batch, draft } = addCounted(newCount(), { category: 'Mouse', manufacturer: 'Logitech', model: 'M90', location: 'F1', quantity: 2, specSummary: 'Black · Wired' });
+    expect(draft.specSummary).toBe('Black · Wired');
+    ({ draft } = addCounted(batch, { category: 'Mouse', manufacturer: 'Logitech', model: 'M90', location: 'F1', quantity: 1, specSummary: '' }));
+    expect(draft.specSummary).toBe('Black · Wired');
+  });
+});

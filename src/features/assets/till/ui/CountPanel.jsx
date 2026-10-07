@@ -6,6 +6,8 @@ import PhotoInput from '../../ui/PhotoInput';
 import CodeScanSheet from '../../ui/CodeScanSheet';
 import TextScanSheet from '../../ui/TextScanSheet';
 import SerialRunSheet from './SerialRunSheet';
+import BoxSweepSheet from './BoxSweepSheet';
+import { detailLine } from '../boxSweep';
 import { recentModels, knownLocations, COUNT_RESULT } from '../count';
 
 /**
@@ -29,6 +31,8 @@ export default function CountPanel({ assets, drafts, categories, onAdd }) {
   const [noSerial, setNoSerial] = useState(false);
   const [condition, setCondition] = useState('Good');
   const [photoId, setPhotoId] = useState(null);
+  // Colour and details read off the box, saved with the line.
+  const [details, setDetails] = useState('');
   const [sheet, setSheet] = useState(null);
   const modelStepRef = useRef(null);
 
@@ -50,13 +54,14 @@ export default function CountPanel({ assets, drafts, categories, onAdd }) {
     setSerial('');
     setNoSerial(false);
     setPhotoId(null);
+    setDetails('');
   };
 
   const ready = Boolean(category && model.trim() && (!tracked || serial.trim() || noSerial));
 
   const add = () => {
     const result = onAdd({
-      category, manufacturer, model, quantity, location, condition,
+      category, manufacturer, model, quantity, location, condition, specSummary: details,
       serialNumber: tracked ? serial : '', noSerial: tracked && noSerial, photoId: tracked ? photoId : null,
     });
     if (result === COUNT_RESULT.ADDED || result === COUNT_RESULT.COUNTED) {
@@ -116,6 +121,10 @@ export default function CountPanel({ assets, drafts, categories, onAdd }) {
       {category && (
         <div className="till-count-step" ref={modelStepRef}>
           <span className="till-kicker">3 · Which model?</span>
+          <button type="button" className="till-chip till-chip-wide" onClick={() => setSheet('sweep')}>
+            <Camera size={14} /> Sweep the box — read it off the packaging
+          </button>
+          {details && <span className="till-sweep-tag">Details: {details} (guessed)</span>}
           {models.length > 0 && (
             <div className="till-chips">
               {models.map((entry) => {
@@ -205,6 +214,23 @@ export default function CountPanel({ assets, drafts, categories, onAdd }) {
 
       <Button icon={Plus} className="till-cta" disabled={!ready} onClick={add}>{label}</Button>
 
+      {sheet === 'sweep' && (
+        <BoxSweepSheet
+          onCancel={() => setSheet(null)}
+          onUse={(found) => {
+            setSheet(null);
+            if (found.category && categories.includes(found.category) && found.category !== category) {
+              setCategory(found.category);
+              setQuantity(1);
+              setSerial('');
+              setNoSerial(false);
+            }
+            if (found.make) setManufacturer(found.make);
+            if (found.model) setModel(found.model);
+            setDetails(detailLine(found));
+          }}
+        />
+      )}
       {sheet === 'run' && (
         <SerialRunSheet
           title={`Serials · ${[manufacturer, model].filter(Boolean).join(' ')}`}
@@ -214,7 +240,7 @@ export default function CountPanel({ assets, drafts, categories, onAdd }) {
           onDone={(run) => {
             setSheet(null);
             onAdd({
-              category, manufacturer, model, location, serials: run.serials, without: run.without,
+              category, manufacturer, model, location, specSummary: details, serials: run.serials, without: run.without,
             });
           }}
         />

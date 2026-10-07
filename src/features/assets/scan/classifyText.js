@@ -41,7 +41,7 @@ const MIN_LENGTH = 3;
  * `Latitude` says whether it is a make, a model or a room. Only a name
  * we already know is safe to file as the make.
  */
-const MAKES = [
+export const MAKES = [
   'Dell', 'HP', 'Hewlett-Packard', 'Lenovo', 'Apple', 'Asus', 'Acer', 'MSI',
   'Microsoft', 'Samsung', 'LG', 'Logitech', 'Canon', 'Epson', 'Brother',
   'Cisco', 'TP-Link', 'Ubiquiti', 'Aruba', 'Netgear', 'Seagate',

@@ -115,6 +115,95 @@ export function cleanLines(readings) {
   return kept;
 }
 
+/**
+ * A label on a line of its own, with its value on the NEXT line. That is how
+ * a screen lays it out — a phone's About page, a printer's configuration
+ * printout, `wmic bios get serialnumber` — where a sticker would put both on
+ * one line.
+ */
+const STACKED_LABEL = new RegExp(
+  '^(?:'
+  + '(?:printer|device|product|system|engine|hardware)?\\s*serial\\s*(?:no\\.?|num(?:ber)?)?'
+  + '|serialnumber|s/n|service\\s*tag'
+  + '|imei\\s*(?:\\(?\\s*(?:slot\\s*)?\\d\\s*\\)?)?'
+  + '|model(?:\\s*(?:name|no\\.?|number))?'
+  + '|product\\s*(?:name|no\\.?|number)'
+  + '|part\\s*(?:no\\.?|number)'
+  + '|(?:wi-?fi\\s*)?mac\\s*address'
+  + '|manufacturer|brand'
+  + ')\\s*:?$',
+  'i',
+);
+
+/**
+ * Every maker words its labels differently. These put the variants into the
+ * forms the rest of this file and `classifyCodes` already understand, so one
+ * set of rules decides what each value is.
+ */
+const CANONICAL_LABELS = [
+  [/^(?:printer|device|product|system|engine|hardware)\s+serial/i, 'Serial'],
+  [/^imei\s*\(?\s*(?:slot\s*)?\d\s*\)?/i, 'IMEI'],
+  [/^product\s*(?:no\.?|number)/i, 'P/N'],
+  // A model NUMBER is a code (SM-A525F, MLPF3ZP/A) — the part number. Left
+  // as it is, `MODEL` would claim the prefix and keep "Number:" as the value.
+  [/^model\s*(?:no\.?|number)/i, 'P/N'],
+  [/^product\s*name/i, 'Model name'],
+  [/^wi-?fi\s*mac\s*address/i, 'MAC'],
+];
+
+function canonical(line) {
+  for (const [pattern, label] of CANONICAL_LABELS) {
+    if (pattern.test(line)) return line.replace(pattern, label);
+  }
+  return line;
+}
+
+/** The check digit every IMEI carries (Luhn). A misread digit breaks it. */
+export function validImei(digits) {
+  if (!/^\d{15}$/.test(digits)) return false;
+  let sum = 0;
+  for (let i = 0; i < 15; i += 1) {
+    let d = Number(digits[14 - i]);
+    if (i % 2 === 1) {
+      d *= 2;
+      if (d > 9) d -= 9;
+    }
+    sum += d;
+  }
+  return sum % 10 === 0;
+}
+
+const IMEI_LINE = /^IMEI\s*[:=#]?\s*(.+)$/i;
+
+/**
+ * Lines as a screen or a printout gives them, made into lines a sticker
+ * would: a stacked label is joined to the value under it, and the wording is
+ * made canonical. An IMEI loses the spaces a screen groups it with, and one
+ * whose check digit fails is DROPPED — that is a misread, and a wrong IMEI
+ * is worse than none.
+ */
+export function joinStackedLines(lines) {
+  const out = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    let line = lines[i];
+    const next = lines[i + 1];
+    if (STACKED_LABEL.test(line) && next && !STACKED_LABEL.test(next)) {
+      line = `${line.replace(/\s*:$/, '')}: ${next}`;
+      i += 1;
+    }
+    line = canonical(line);
+
+    const imei = line.match(IMEI_LINE);
+    if (imei) {
+      const digits = imei[1].replace(/[\s-]/g, '');
+      if (!validImei(digits)) continue;
+      line = `IMEI: ${digits}`;
+    }
+    out.push(line);
+  }
+  return out;
+}
+
 export function isSpecLine(text) {
   return SPEC_PATTERNS.some((pattern) => pattern.test(text));
 }
@@ -138,7 +227,7 @@ function readMake(text) {
  * names of the fields whose value was worked out rather than read.
  */
 export function readTextFields(readings) {
-  const cleaned = cleanLines(readings);
+  const cleaned = joinStackedLines(cleanLines(readings));
 
   const result = {
     manufacturer: '',
@@ -191,7 +280,14 @@ export function readTextFields(readings) {
   // `format: 'text'` keeps the retail-barcode rule from firing: a line of
   // digits read off a label is not a scanned EAN, and treating it as one
   // would file it as the part number of every identical box.
-  const codes = classifyCodes(rest.map((rawValue) => ({ rawValue, format: 'text' })));
+  // A phone's screen shows its serial AND its IMEI, and the first labelled
+  // value claims the serial slot. The serial is the one on the box and the
+  // invoice, so IMEI lines go last and only take the slot when nothing else did.
+  const ordered = [
+    ...rest.filter((line) => !IMEI_LINE.test(line)),
+    ...rest.filter((line) => IMEI_LINE.test(line)),
+  ];
+  const codes = classifyCodes(ordered.map((rawValue) => ({ rawValue, format: 'text' })));
 
   return {
     ...result,

@@ -9,8 +9,8 @@ export default function CantScanSheet({ mode, onClose, onReadLabel, onType, onNo
   const options = [
     {
       key: 'label',
-      title: 'Read the printed label',
-      body: 'The camera reads the words on the sticker: model, serial number, part number.',
+      title: 'Read the printed label or screen',
+      body: 'A sticker, a phone’s About screen, a printer’s configuration page, or a PC showing “wmic bios get serialnumber”.',
       onPick: onReadLabel,
     },
     {

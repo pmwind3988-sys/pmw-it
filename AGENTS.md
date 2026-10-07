@@ -141,6 +141,7 @@ pmw-it/
 | Native vs ponyfill barcode decoding | `src/features/assets/scan/detector.js` |
 | Reading the printed words off a label | `src/features/assets/scan/textReader.js`, `useTextScanner.js` |
 | Which line of a label is which field | `src/features/assets/scan/classifyText.js` |
+| Reading a serial off a phone screen, a printer config page or `wmic` output | `joinStackedLines` in `scan/classifyText.js` |
 | Why a read value must agree twice, and what a scan may overwrite | `src/features/assets/scan/textScan.js` |
 | Where the recognition engine is served from | `scripts/fetch-ocr.mjs`, `public/ocr/` |
 | What makes two rows the same asset | `src/features/assets/identity.js` |
@@ -598,6 +599,19 @@ identical monitor on the pallet carries the same one), and scores the rest by
 shape. Everything it infers lands in `guessed` and renders as `guessed` in the
 review grid — same contract as the device import's derived values, and the
 reason a shape heuristic is safe to ship.
+
+**A screen puts the label ABOVE its value.** A phone's About page, a printer's
+configuration printout and `wmic bios get serialnumber` print "Serial number"
+on one line and the value on the next, where a sticker uses one line.
+`joinStackedLines` (in `classifyText.js`, before anything else reads the
+lines) joins the two and rewrites each maker's wording into the forms
+`classifyCodes` already knows: "Printer Serial Number" → Serial, "Product
+Number" and "Model number" → P/N (a model NUMBER is a code; left alone the
+`MODEL` prefix keeps "Number:" as the value), "Product Name" → Model name,
+"IMEI (slot 1)" → IMEI. An IMEI loses the spaces a screen groups it with, and
+one whose Luhn check digit fails is DROPPED as a misread. IMEI lines are fed to
+`classifyCodes` last, because a phone shows both and the first labelled value
+claims the serial slot -- the serial, not the IMEI, is what the box says.
 
 **A code seen on TWO boxes is the part number.** The surest evidence there is,
 because a serial appears on one box and one box only. In ONE-item mode a repeat

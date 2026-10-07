@@ -925,7 +925,7 @@ export default function AssetTillPage() {
       )}
 
       {sheet === 'label' && (
-        <TextScanSheet title="Read the printed label" onCancel={closeLabel} onUse={takeLabel} />
+        <TextScanSheet title="Read the label or screen" onCancel={closeLabel} onUse={takeLabel} />
       )}
 
       {sheet === 'nocode' && (

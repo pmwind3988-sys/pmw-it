@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { cleanLines, isSpecLine, readTextFields } from './classifyText.js';
+import {
+  cleanLines, isSpecLine, readTextFields, joinStackedLines, validImei,
+} from './classifyText.js';
 
 const lines = (...values) => values.map((text) => ({ text, confidence: 90 }));
 
@@ -128,5 +130,69 @@ describe('readTextFields — what each line turns out to be', () => {
     expect(result.serialNumber).toBe('');
     expect(result.specSummary).toBe('');
     expect(result.guessed).toEqual([]);
+  });
+});
+
+describe('screens and printouts — the label above its value', () => {
+  const read = (lines) => readTextFields(lines.map((text) => ({ text })));
+
+  it('reads an iPhone About screen, serial over IMEI', () => {
+    const out = read([
+      'Name', 'Model Name', 'iPhone 13', 'Model Number', 'MLPF3ZP/A',
+      'Serial Number', 'F17XK2ABCD12', 'IMEI', '49 015420 323751 8',
+    ]);
+    expect(out.model).toBe('iPhone 13');
+    expect(out.partNumber).toBe('MLPF3ZP/A');
+    expect(out.serialNumber).toBe('F17XK2ABCD12');
+    expect(out.additional).toContain('490154203237518');
+  });
+
+  it('reads an Android About screen and drops an IMEI that fails its check digit', () => {
+    const out = read([
+      'IMEI (slot 1)', '490154203237518', 'IMEI (slot 2)', '490154203237519',
+      'Model name', 'Galaxy A52', 'Model number', 'SM-A525F/DS',
+      'Serial number', 'R58R12ABCDE',
+    ]);
+    expect(out.model).toBe('Galaxy A52');
+    expect(out.partNumber).toBe('SM-A525F/DS');
+    expect(out.serialNumber).toBe('R58R12ABCDE');
+    expect(out.additional).toContain('490154203237518');
+    expect(JSON.stringify(out)).not.toContain('490154203237519');
+  });
+
+  it('reads what `wmic bios get serialnumber` prints', () => {
+    expect(read(['SerialNumber', '5CG4211XQ7']).serialNumber).toBe('5CG4211XQ7');
+  });
+
+  it('reads a printer configuration page', () => {
+    const out = read([
+      'Printer Information',
+      'Product Name: HP LaserJet Pro M404dn',
+      'Product Number: W1A53A',
+      'Printer Serial Number: PHBQB12345',
+    ]);
+    expect(out.model).toBe('HP LaserJet Pro M404dn');
+    expect(out.partNumber).toBe('W1A53A');
+    expect(out.serialNumber).toBe('PHBQB12345');
+  });
+
+  it('takes an IMEI as the serial only when the screen shows nothing better', () => {
+    expect(read(['IMEI', '49 015420 323751 8']).serialNumber).toBe('490154203237518');
+    expect(read(['IMEI', '49 015420 323751 9']).serialNumber).toBe('');
+  });
+});
+
+describe('joinStackedLines', () => {
+  it('joins a label to the line under it, and leaves a sticker line alone', () => {
+    expect(joinStackedLines(['Serial number', 'R58R12ABCDE'])).toEqual(['Serial number: R58R12ABCDE']);
+    expect(joinStackedLines(['S/N: 5CG1', 'Made in China'])).toEqual(['S/N: 5CG1', 'Made in China']);
+  });
+});
+
+describe('validImei', () => {
+  it('checks the Luhn digit', () => {
+    expect(validImei('490154203237518')).toBe(true);
+    expect(validImei('490154203237519')).toBe(false);
+    expect(validImei('49015420323751')).toBe(false);
   });
 });

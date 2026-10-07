@@ -1,0 +1,23 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "bounce-easing",
+        "value": "iconbounce",
+        "createdAt": "2026-10-07T01:33:40.645Z",
+        "reason": "user confirmed 2026-10-07: intentional portal icon animation"
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "src/styles/shell.css"
+        ],
+        "createdAt": "2026-10-07T01:33:40.735Z",
+        "reason": "user confirmed 2026-10-07: intentional card accent in the portal shell"
+      }
+    ]
+  }
+}

@@ -3,6 +3,7 @@ import { addDraft, replaceDraft } from '../draft/batch.js';
 import { normaliseCode, indexByTag } from '../identity.js';
 import { TRACKED, trackingModeFor } from '../assetKinds.js';
 import { serialScore, partScore } from '../scan/classifyCode.js';
+import { unitsOf, parseUnits, serialiseUnits } from '../units.js';
 
 /**
  * Stock in at the till: what one scanned code does to the delivery on the
@@ -53,16 +54,48 @@ export function matchRegister(assets, raw) {
   for (const asset of assets) {
     if (normaliseCode(asset.serialNumber) === wanted) return { asset, by: 'serial' };
     if (normaliseCode(asset.assetTag) === wanted) return { asset, by: 'tag' };
+    // A counted line keeps its serials and labels on its ITEMS. One of those
+    // read again is a thing already registered, not a new one.
+    if (asset.trackingMode !== TRACKED) {
+      for (const unit of unitsOf(asset)) {
+        if (normaliseCode(unit.serialNumber) === wanted) return { asset, by: 'serial' };
+        if (normaliseCode(unit.assetTag) === wanted) return { asset, by: 'tag' };
+      }
+    }
   }
   for (const asset of assets) {
     if (
       normaliseCode(asset.partNumber) === wanted
       || (asset.additionalCodes ?? []).some((code) => normaliseCode(code) === wanted)
+      // A counted line's box barcode was filed under its first item when the
+      // line was saved, so the next delivery of the same box finds it there.
+      || (asset.trackingMode !== TRACKED
+        && unitsOf(asset).some((unit) => normaliseCode(unit.partNumber) === wanted))
     ) {
       return { asset, by: 'part' };
     }
   }
   return null;
+}
+
+const union = (...lists) => [...new Set(lists.flat().map((code) => String(code ?? '').trim()).filter(Boolean))];
+
+/**
+ * A model draft that remembers the box barcode it was recognised by. On a
+ * counted line the code goes into the row's OTHER CODES — a part number on a
+ * counted line is moved onto one item when saved, and then the next box of
+ * the same model would not be recognised from the line itself.
+ */
+function draftRemembering(asset, code, overrides = {}) {
+  if (asset.trackingMode === TRACKED) {
+    return draftOfModel(asset, { partNumber: code || asset.partNumber || '', ...overrides });
+  }
+  return draftOfModel(asset, {
+    partNumber: '',
+    additionalCodes: union(asset.additionalCodes ?? [], code ? [code] : []),
+    quantity: 1,
+    ...overrides,
+  });
 }
 
 /**
@@ -78,6 +111,8 @@ export function draftOfModel(asset, overrides = {}) {
     manufacturer: asset.manufacturer ?? '',
     model: asset.model ?? '',
     partNumber: asset.partNumber ?? '',
+    // Carried so a save does not drop the barcodes the line is known by.
+    additionalCodes: [...(asset.additionalCodes ?? [])],
     specSummary: asset.specSummary ?? '',
     location: asset.location ?? '',
     scanSource: 'Camera',
@@ -163,9 +198,19 @@ export function scanIn(batch, raw, assets = [], format = '') {
     return { batch, result: STOCK_RESULT.KNOWN, draft: null, asset: match.asset };
   }
   if (match) {
-    const draft = match.asset.trackingMode === TRACKED
-      ? draftOfModel(match.asset, { partNumber: code })
-      : draftOfModel(match.asset, { quantity: 1 });
+    // The same model already on the receipt — recognised by a different box
+    // barcode, or linked a moment ago — is the same line: one more, and the
+    // line now remembers this barcode too.
+    const same = match.asset.trackingMode !== TRACKED
+      && batch.drafts.find((draft) => draft.trackingMode !== TRACKED && !needsKind(draft) && sameModel(draft, match.asset));
+    if (same) {
+      const next = {
+        ...setDraftField(same, 'quantity', (same.quantity ?? 1) + 1),
+        additionalCodes: union(same.additionalCodes ?? [], [code]),
+      };
+      return { batch: replaceDraft(batch, next), result: STOCK_RESULT.COUNTED, draft: next };
+    }
+    const draft = draftRemembering(match.asset, code);
     return { batch: addDraft(batch, draft), result: STOCK_RESULT.ADDED, draft };
   }
 
@@ -275,3 +320,61 @@ export function itemCount(batch) {
   return batch.drafts.reduce((sum, draft) => sum + (draft.trackingMode === TRACKED ? 1 : (draft.quantity ?? 1)), 0);
 }
 
+
+/** The code an unknown line was scanned by — what it should be remembered as. */
+function codeOf(draft) {
+  return draft.partNumber || draft.serialNumber || (draft.additionalCodes ?? [])[0] || '';
+}
+
+/**
+ * "Same as one we have": an unknown code is a model the register already
+ * holds. The line becomes that model, and on a counted line the box barcode is
+ * remembered against it — so every later box, in this delivery or the next,
+ * is recognised on sight instead of asking again.
+ */
+export function linkToModel(batch, localId, asset) {
+  const draft = batch.drafts.find((entry) => entry.localId === localId);
+  if (!draft) return batch;
+  const code = codeOf(draft);
+  let next;
+  if (asset.trackingMode === TRACKED) {
+    // A tracked box's own code is usually its serial; a part-shaped one is
+    // the model's, and the machine then waits for its serial.
+    next = looksLikeSerial(code)
+      ? draftOfModel(asset, { serialNumber: code, partNumber: asset.partNumber ?? '' })
+      : draftOfModel(asset, { partNumber: code });
+  } else {
+    next = draftRemembering(asset, code, { quantity: draft.quantity ?? 1 });
+  }
+  return replaceDraft(batch, { ...next, localId: draft.localId, photoId: draft.photoId ?? null });
+}
+
+/**
+ * A serial run onto a counted line: each serial is one item, in the next free
+ * positions; `without` items were counted with no serial. The line's count
+ * becomes at least what was scanned — scanning twelve serials off a line of
+ * ten boxes means twelve.
+ */
+export function addSerialsTo(batch, localId, serials = [], without = 0) {
+  const draft = batch.drafts.find((entry) => entry.localId === localId);
+  if (!draft || draft.trackingMode === TRACKED) return batch;
+  const units = parseUnits(draft.units);
+  const taken = new Set(units.map((unit) => unit.index));
+  let at = 0;
+  const added = serials.map((serialNumber) => {
+    while (taken.has(at)) at += 1;
+    taken.add(at);
+    return { index: at, serialNumber };
+  });
+  const recorded = units.length + added.length + Math.max(0, without);
+  return replaceDraft(batch, {
+    ...draft,
+    units: serialiseUnits([...units, ...added]),
+    quantity: Math.max(draft.quantity ?? 1, recorded),
+  });
+}
+
+/** How many items on a counted line have a serial written on them. */
+export function serialCount(draft) {
+  return parseUnits(draft.units).filter((unit) => String(unit.serialNumber ?? '').trim()).length;
+}

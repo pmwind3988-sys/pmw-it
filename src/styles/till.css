@@ -6,7 +6,10 @@
  * Everything else sits on the portal's own tokens so light and dark both work.
  */
 
-.till {
+/* The colours live on the sheets too: a sheet is drawn outside `.till`, at the
+   end of the page, and would otherwise lose every one of them. */
+.till,
+.till-scrim {
   --till-dark: #111317;
   --till-dark-2: #1b1e24;
   --till-dark-line: #2e333c;
@@ -18,12 +21,16 @@
   --till-ask-ink: #6b4e00;
   --till-bad: var(--it-danger-wash);
   --till-bad-ink: #9a3412;
+}
+
+.till {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
-[data-theme='dark'] .till {
+[data-theme='dark'] .till,
+[data-theme='dark'] .till-scrim {
   --till-ask: #2a2410;
   --till-ask-ink: #fcd34d;
   --till-bad-ink: #fdba74;
@@ -763,3 +770,34 @@ select.till-chip { padding-right: 8px; }
 .till-choice:hover, .till-choice:focus-visible { border-color: var(--till-key); outline: none; }
 /* Room for three or four choices without scrolling. */
 .till-viewfinder.as-viewfinder:has(.till-choose) { height: 300px; }
+
+/* ── Serial run and "same as one we have" ──────────────────────────────── */
+
+.till-link-small { min-height: 32px; font-size: 13px; padding: 0; }
+.till-chip-wide { align-self: flex-start; }
+.till-sameas { display: flex; flex-direction: column; gap: 6px; }
+
+.till-run-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--it-line);
+  border-radius: 12px;
+}
+.till-run-bar strong { font-size: 30px; line-height: 1; }
+.till-run-bar > span:nth-child(2) { color: var(--it-ink-soft); font-size: 14px; }
+.till-run-actions { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+
+.till-run-list {
+  margin: 0;
+  padding: 6px 12px 6px 40px;
+  max-height: 22vh;
+  overflow-y: auto;
+  border: 1px solid var(--it-line);
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.till-run-more { list-style: none; color: var(--it-ink-soft); font-family: inherit; }

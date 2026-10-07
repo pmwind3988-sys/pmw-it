@@ -3,6 +3,7 @@ import { newBatch } from '../draft/batch.js';
 import { TRACKED, BULK } from '../assetKinds.js';
 import {
   scanIn, addModel, STOCK_RESULT, matchRegister, needsKind, needsSerial, setKind, nextTag,
+  linkToModel, addSerialsTo, serialCount,
   noCodeDraft, holdsFor, itemCount,
 } from './stockIn.js';
 
@@ -117,5 +118,61 @@ describe('itemCount', () => {
     ({ batch } = scanIn(batch, '5099206092372', REGISTER));
     ({ batch } = scanIn(batch, '0X7K3M', REGISTER));
     expect(itemCount(batch)).toBe(3);
+  });
+});
+
+describe('new stock of a model already counted', () => {
+  // A counted line as it comes back from SharePoint: its box barcode was
+  // filed under item 1, and one more barcode remembered on the line.
+  const SAVED_MICE = {
+    ...MICE, partNumber: '', additionalCodes: ['MOUSEBOX2'],
+    units: JSON.stringify([{ index: 0, partNumber: '5099206092372', serialNumber: '2133LZ0A1' }]),
+  };
+
+  it('recognises the box by the barcode on its first item, or one remembered on the line', () => {
+    expect(matchRegister([SAVED_MICE], '5099206092372')).toMatchObject({ by: 'part' });
+    expect(matchRegister([SAVED_MICE], 'mousebox2')).toMatchObject({ by: 'part' });
+    expect(matchRegister([SAVED_MICE], '2133LZ0A1')).toMatchObject({ by: 'serial' });
+  });
+
+  it('counts the new boxes onto one line that remembers the barcode', () => {
+    let { batch, draft } = scanIn(newBatch(), '5099206092372', [SAVED_MICE]);
+    expect(draft.additionalCodes).toEqual(['MOUSEBOX2', '5099206092372']);
+    expect(draft.partNumber).toBe('');
+    ({ draft } = scanIn(batch, '5099206092372', [SAVED_MICE]));
+    expect(draft.quantity).toBe(2);
+  });
+
+  it('turns an unknown code into a model we have, and counts the next box on sight', () => {
+    let { batch, draft } = scanIn(newBatch(), 'NEWBOX123', [SAVED_MICE]);
+    batch = linkToModel(batch, draft.localId, SAVED_MICE);
+    expect(batch.drafts[0]).toMatchObject({ model: 'M90', manufacturer: 'Logitech', quantity: 1 });
+    expect(batch.drafts[0].additionalCodes).toContain('NEWBOX123');
+    const again = scanIn(batch, 'NEWBOX123', [SAVED_MICE]);
+    expect(again.result).toBe(STOCK_RESULT.COUNTED);
+    expect(again.batch.drafts).toHaveLength(1);
+  });
+
+  it('counts a box with the model’s other barcode onto the same line', () => {
+    let { batch, draft } = scanIn(newBatch(), 'NEWBOX123', [SAVED_MICE]);
+    batch = linkToModel(batch, draft.localId, SAVED_MICE);
+    const out = scanIn(batch, '5099206092372', [SAVED_MICE]);
+    expect(out.result).toBe(STOCK_RESULT.COUNTED);
+    expect(out.batch.drafts).toHaveLength(1);
+    expect(out.draft.quantity).toBe(2);
+    expect(out.draft.additionalCodes).toEqual(expect.arrayContaining(['NEWBOX123', '5099206092372']));
+  });
+
+  it('links an unknown laptop code as its serial', () => {
+    const { batch, draft } = scanIn(newBatch(), '5CG9999ZZ1', []);
+    const linked = linkToModel(batch, draft.localId, LAPTOP);
+    expect(linked.drafts[0]).toMatchObject({ model: 'Latitude 5450', serialNumber: '5CG9999ZZ1' });
+  });
+
+  it('puts a serial run onto a counted line, one item each', () => {
+    let { batch, draft } = scanIn(newBatch(), '5099206092372', REGISTER);
+    batch = addSerialsTo(batch, draft.localId, ['S1', 'S2', 'S3'], 1);
+    expect(batch.drafts[0].quantity).toBe(4);
+    expect(serialCount(batch.drafts[0])).toBe(3);
   });
 });

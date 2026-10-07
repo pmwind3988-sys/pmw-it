@@ -5,6 +5,7 @@ import { trackingModeFor, TRACKED } from '../../assetKinds';
 import PhotoInput from '../../ui/PhotoInput';
 import CodeScanSheet from '../../ui/CodeScanSheet';
 import TextScanSheet from '../../ui/TextScanSheet';
+import SerialRunSheet from './SerialRunSheet';
 import { recentModels, knownLocations, COUNT_RESULT } from '../count';
 
 /**
@@ -163,6 +164,9 @@ export default function CountPanel({ assets, drafts, categories, onAdd }) {
             <button type="button" className="till-chip" onClick={() => setQuantity((n) => n + 5)}>+5</button>
             <button type="button" className="till-chip" onClick={() => setQuantity((n) => n + 10)}>+10</button>
           </div>
+          <button type="button" className="till-chip till-chip-wide" onClick={() => setSheet('run')} disabled={!model.trim()}>
+            <ScanLine size={14} /> Each has its own serial? Scan them instead
+          </button>
         </div>
       )}
 
@@ -201,6 +205,20 @@ export default function CountPanel({ assets, drafts, categories, onAdd }) {
 
       <Button icon={Plus} className="till-cta" disabled={!ready} onClick={add}>{label}</Button>
 
+      {sheet === 'run' && (
+        <SerialRunSheet
+          title={`Serials · ${[manufacturer, model].filter(Boolean).join(' ')}`}
+          assets={assets}
+          drafts={drafts}
+          onCancel={() => setSheet(null)}
+          onDone={(run) => {
+            setSheet(null);
+            onAdd({
+              category, manufacturer, model, location, serials: run.serials, without: run.without,
+            });
+          }}
+        />
+      )}
       {sheet === 'code' && (
         <CodeScanSheet
           title="Scan its serial"

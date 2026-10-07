@@ -21,6 +21,8 @@ import { readPref, writePref } from '../features/assets/till/prefs';
 import { newCount, addCounted, COUNT_RESULT } from '../features/assets/till/count';
 import { useStoredBatch } from '../features/assets/till/ui/useStoredBatch';
 import CountPanel from '../features/assets/till/ui/CountPanel';
+import SerialRunSheet from '../features/assets/till/ui/SerialRunSheet';
+import SameAsSearch from '../features/assets/till/ui/SameAsSearch';
 import { saveBatchToSharePoint, remainingDrafts } from '../features/assets/sharepoint/saveBatch';
 import { commitHandover, commitReturn } from '../features/assets/sharepoint/writeHandover';
 import { newBasket, removeLine, setQuantity, isUnitLine } from '../features/assets/handover/basket';
@@ -30,7 +32,7 @@ import { assetTitle } from '../features/assets/identity';
 import { TRACKED, CONDITIONS } from '../features/assets/assetKinds';
 import {
   scanIn, addModel, setKind, setLineField, needsKind, needsSerial, holdsFor, nextTag, matchRegister,
-  noCodeDraft, itemCount as itemsIn, STOCK_RESULT,
+  noCodeDraft, itemCount as itemsIn, STOCK_RESULT, linkToModel, addSerialsTo, serialCount,
 } from '../features/assets/till/stockIn';
 import {
   scanOut, addAsset, refusalsFor, sendable, itemCount as itemsOut, withTerms, DUE_CHOICES, OUT_RESULT,
@@ -152,6 +154,8 @@ export default function AssetTillPage() {
   const gateRef = useRef(createReadGate());
   // Codes the camera could not choose between, offered to the person.
   const [choices, setChoices] = useState([]);
+  // A serial run onto one counted line: { localId, which: 'in' | 'count', title }.
+  const [runFor, setRunFor] = useState(null);
 
   // What the scan handlers read. A camera frame can carry several codes, and
   // each must see the receipt the previous one left — not the one this render
@@ -303,7 +307,8 @@ export default function AssetTillPage() {
       say('ok', `Added · ${name}`);
     } else if (out.result === COUNT_RESULT.COUNTED) {
       setCountBatch(out.batch);
-      say('ok', `+${entry.quantity} · ${name} (now ${out.draft.quantity})`);
+      const added = (entry.serials?.length ?? 0) + (entry.without ?? 0) || entry.quantity;
+      say('ok', `+${added} · ${name} (now ${out.draft.quantity})`);
     } else if (out.result === COUNT_RESULT.DUPLICATE) {
       say('ask', 'That serial is already on this count');
     } else if (out.result === COUNT_RESULT.KNOWN) {
@@ -503,7 +508,7 @@ export default function AssetTillPage() {
 
   const categories = useMemo(() => categoriesIn(assets), [assets]);
 
-  const draftRows = (theBatch, setTheBatch, theHolds) => theBatch.drafts.map((draft) => {
+  const draftRows = (theBatch, setTheBatch, theHolds, which) => theBatch.drafts.map((draft) => {
     const unnamed = needsKind(draft);
     const hold = theHolds.get(draft.localId);
     const update = (field) => (event) => setTheBatch((current) => setLineField(current, draft.localId, field, event.target.value));
@@ -515,6 +520,7 @@ export default function AssetTillPage() {
       sub: [
         draft.serialNumber ? `S/N ${draft.serialNumber}` : (draft.assetTag ? `Label ${draft.assetTag}` : (draft.partNumber ? `Part ${draft.partNumber}` : '')),
         draft.noSerial && (draft.photoId ? 'No serial · photo taken' : 'No serial · no photo'),
+        bulk && serialCount(draft) > 0 && `${serialCount(draft)} serial${serialCount(draft) === 1 ? '' : 's'} recorded`,
         draft.location,
       ].filter(Boolean).join(' · '),
       note: hold,
@@ -523,7 +529,7 @@ export default function AssetTillPage() {
       onInc: bulk && !unnamed ? () => setTheBatch((current) => setLineField(current, draft.localId, 'quantity', draft.quantity + 1)) : null,
       onDec: () => setTheBatch((current) => setLineField(current, draft.localId, 'quantity', Math.max(1, draft.quantity - 1))),
       onRemove: () => setTheBatch((current) => removeDraft(current, draft.localId)),
-      extra: (unnamed || hold) && (
+      extra: (unnamed || hold || bulk) && (
         <div className="till-fix">
           {unnamed && (
             <div className="till-chips">
@@ -541,6 +547,24 @@ export default function AssetTillPage() {
               </select>
             </div>
           )}
+          {unnamed && (
+            <SameAsSearch
+              assets={assets}
+              onPick={(asset) => {
+                setTheBatch((current) => linkToModel(current, draft.localId, asset));
+                say('ok', `Linked to ${asset.title || asset.model} — its box will be recognised from now on`);
+              }}
+            />
+          )}
+          {bulk && !unnamed && (
+            <button
+              type="button"
+              className="till-link till-link-small"
+              onClick={() => setRunFor({ localId: draft.localId, which, title: `Serials · ${assetTitle(draft)}` })}
+            >
+              Each has its own serial? Scan them
+            </button>
+          )}
           {!unnamed && needsSerial(draft) && (
             <input className="till-inline" placeholder="Serial number" aria-label="Serial number" onBlur={update('serialNumber')} onKeyDown={commitOnEnter} defaultValue="" />
           )}
@@ -551,8 +575,8 @@ export default function AssetTillPage() {
       ),
     };
   });
-  const rowsIn = draftRows(batch, setBatch, holds);
-  const rowsCount = draftRows(countBatch, setCountBatch, countHolds);
+  const rowsIn = draftRows(batch, setBatch, holds, 'in');
+  const rowsCount = draftRows(countBatch, setCountBatch, countHolds, 'count');
 
   const rowsOut = [
     ...basket.lines.map((line) => {
@@ -710,7 +734,7 @@ export default function AssetTillPage() {
             <div className="till-scan">
               {cameraOn && !done && (
                 <TillCamera
-                  active={!sheet}
+                  active={!sheet && !runFor}
                   onCodes={onCodes}
                   flash={flash}
                   onQuiet={onQuiet}
@@ -926,6 +950,21 @@ export default function AssetTillPage() {
 
       {sheet === 'label' && (
         <TextScanSheet title="Read the label or screen" onCancel={closeLabel} onUse={takeLabel} />
+      )}
+
+      {runFor && (
+        <SerialRunSheet
+          title={runFor.title}
+          assets={assets}
+          drafts={(runFor.which === 'count' ? countBatch : batch).drafts}
+          onCancel={() => setRunFor(null)}
+          onDone={(run) => {
+            const setTarget = runFor.which === 'count' ? setCountBatch : setBatch;
+            setTarget((current) => addSerialsTo(current, runFor.localId, run.serials, run.without));
+            setRunFor(null);
+            say('ok', `${run.serials.length + run.without} items recorded`);
+          }}
+        />
       )}
 
       {sheet === 'nocode' && (

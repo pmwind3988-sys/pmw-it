@@ -540,6 +540,23 @@ batch (`tillCountId`), separate from an open delivery, with no arrival date --
 nothing arrived, so none is invented. No PMW sticker labels: the user does not
 want labels stuck on things.
 
+**New stock of a counted model joins its line, and remembers its box.** A
+counted line's box barcode is moved onto item 1 when saved (a part number is
+per-item), so `matchRegister` also looks in a counted line's ITEMS and in its
+`additionalCodes`; till drafts of a counted model put the box code in
+`additionalCodes` instead (`draftRemembering`), and `planSave` UNIONS
+`additionalCodes` on update rather than overwriting them. "Same as one we have"
+(`linkToModel`, `ui/SameAsSearch.jsx`) turns an unknown code into a known
+model and remembers its barcode, so the next box counts on sight; a box with
+another barcode of a model already on the receipt counts onto that line. A
+SERIAL RUN (`till/serialRun.js`, `ui/SerialRunSheet.jsx`) scans one serial per
+item onto a counted line -- the count is how many were scanned, "one without a
+serial" still counts, and a serial already in the run, on the receipt or in
+the register is refused. The serials land as the line's items after the ones
+already counted (`addSerialsTo`, `count.addCounted`, and `coalesce` now carries
+a draft's own `units`). Sheets are portalled outside `.till`, so the `--till-*`
+colours are declared on `.till-scrim` too.
+
 **"Who has it" is one line per PERSON.** `groupHolders` in
 `handover/availability.js` gathers the open handovers on an item by email:
 somebody who took five cables on Monday and one more on Wednesday is two

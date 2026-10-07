@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { planSave, coalesce, diffAsset, applyManualOverrides } from './planSave.js';
 import { newDraft, setDraftField } from '../draft/draftAsset.js';
 import { unitsOf } from '../units.js';
+import { assetKey } from '../identity.js';
 import { TRACKED, BULK } from '../assetKinds.js';
 
 const laptop = (overrides = {}) => newDraft({
@@ -271,5 +272,40 @@ describe('applyManualOverrides', () => {
   it('leaves an incoming record alone when nothing was hand-set', () => {
     const incoming = { model: 'x' };
     expect(applyManualOverrides(incoming, { manualFields: [] })).toBe(incoming);
+  });
+});
+
+describe('planSave — new stock of a model already counted', () => {
+  const existing = {
+    id: 9, title: 'Logitech M90', category: 'Mouse',
+    trackingMode: BULK, manufacturer: 'Logitech', model: 'M90', quantity: 10,
+    additionalCodes: ['MOUSEBOX2'],
+    units: JSON.stringify([{ index: 0, serialNumber: 'OLD0' }]),
+  };
+
+  existing.assetKey = assetKey(existing);
+
+  it('adds to the line, keeps the barcodes it is known by, and puts new serials after the old', () => {
+    const draft = newDraft({
+      category: 'Mouse', trackingMode: BULK, manufacturer: 'Logitech', model: 'M90', quantity: 2,
+      additionalCodes: ['5099206092372'],
+      units: JSON.stringify([{ index: 0, serialNumber: 'NEW1' }, { index: 1, serialNumber: 'NEW2' }]),
+    });
+    const { updates, inserts } = planSave([draft], [existing]);
+    expect(inserts).toHaveLength(0);
+    expect(updates).toHaveLength(1);
+    const body = updates[0].body;
+    expect(body.quantity).toBe(12);
+    expect(body.additionalCodes).toEqual(['MOUSEBOX2', '5099206092372']);
+    expect(unitsOf(body).filter((unit) => unit.serialNumber).map((unit) => [unit.index, unit.serialNumber]))
+      .toEqual([[0, 'OLD0'], [10, 'NEW1'], [11, 'NEW2']]);
+  });
+
+  it('keeps a serial run when two lines of the same model are combined in one save', () => {
+    const a = newDraft({ category: 'Mouse', trackingMode: BULK, manufacturer: 'Logitech', model: 'M90', quantity: 2, units: JSON.stringify([{ index: 0, serialNumber: 'A1' }, { index: 1, serialNumber: 'A2' }]) });
+    const b = newDraft({ category: 'Mouse', trackingMode: BULK, manufacturer: 'Logitech', model: 'M90', quantity: 1, units: JSON.stringify([{ index: 0, serialNumber: 'B1' }]) });
+    const [merged] = coalesce([a, b]);
+    expect(merged.quantity).toBe(3);
+    expect(unitsOf(merged).map((unit) => unit.serialNumber)).toEqual(['A1', 'A2', 'B1']);
   });
 });

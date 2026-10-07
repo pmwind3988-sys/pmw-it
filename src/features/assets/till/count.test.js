@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { TRACKED, BULK } from '../assetKinds.js';
+import { parseUnits } from '../units.js';
 import { holdsFor, itemCount } from './stockIn.js';
 import {
   newCount, addCounted, recentModels, knownLocations, COUNT_RESULT, COUNT_REMARK,
@@ -77,5 +78,15 @@ describe('recentModels', () => {
 describe('knownLocations', () => {
   it('lists each place once, the count’s own first', () => {
     expect(knownLocations(REGISTER, [{ location: 'F3' }])).toEqual(['F3', 'F1', 'IT store']);
+  });
+});
+
+describe('a serial run in a count', () => {
+  it('makes one item per serial, and a later run lands after the first', () => {
+    let { batch, draft } = addCounted(newCount(), { category: 'Mouse', manufacturer: 'Logitech', model: 'M90', location: 'F1', serials: ['A1', 'A2'], without: 1 });
+    expect(draft.quantity).toBe(3);
+    ({ draft } = addCounted(batch, { category: 'Mouse', manufacturer: 'Logitech', model: 'M90', location: 'F1', serials: ['B1'] }));
+    expect(draft.quantity).toBe(4);
+    expect(parseUnits(draft.units).map((unit) => [unit.index, unit.serialNumber])).toEqual([[0, 'A1'], [1, 'A2'], [3, 'B1']]);
   });
 });

@@ -3,6 +3,7 @@ import { addDraft, replaceDraft, newBatch } from '../draft/batch.js';
 import { normaliseCode } from '../identity.js';
 import { TRACKED, trackingModeFor } from '../assetKinds.js';
 import { matchRegister } from './stockIn.js';
+import { serialiseUnits, mergeUnits } from '../units.js';
 
 /**
  * The catch-up count: getting what IT already owns into the register, fast,
@@ -89,7 +90,13 @@ export function addCounted(batch, entry, assets = []) {
   const location = clean(entry.location);
 
   if (trackingMode !== TRACKED) {
-    const quantity = Math.max(1, Math.floor(Number(entry.quantity) || 1));
+    // A serial run says how many by itself: one item per serial scanned, plus
+    // the ones counted with no serial. Its serials become the line's items.
+    const serials = (entry.serials ?? []).map(normaliseCode).filter(Boolean);
+    const without = Math.max(0, Math.floor(Number(entry.without) || 0));
+    const run = serials.length + without > 0;
+    const quantity = run ? serials.length + without : Math.max(1, Math.floor(Number(entry.quantity) || 1));
+    const runUnits = serialiseUnits(serials.map((serialNumber, index) => ({ index, serialNumber })));
     // Same model in the same place is the same line: counting a second drawer
     // of the same mice adds to it rather than starting another.
     const existing = batch.drafts.find((draft) => draft.trackingMode !== TRACKED
@@ -98,11 +105,16 @@ export function addCounted(batch, entry, assets = []) {
       && key(draft.model) === key(model)
       && key(draft.location) === key(location));
     if (existing) {
-      const next = { ...existing, quantity: existing.quantity + quantity };
+      const next = {
+        ...existing,
+        quantity: existing.quantity + quantity,
+        // The new serials take the positions after everything already counted.
+        units: runUnits ? mergeUnits(existing.units, runUnits, existing.quantity) : existing.units,
+      };
       return { batch: replaceDraft(batch, next), result: COUNT_RESULT.COUNTED, draft: next };
     }
     const draft = newDraft({
-      category, trackingMode, manufacturer, model, quantity, location,
+      category, trackingMode, manufacturer, model, quantity, location, units: runUnits,
       scanSource: 'Manual', remarks: COUNT_REMARK, manualFields: ['category', 'model'],
     });
     return { batch: addDraft(batch, draft), result: COUNT_RESULT.ADDED, draft };

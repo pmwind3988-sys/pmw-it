@@ -87,7 +87,11 @@ export function coalesce(drafts) {
       // rather than filling gaps in the first one's record: they describe a
       // different object, and merging them would invent an item that has one
       // tab's serial and the other's label.
-      existing.units = appendUnit(existing.units, draft, existing.quantity ?? 0, PER_UNIT_CODES);
+      const offset = existing.quantity ?? 0;
+      existing.units = appendUnit(existing.units, draft, offset, PER_UNIT_CODES);
+      // A line that arrived with its own items (a serial run) brings them, in
+      // the positions after everything this line already counted.
+      if (draft.units) existing.units = mergeUnits(existing.units, draft.units, offset);
       existing.quantity = (existing.quantity ?? 0) + (draft.quantity ?? 0);
     }
 
@@ -178,6 +182,10 @@ export function planSave(drafts, register, { addedOn = Date.now(), addedBy = '' 
         quantity,
         status: draft.status ?? existing.status,
         units,
+        // Added to, never replaced: these are the barcodes the line is
+        // recognised by, and a delivery that did not happen to scan one must
+        // not make the register forget it.
+        additionalCodes: [...new Set([...(existing.additionalCodes ?? []), ...(draft.additionalCodes ?? [])])],
       },
       existing,
     ));

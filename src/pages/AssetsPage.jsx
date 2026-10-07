@@ -10,7 +10,7 @@ import Pager from '../components/ui/Pager';
 import { paginate } from '../components/ui/paginate';
 import { useConfirm } from '../components/ui/useConfirm';
 import {
-  ScanLine, Plus, Package, Tag, AlertTriangle, Truck, RefreshCw, Users, Clock,
+  ScanLine, Package, Tag, AlertTriangle, Truck, RefreshCw, Users, Clock,
   ClipboardList, Boxes, X,
 } from '../components/ui/Icons';
 import { useAssets, SHAREPOINT_SITE_URL } from '../features/assets/useAssets';
@@ -27,8 +27,6 @@ import {
 import { CONDITIONS, STATUSES } from '../features/assets/assetKinds';
 import { categoriesIn } from '../features/assets/categories';
 import { batchTitle } from '../features/assets/draft/batch';
-import { newBatch } from '../features/assets/draft/batch';
-import { saveBatch } from '../features/assets/store/assetDb';
 import AssetTable from '../features/assets/ui/AssetTable';
 
 /**
@@ -219,12 +217,6 @@ export default function AssetsPage() {
     discard(batch.id);
   };
 
-  /** Adding by hand is the same review grid, just with nothing scanned into it. */
-  const addByHand = async () => {
-    const batch = newBatch();
-    await saveBatch(batch);
-    navigate(`/assets/batch/${batch.id}`);
-  };
 
   return (
     <AppShell
@@ -240,11 +232,9 @@ export default function AssetsPage() {
           >
             {picking ? 'Stop combining' : 'Combine rows'}
           </Button>
-          <Button variant="ghost" icon={Plus} onClick={addByHand}>Add by hand</Button>
           <Button variant="secondary" icon={Users} onClick={() => navigate('/assets/handover')}>
             Hand over
           </Button>
-          <Button variant="secondary" icon={ScanLine} onClick={() => navigate('/assets/scan')}>Scan a delivery</Button>
           <Button icon={ScanLine} onClick={() => navigate('/assets/till')}>Open till</Button>
         </>
       )}
@@ -417,7 +407,7 @@ export default function AssetsPage() {
       {!loading && shown.length === 0 && (
         <EmptyState>
           {assets.length === 0
-            ? 'Nothing in the register yet. Scan a delivery, or add an item by hand.'
+            ? 'Nothing in the register yet. Open the till to stock in a delivery or count what is already here.'
             : 'Nothing matches those filters.'}
         </EmptyState>
       )}

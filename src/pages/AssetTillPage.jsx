@@ -29,7 +29,7 @@ import { categoriesIn } from '../features/assets/categories';
 import { assetTitle } from '../features/assets/identity';
 import { TRACKED, CONDITIONS } from '../features/assets/assetKinds';
 import {
-  scanIn, addModel, setKind, setLineField, needsKind, needsSerial, holdsFor, nextTag,
+  scanIn, addModel, setKind, setLineField, needsKind, needsSerial, holdsFor, nextTag, matchRegister,
   noCodeDraft, itemCount as itemsIn, STOCK_RESULT,
 } from '../features/assets/till/stockIn';
 import {
@@ -39,7 +39,8 @@ import {
   scanBack, addHandover, chooseHolder, setReturnQuantity, toReturns, itemCount as itemsBack, BACK_RESULT,
 } from '../features/assets/till/takeBack';
 import { tillSearch, quickKeys } from '../features/assets/till/tillSearch';
-import { createCooldown } from '../features/assets/till/cooldown';
+import { createReadGate, guessKind } from '../features/assets/till/readGate';
+import { findScanTarget } from '../features/assets/handover/scanMatch';
 import TillCamera from '../features/assets/till/ui/TillCamera';
 import TillReceipt from '../features/assets/till/ui/TillReceipt';
 import TillSheet from '../features/assets/till/ui/TillSheet';
@@ -148,7 +149,9 @@ export default function AssetTillPage() {
   const inputRef = useRef(null);
   const flashTimer = useRef(null);
   const labelDraftRef = useRef(null);
-  const cooldownRef = useRef(createCooldown());
+  const gateRef = useRef(createReadGate());
+  // Codes the camera could not choose between, offered to the person.
+  const [choices, setChoices] = useState([]);
 
   // What the scan handlers read. A camera frame can carry several codes, and
   // each must see the receipt the previous one left — not the one this render
@@ -217,11 +220,40 @@ export default function AssetTillPage() {
     else say('ok', `${out.result === BACK_RESULT.COUNTED ? '+1 · ' : ''}Back from ${out.line.from}`);
   }, [say, setBatch]);
 
-  const onCodes = useCallback((codes) => {
-    for (const code of codes) {
-      if (cooldownRef.current(code.rawValue)) handleCode(code.rawValue, code.format);
+  /**
+   * Every camera read goes through the gate (`till/readGate.js`): read twice,
+   * aim wins, and when it cannot tell which barcode is meant it asks. While
+   * the last delivery line is waiting for its serial, a serial-shaped code is
+   * taken without asking.
+   */
+  const onCodes = useCallback((codes, meta = {}) => {
+    const state = live.current;
+    const last = state.batch?.drafts[state.batch.drafts.length - 1];
+    const expect = state.mode === 'in' && last && needsSerial(last) && !needsKind(last) ? 'serial' : null;
+    const { accept, choices: unsure } = gateRef.current(codes, { aimed: Boolean(meta.aimed), expect });
+    for (const code of accept) handleCode(code);
+    if (unsure.length) {
+      signalDuplicate();
+      setChoices(unsure);
     }
   }, [handleCode]);
+
+  const pickChoice = (code) => {
+    setChoices([]);
+    handleCode(code);
+  };
+
+  /** What a code is, in words, so the right one can be picked. */
+  const describe = (code) => {
+    if (mode === 'in') {
+      const hit = matchRegister(assets, code);
+      if (hit) return hit.by === 'part' ? `Model number of ${hit.asset.title || hit.asset.model}` : `Already registered: ${hit.asset.title}`;
+    } else {
+      const hit = findScanTarget(assets, code);
+      if (hit) return `In the register: ${hit.asset.title}`;
+    }
+    return guessKind(code);
+  };
 
   const onQuiet = useCallback((quiet) => { if (quiet) setNudge(true); }, []);
 
@@ -629,6 +661,7 @@ export default function AssetTillPage() {
     setParams((current) => { const next = new URLSearchParams(current); next.set('mode', id); return next; }, { replace: true });
     setTyped('');
     setFlash(null);
+    setChoices([]);
     setDone(null);
   };
 
@@ -675,7 +708,17 @@ export default function AssetTillPage() {
             ) : (
             <>
             <div className="till-scan">
-              {cameraOn && !done && <TillCamera active={!sheet} onCodes={onCodes} flash={flash} onQuiet={onQuiet} />}
+              {cameraOn && !done && (
+                <TillCamera
+                  active={!sheet}
+                  onCodes={onCodes}
+                  flash={flash}
+                  onQuiet={onQuiet}
+                  choices={choices.map((code) => ({ code, kind: describe(code) }))}
+                  onPick={pickChoice}
+                  onDismiss={() => setChoices([])}
+                />
+              )}
 
               <form className="till-entry" onSubmit={submitTyped}>
                 <label htmlFor="till-code" className="sr-only">Scan or type a code</label>

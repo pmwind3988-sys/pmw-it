@@ -155,7 +155,7 @@ pmw-it/
 | What a return writes | `src/features/assets/handover/planReturn.js` |
 | What one scan does at the till, per mode | `src/features/assets/till/stockIn.js`, `handOut.js`, `takeBack.js` |
 | Type-to-find and the desk's quick keys | `src/features/assets/till/tillSearch.js` |
-| Why a box held in front of the camera counts once | `src/features/assets/till/cooldown.js` |
+| Which barcode the till believes, and when it asks | `src/features/assets/till/readGate.js` |
 | Entering the unlabelled backlog (catch-up count) | `src/features/assets/till/count.js`, `till/ui/CountPanel.jsx` |
 | The till page and its sheets | `src/pages/AssetTillPage.jsx`, `src/features/assets/till/ui/`, `src/styles/till.css` |
 | Finding a person in the directory | `src/features/assets/people/peopleSearch.js` |
@@ -511,9 +511,15 @@ tracked serial already in the register is refused at stock-in rather than
 re-saved from what a barcode knows; a tracked part number is "another of this
 model" waiting for its serial, and the next serial-shaped code fills it; a
 refusal shows on its line the moment it is scanned; a return finds its holder
-and ASKS when several people hold the same bulk line. The camera reports a
-code every frame, so `cooldown.js` counts a code again only after it has been
-out of sight -- without it one box of mice becomes thirty. Checkout is held
+and ASKS when several people hold the same bulk line. Every camera read goes
+through `readGate.js`: a code counts only on its SECOND read within 1.5s (a
+misread is one bad frame and does not repeat); a code read inside the aiming
+box silences everything outside it, even after it has been taken, or the
+shipping label at the edge of the picture wins next; two confirmed codes in
+the box are OFFERED as "Which one did you mean?" rather than guessed, unless
+the till is waiting for a serial and exactly one looks like one; and a code
+is taken once per sighting, so one box of mice held still is not thirty.
+`useScanner` passes `{ aimed }` beside each frame's codes for this. Checkout is held
 while any delivery line needs an answer (`holdOf`). "Can't scan?" offers the
 label reader, type-to-find, and (stock in only) "nothing on it", which gives a
 tracked thing the next free `PMW-NNNN` (`nextTag`). The old scan, batch and

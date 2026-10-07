@@ -724,3 +724,42 @@ select.till-chip { padding-right: 8px; }
   .till-cat { min-height: 54px; padding: 6px 8px; }
   .till-cat strong { font-size: 14px; }
 }
+
+/* Several barcodes in the aiming box: the person picks. Over the picture,
+   on the dark, so it reads as part of the scanner rather than a dialog. */
+.till-choose {
+  position: absolute;
+  inset: 8px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  overflow-y: auto;
+  border-radius: 10px;
+  background: var(--till-dark);
+  color: var(--till-dark-ink);
+}
+.till-choose-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.till-choose-head .till-link { color: var(--till-dark-soft); }
+.till-choice {
+  flex: none;
+  min-height: 52px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  border: 1px solid var(--till-dark-line);
+  border-radius: 10px;
+  background: var(--till-dark-2);
+  color: var(--till-dark-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.till-choice .till-mono { font-size: 17px; font-weight: 600; letter-spacing: 0.02em; overflow-wrap: anywhere; }
+.till-choice > span:last-child { font-size: 13px; color: var(--till-key); }
+.till-choice:hover, .till-choice:focus-visible { border-color: var(--till-key); outline: none; }
+/* Room for three or four choices without scrolling. */
+.till-viewfinder.as-viewfinder:has(.till-choose) { height: 300px; }

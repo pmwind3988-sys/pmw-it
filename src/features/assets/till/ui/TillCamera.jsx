@@ -8,7 +8,9 @@ import { AlertTriangle, Check, Camera } from '../../../../components/ui/Icons';
  * it IS the feedback, and a camera that hides the list hides whether the last
  * box counted.
  */
-export default function TillCamera({ active, onCodes, flash, onQuiet }) {
+export default function TillCamera({
+  active, onCodes, flash, onQuiet, choices = [], onPick, onDismiss,
+}) {
   const {
     videoRef, state, controls, torchOn, toggleTorch, zoomTo, focusOn, quiet,
   } = useScanner({ active, onCodes });
@@ -31,7 +33,25 @@ export default function TillCamera({ active, onCodes, flash, onQuiet }) {
       <div className="as-reticle" aria-hidden="true" />
       <ScanControls controls={controls} torchOn={torchOn} onTorch={toggleTorch} onZoom={zoomTo} />
 
-      {flash && (
+      {/* Several barcodes in the aiming box and no way to tell which is
+          meant: the person holding the box picks. Clicks stop here so a tap
+          on a choice is not also a tap-to-focus. */}
+      {choices.length > 0 && (
+        <div className="till-choose" role="dialog" aria-label="Which barcode?" onClick={(event) => event.stopPropagation()}>
+          <div className="till-choose-head">
+            <strong>Which one did you mean?</strong>
+            <button type="button" className="till-link" onClick={onDismiss}>Neither</button>
+          </div>
+          {choices.map((choice) => (
+            <button key={choice.code} type="button" className="till-choice" onClick={() => onPick(choice.code)}>
+              <span className="till-mono">{choice.code}</span>
+              <span>{choice.kind}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {flash && !choices.length && (
         <div className={`till-flash till-flash-${flash.kind}`} role="status">
           {flash.kind === 'ok' ? <Check size={15} /> : <AlertTriangle size={15} />}
           <span>{flash.text}</span>

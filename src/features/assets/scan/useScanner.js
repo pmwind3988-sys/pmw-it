@@ -139,13 +139,16 @@ export function useScanner({ active = true, onCodes } = {}) {
           // resolves to nothing; this is the single biggest reason a barcode
           // is never read (`cropRegion.js`).
           const source = (readCrop && cropToCanvas(frame)) || frame;
+          const aimed = source !== frame;
           readCrop = !readCrop;
 
           const codes = await readFrame(detector.detect, source);
           if (!cancelled && codes.length) {
             lastFound = Date.now();
             setQuiet(false);
-            handlerRef.current?.(codes);
+            // Whether these came from the aiming box: the till believes a code
+            // in the box over one elsewhere in the picture (`till/readGate.js`).
+            handlerRef.current?.(codes, { aimed });
           } else if (!cancelled && Date.now() - lastFound > QUIET_MS) {
             setQuiet(true);
           }

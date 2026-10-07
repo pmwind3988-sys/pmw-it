@@ -3,6 +3,7 @@ import { LINKS_LIST_NAME } from '../src/features/forms/links/linkSchema.js';
 import {
   CHECKLIST_LIST_NAME, SIGNATURE_LIBRARY_NAME,
 } from '../src/features/forms/sharepoint/checklistSchema.js';
+import { HANDOVER_LIST_NAME } from '../src/features/assets/sharepoint/handoverSchema.js';
 
 /**
  * SharePoint, reached through Microsoft Graph under the portal's OWN identity
@@ -146,6 +147,20 @@ export function createGraph({
       const data = await response.json();
       // Stored server-relative, like a signature saved from inside the portal.
       return { serverRelativeUrl: decodeURIComponent(new URL(data.webUrl).pathname) };
+    },
+
+    /**
+     * The employee's signature onto one till handover row, in `field`
+     * (IssueSignature or ReturnSignature) — only where none is there yet.
+     * Returns whether it wrote.
+     */
+    async signHandover(id, field, url) {
+      const path = `${await itemsPath(HANDOVER_LIST_NAME)}/${encodeURIComponent(id)}`;
+      const response = await call(`${path}?$expand=fields($select=${field})`);
+      const current = (await response.json()).fields?.[field];
+      if (String(current ?? '').trim()) return false;
+      await call(`${path}/fields`, { method: 'PATCH', body: { [field]: url } });
+      return true;
     },
 
     async readSignature(fileName) {

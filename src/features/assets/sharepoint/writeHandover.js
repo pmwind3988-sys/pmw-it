@@ -83,7 +83,10 @@ export async function commitHandover({
   const written = await runPool(plan.handovers, async (handover) => {
     const response = await insert(siteUrl, token, digest, HANDOVER_LIST_NAME, toListItem(handover));
     if (!response.ok) throw new Error(`${response.status}: ${await response.text()}`);
-    return handover.assetKey;
+    // The new row's id, so a checklist link made with this handover can put
+    // the employee's signature onto exactly these rows when they sign.
+    const data = await response.json().catch(() => ({}));
+    return { assetKey: handover.assetKey, id: data.Id ?? data.ID ?? null };
   }, { concurrency: 4, onProgress: (done, total) => report('writing', done, total) });
 
   /**
@@ -109,6 +112,7 @@ export async function commitHandover({
 
   return {
     handedOver: written.filter((result) => !result.error).length,
+    handoverIds: written.map((result) => (result.error ? null : result.value?.id)).filter((id) => id != null),
     signed: Boolean(issueSignature),
     signatureFailed,
     blocked: plan.blocked,
@@ -184,6 +188,8 @@ export async function commitReturn({
 
   return {
     returned: written.filter((result) => !result.error).length,
+    // Which handover rows were returned, for an OUT checklist made with it.
+    returnedIds: written.map((result, index) => (result.error ? null : plan.handoverUpdates[index].id)).filter((id) => id != null),
     signed: Boolean(returnSignature),
     signatureFailed,
     blocked: plan.blocked,

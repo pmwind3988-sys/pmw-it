@@ -11,12 +11,14 @@ import { ConflictError } from './errors.js';
 
 export { ConflictError };
 
-export function createFakeGraph({ links = [], fail = {} } = {}) {
+export function createFakeGraph({ links = [], handovers = {}, fail = {} } = {}) {
   let version = 1;
   let nextChecklistId = 100;
   const rows = new Map();
   const checklists = [];
   const files = new Map();
+  // Till handover rows by id: { IssueSignature, ReturnSignature, ... }.
+  const handoverRows = new Map(Object.entries(handovers).map(([id, fields]) => [String(id), { ...fields }]));
 
   const store = (id, fields) => {
     version += 1;
@@ -29,6 +31,7 @@ export function createFakeGraph({ links = [], fail = {} } = {}) {
     rows,
     checklists,
     files,
+    handoverRows,
 
     async findLink(code) {
       const row = [...rows.values()].find((entry) => entry.fields.Title === code);
@@ -61,6 +64,15 @@ export function createFakeGraph({ links = [], fail = {} } = {}) {
       if (fail.uploadSignature) throw new Error('uploadSignature failed');
       files.set(fileName, bytes);
       return { serverRelativeUrl: `/sites/IThelpdesk/Signatures/${fileName}` };
+    },
+
+    async signHandover(id, field, url) {
+      if (fail.signHandover) throw new Error('signHandover failed');
+      const row = handoverRows.get(String(id));
+      if (!row) throw new Error('No such handover row');
+      if (String(row[field] ?? '').trim()) return false;
+      row[field] = url;
+      return true;
     },
 
     async readSignature(fileName) {

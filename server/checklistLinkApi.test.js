@@ -272,3 +272,47 @@ describe('a checklist IT edited after signing', () => {
     expect((await api.get(CODE)).body.edited).toBeNull();
   });
 });
+
+describe('a checklist made at the till', () => {
+  const tillSetup = (handovers, rows, fail) => {
+    const graph = createFakeGraph({ links: [linkFields({ Handovers: JSON.stringify(handovers) })], handovers: rows, fail });
+    const log = { error: vi.fn(), warn: vi.fn() };
+    return { graph, api: createLinkApi({ graph, now: () => NOW, log }), log };
+  };
+
+  it('puts the signature on the handover rows it was made with', async () => {
+    const { graph, api } = tillSetup({ kind: 'issue', ids: [7, 8] }, { 7: {}, 8: {} });
+    const { status } = await api.submit(CODE, answer());
+    expect(status).toBe(200);
+    const url = graph.handoverRows.get('7').IssueSignature;
+    expect(url).toMatch(/^\/sites\/IThelpdesk\/Signatures\//);
+    expect(graph.handoverRows.get('8').IssueSignature).toBe(url);
+  });
+
+  it('signs a return as "signed for (in)"', async () => {
+    const { graph, api } = tillSetup({ kind: 'return', ids: [9] }, { 9: { IssueSignature: '/old.png' } });
+    await api.submit(CODE, answer());
+    expect(graph.handoverRows.get('9').ReturnSignature).toMatch(/Signatures/);
+    expect(graph.handoverRows.get('9').IssueSignature).toBe('/old.png');
+  });
+
+  it('never writes over a signature already there', async () => {
+    const { graph, api } = tillSetup({ kind: 'issue', ids: [7] }, { 7: { IssueSignature: '/signed-on-phone.png' } });
+    await api.submit(CODE, answer());
+    expect(graph.handoverRows.get('7').IssueSignature).toBe('/signed-on-phone.png');
+  });
+
+  it('still records the signed checklist when a handover row cannot be signed', async () => {
+    const { graph, api, log } = tillSetup({ kind: 'issue', ids: [7] }, { 7: {} }, { signHandover: true });
+    const { status } = await api.submit(CODE, answer());
+    expect(status).toBe(200);
+    expect(graph.checklists).toHaveLength(1);
+    expect(log.warn).toHaveBeenCalled();
+  });
+
+  it('leaves an ordinary link alone', async () => {
+    const { graph, api } = setup();
+    await api.submit(CODE, answer());
+    expect(graph.handoverRows.size).toBe(0);
+  });
+});

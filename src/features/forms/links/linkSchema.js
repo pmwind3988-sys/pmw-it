@@ -47,6 +47,10 @@ export const LINK_COLUMNS = [
   text('EditedBy', 'Edited by'),
   date('EditedOn', 'Edited on'),
   note('OriginalSubmitted', 'Values as first signed'),
+  // The till's handover (or return) rows this checklist is the signature for:
+  // { kind: 'issue' | 'return', ids: [handover row id] }. When the employee
+  // signs, the server attaches that signature to those rows.
+  note('Handovers', 'Till handover rows'),
 ];
 
 export const LINK_VIEWS = [
@@ -86,6 +90,7 @@ export function toLinkItem(link, { createdByName = '', createdByEmail = '' } = {
     LinkStatus: link.status ?? LINK_STATUS.WAITING,
     CreatedByName: createdByName,
     CreatedByEmail: createdByEmail,
+    Handovers: link.handovers ? JSON.stringify(link.handovers) : '',
   };
 }
 
@@ -119,5 +124,6 @@ export function fromLinkItem(fields = {}) {
     editedBy: fields.EditedBy ?? '',
     editedOn: fields.EditedOn ?? '',
     originalSubmitted: parse(fields.OriginalSubmitted, null, isObject),
+    handovers: parse(fields.Handovers, null, isObject),
   };
 }

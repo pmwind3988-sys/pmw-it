@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import Button from '../../../../components/ui/Button';
 import { Check, ArrowLeft } from '../../../../components/ui/Icons';
+import ChecklistLinkCard from './ChecklistLinkCard';
 
 /**
  * What just happened, as a receipt, and the one button for the next job.
@@ -34,6 +35,8 @@ export default function DoneReceipt({ done, onNext }) {
         <div className="till-done-total till-mono"><span>TOTAL</span><span>{done.total}</span></div>
         {done.warning && <p className="till-done-warning">{done.warning}</p>}
       </div>
+
+      {done.checklist?.url && <ChecklistLinkCard url={done.checklist.url} mode={done.checklist.mode} />}
 
       <Button className="till-cta" onClick={onNext}>{done.next}</Button>
       {done.link && (

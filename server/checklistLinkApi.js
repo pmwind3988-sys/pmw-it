@@ -26,6 +26,26 @@ const SAVE_FAILED = 'Your form could not be saved just now. Your answers are sti
 const bytesToDataUrl = (bytes) => `data:image/png;base64,${Buffer.from(bytes).toString('base64')}`;
 
 export function createLinkApi({ graph, now = Date.now, log = console }) {
+  /**
+   * A checklist made at the till is the signature for the handover (or the
+   * return) it was made with: once signed, that signature goes onto those
+   * rows, where the person page reads it. Never over one already there, and
+   * never at the cost of the signing — the checklist is recorded either way,
+   * and a row that could not be signed is logged, not failed.
+   */
+  async function attachToHandovers(link, signatureUrl) {
+    const ids = Array.isArray(link.handovers?.ids) ? link.handovers.ids : [];
+    if (!ids.length) return;
+    const field = link.handovers.kind === 'return' ? 'ReturnSignature' : 'IssueSignature';
+    for (const id of ids) {
+      try {
+        await graph.signHandover(id, field, signatureUrl);
+      } catch (error) {
+        log.warn?.('[checklist-link] signature not attached to handover row', { id, error });
+      }
+    }
+  }
+
   async function load(code) {
     if (!isLinkCode(code)) return null;
     const row = await graph.findLink(code);
@@ -162,6 +182,8 @@ export function createLinkApi({ graph, now = Date.now, log = console }) {
         SignedOn: signedOn,
         ...(link.editedBy ? { EditedBy: '' } : {}),
       });
+
+      if (signatureUrl) await attachToHandovers(link, signatureUrl);
 
       return { status: 200, body: signedCopyBody };
     } catch (error) {

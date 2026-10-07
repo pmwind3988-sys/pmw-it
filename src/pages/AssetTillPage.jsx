@@ -24,6 +24,12 @@ import CountPanel from '../features/assets/till/ui/CountPanel';
 import SerialRunSheet from '../features/assets/till/ui/SerialRunSheet';
 import SameAsSearch from '../features/assets/till/ui/SameAsSearch';
 import BoxSweepSheet from '../features/assets/till/ui/BoxSweepSheet';
+import ChoiceSheet from '../features/assets/till/ui/ChoiceSheet';
+import { checklistFromTill } from '../features/assets/till/checklistFromTill';
+import { useOrgDirectory } from '../hooks/useOrgDirectory';
+import { snapshotOptions } from '../features/forms/formOptions';
+import { IN, OUT, INDIVIDUAL, modeLabel } from '../features/forms/checklistForm';
+import { createLink, draftLink, linkUrl } from '../features/forms/sharepoint/checklistLinks';
 import { saveBatchToSharePoint, remainingDrafts } from '../features/assets/sharepoint/saveBatch';
 import { commitHandover, commitReturn } from '../features/assets/sharepoint/writeHandover';
 import { newBasket, removeLine, setQuantity, isUnitLine } from '../features/assets/handover/basket';
@@ -76,6 +82,7 @@ const PHASE = {
   logging: 'Recording changes',
   delivery: 'Recording the delivery',
   signature: 'Saving the signature',
+  link: 'Creating the checklist link',
   updating: 'Updating the register',
 };
 
@@ -125,6 +132,9 @@ export default function AssetTillPage() {
   const { assets, error: assetsError, reload: reloadAssets } = useAssets();
   const { handovers, reload: reloadHandovers } = useHandovers();
   const assetsById = useMemo(() => new Map(assets.map((asset) => [asset.id, asset])), [assets]);
+  // Entity and department choices a checklist link carries for the employee.
+  const directory = useOrgDirectory();
+  const linkOptions = useMemo(() => (directory ? snapshotOptions(directory) : null), [directory]);
 
   // The receipts. Each mode keeps its own, so switching tab to check
   // something does not throw away a half-scanned delivery. A delivery and a
@@ -427,11 +437,41 @@ export default function AssetTillPage() {
     });
   });
 
-  const handOver = () => run(async () => {
+  /**
+   * A checklist link for what was just recorded: pre-filled, locked to what
+   * the till scanned, and tied to those handover rows so the employee's
+   * signature lands on them. The handover is already recorded either way; a
+   * link that cannot be made is reported, never a reason to undo it.
+   */
+  const makeChecklistLink = async (token, { formMode, person, rows, kind, ids }) => {
+    setProgress({ phase: 'link' });
+    try {
+      const values = checklistFromTill({ formMode, person, rows });
+      const link = {
+        ...draftLink({ formMode, values, editable: ['position'], options: linkOptions, expiresInDays: 14 }),
+        handovers: { kind, ids },
+      };
+      const account = instance.getActiveAccount();
+      const created = await createLink({
+        siteUrl: SHAREPOINT_SITE_URL, token, link,
+        createdByName: account?.name ?? '', createdByEmail: account?.username ?? '',
+      });
+      return { url: linkUrl(window.location.origin, created.code), mode: modeLabel(formMode) };
+    } catch (thrown) {
+      return { error: thrown.message || 'The checklist link could not be created' };
+    }
+  };
+
+  const serialOfLine = (line) => line.serialNumber || line.unitLabel
+    || (line.trackingMode === TRACKED ? assetsById.get(line.assetId)?.serialNumber : '') || '';
+
+  const handOver = (formMode = null) => run(async () => {
     const token = (await getToken()).accessToken;
     const toSend = sendable(withTerms(basket, terms), refusals);
+    // Signed on the checklist link instead: no phone signature now — theirs
+    // arrives on these rows when they sign.
     const report = await commitHandover({
-      siteUrl: SHAREPOINT_SITE_URL, token, basket: toSend, issuedBy: who(), signature, onProgress: setProgress,
+      siteUrl: SHAREPOINT_SITE_URL, token, basket: toSend, issuedBy: who(), signature: formMode ? null : signature, onProgress: setProgress,
     });
     reloadAssets();
     reloadHandovers();
@@ -439,25 +479,40 @@ export default function AssetTillPage() {
     const blocked = new Set(report.blocked.map((entry) => entry.line.lineId));
     const sent = toSend.lines.filter((line) => !blocked.has(line.lineId));
     const due = withTerms(basket, terms).dueOn;
+    const checklist = formMode && sent.length
+      ? await makeChecklistLink(token, {
+        formMode,
+        person: basket.person,
+        rows: sent.map((line) => ({
+          category: line.category, name: line.itemTitle, serial: serialOfLine(line), qty: line.quantity,
+        })),
+        kind: 'issue',
+        ids: report.handoverIds ?? [],
+      })
+      : null;
     signalDone();
     setSheet(null);
     setDone({
       mode: 'out',
+      checklist,
       title: `Handed to ${basket.person.name}`,
       when: stamp(),
       meta: [
         { k: 'To', v: basket.person.email || basket.person.name },
         { k: 'Terms', v: terms.loan ? (due ? `Loan · back by ${new Date(due).toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })}` : 'Loan · no date') : 'Theirs to keep' },
-        { k: 'Signature', v: report.signed ? 'Signed' : (report.signatureFailed ? 'Did not upload' : 'Not signed') },
+        { k: 'Signature', v: checklist?.url ? 'Waiting for the checklist' : (report.signed ? 'Signed' : (report.signatureFailed ? 'Did not upload' : 'Not signed')) },
       ],
       rows: sent.map((line) => ({
         id: line.lineId,
         name: line.itemTitle,
-        sub: line.serialNumber || line.unitLabel || (line.trackingMode === TRACKED ? assetsById.get(line.assetId)?.serialNumber : '') || '',
+        sub: serialOfLine(line),
         qty: line.quantity,
       })),
       total: sent.reduce((sum, line) => sum + line.quantity, 0),
-      warning: blocked.size ? `${plural(blocked.size, 'line')} could not go out and are still on the receipt.` : '',
+      warning: [
+        blocked.size ? `${plural(blocked.size, 'line')} could not go out and are still on the receipt.` : '',
+        checklist?.error ? `The handover is recorded, but the checklist link could not be made: ${checklist.error}` : '',
+      ].filter(Boolean).join(' '),
       next: 'Next person',
       link: { to: `/assets/people/${encodeURIComponent(basket.person.email)}`, label: `Open ${firstName(basket.person.name)}’s page` },
     });
@@ -469,7 +524,7 @@ export default function AssetTillPage() {
     setMissesOut([]);
   });
 
-  const recordReturn = () => run(async () => {
+  const recordReturn = (withLink = false) => run(async () => {
     const token = (await getToken()).accessToken;
     const returns = toReturns(backLines, condition);
     const report = await commitReturn({
@@ -480,9 +535,28 @@ export default function AssetTillPage() {
 
     const blocked = new Set(report.blocked.map((entry) => entry.entry.handoverId));
     const sent = backLines.filter((line) => line.handoverId != null && !blocked.has(line.handoverId));
+    const checklist = withLink && sent.length
+      ? await makeChecklistLink(token, {
+        formMode: OUT,
+        person: { name: sent[0].from, title: '' },
+        rows: sent.map((line) => {
+          const row = handovers.find((entry) => entry.id === line.handoverId);
+          const asset = assets.find((entry) => entry.assetKey === line.assetKey);
+          return {
+            category: asset?.category ?? row?.category ?? '',
+            name: asset?.title || row?.itemTitle || line.name,
+            serial: row?.serialNumber || (asset?.trackingMode === TRACKED ? asset.serialNumber : '') || '',
+            qty: line.quantity,
+          };
+        }),
+        kind: 'return',
+        ids: report.returnedIds ?? [],
+      })
+      : null;
     signalDone();
     setDone({
       mode: 'back',
+      checklist,
       title: 'Return recorded',
       when: stamp(),
       meta: [
@@ -491,7 +565,10 @@ export default function AssetTillPage() {
       ],
       rows: sent.map((line) => ({ id: line.lineId, name: line.name, sub: `From ${line.from}`, qty: line.quantity })),
       total: sent.reduce((sum, line) => sum + line.quantity, 0),
-      warning: blocked.size ? `${plural(blocked.size, 'line')} could not be recorded and are still on the receipt.` : '',
+      warning: [
+        blocked.size ? `${plural(blocked.size, 'line')} could not be recorded and are still on the receipt.` : '',
+        checklist?.error ? `The return is recorded, but the checklist link could not be made: ${checklist.error}` : '',
+      ].filter(Boolean).join(' '),
       next: 'Next return',
       link: { to: '/assets/people', label: 'Open who has what' },
     });
@@ -665,6 +742,10 @@ export default function AssetTillPage() {
 
   // ── Footer, per mode ──────────────────────────────────────────────────────
 
+  // A checklist is one employee's, so an OUT link is offered only when every
+  // returned line came from the same person.
+  const oneHolder = new Set(backLines.filter((line) => line.handoverId != null).map((line) => line.fromEmail || line.from)).size === 1;
+
   let rows; let total; let note = ''; let noteBad = false; let cta; let ctaOk; let onCheckout;
   if (mode === 'in') {
     rows = rowsIn;
@@ -695,7 +776,7 @@ export default function AssetTillPage() {
       : !basket.person ? 'Choose who is getting it'
         : `Hand ${total} to ${firstName(basket.person.name)} · sign`;
     ctaOk = total > 0;
-    onCheckout = () => setSheet(basket.person ? 'sign' : 'person');
+    onCheckout = () => setSheet(basket.person ? 'signhow' : 'person');
   } else {
     rows = rowsBack;
     total = itemsBack(backLines);
@@ -703,7 +784,8 @@ export default function AssetTillPage() {
     if (asking) { note = `Say whose ${asking === 1 ? 'it is' : 'they are'} on ${plural(asking, 'line')}`; noteBad = true; }
     cta = total ? `Record return of ${total}` : 'Scan what came back';
     ctaOk = total > 0;
-    onCheckout = recordReturn;
+    // A checklist is one employee's: offered only when everything came back from one.
+    onCheckout = () => (oneHolder ? setSheet('backhow') : recordReturn(false));
   }
 
   const switchMode = (id) => {
@@ -975,6 +1057,30 @@ export default function AssetTillPage() {
 
       {sheet === 'label' && (
         <TextScanSheet title="Read the label or screen" onCancel={closeLabel} onUse={takeLabel} />
+      )}
+
+      {sheet === 'signhow' && basket.person && (
+        <ChoiceSheet
+          title={`How will ${firstName(basket.person.name)} sign?`}
+          lede="A checklist link is the employee's own signed record. Their signature is added to this handover when they sign it."
+          onClose={() => setSheet(null)}
+          options={[
+            { key: 'phone', title: 'Sign on this phone', body: 'Hand them the phone now.', onPick: () => setSheet('sign') },
+            { key: 'in', title: 'Checklist link · New joiner (IN)', body: 'Items ticked, serials filled in. They sign on the link.', onPick: () => { setSheet(null); handOver(IN); } },
+            { key: 'request', title: 'Checklist link · Individual request', body: 'Items listed with quantities, serials filled in. They sign on the link.', onPick: () => { setSheet(null); handOver(INDIVIDUAL); } },
+          ]}
+        />
+      )}
+
+      {sheet === 'backhow' && (
+        <ChoiceSheet
+          title="Record the return"
+          onClose={() => setSheet(null)}
+          options={[
+            { key: 'plain', title: 'Record the return', body: 'Just put it back in stock.', onPick: () => { setSheet(null); recordReturn(false); } },
+            { key: 'out', title: 'Record it and send an OUT checklist', body: 'What came back, ticked and with serials. They sign on the link.', onPick: () => { setSheet(null); recordReturn(true); } },
+          ]}
+        />
       )}
 
       {sweepFor && (

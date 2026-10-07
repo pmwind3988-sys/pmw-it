@@ -584,6 +584,24 @@ only EMPTY make/model, appends colour and details to `specSummary`, and marks
 them guessed. Offered on an unknown stock-in line and at the Count tab's model
 step. No machine-learning image recognition: the user decided against it.
 
+**A till handover can be signed on a checklist link.** At Hand out checkout
+the till asks how the person signs: on the phone (as before), or a shared
+checklist link -- New joiner (IN) or Individual request. Take back offers an
+OUT link when every returned line came from ONE person. The handover/return is
+written first with no signature; `checklistFromTill` (pure) then builds the
+link's values: name and directory title (title left editable), categories
+ticked or listed where the checklist has a place (`checklistItemFor`: Laptop,
+Mouse, Monitor, Keyboard; Phone → Phone & Simcard; Desktop and HDMI/VGA cables
+on a request only), every serial one line each in the serial box, and anything
+with no place in Other remarks. Employee no., entity and department stay blank
+so the employee fills them. The link carries `handovers: { kind, ids }` (column
+`Handovers`), from `commitHandover().handoverIds` / `commitReturn().returnedIds`,
+and when the employee signs, the SERVER (`attachToHandovers` in
+`checklistLinkApi.js`, `graph.signHandover`) writes that signature into the
+rows' `IssueSignature` / `ReturnSignature` -- only where blank, and a failure
+there is logged, never fails the signing. A link that cannot be created leaves
+the handover recorded and says so on the done receipt.
+
 **"Who has it" is one line per PERSON.** `groupHolders` in
 `handover/availability.js` gathers the open handovers on an item by email:
 somebody who took five cables on Monday and one more on Wednesday is two

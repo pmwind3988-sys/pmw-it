@@ -17,6 +17,15 @@
         ],
         "createdAt": "2026-10-07T01:33:40.735Z",
         "reason": "user confirmed 2026-10-07: intentional card accent in the portal shell"
+      },
+      {
+        "rule": "layout-transition",
+        "value": "*",
+        "files": [
+          "src/styles/forms.css"
+        ],
+        "createdAt": "2026-10-09T07:08:32.883Z",
+        "reason": "Claude: .cl-find search pill widens on focus, the grow-on-focus from the checklists design canvas; one small element, focus-only, not a hot path"
       }
     ]
   }

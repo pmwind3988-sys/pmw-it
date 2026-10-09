@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import QRCode from 'qrcode';
 import { Copy, Check } from '../../../../components/ui/Icons';
 
@@ -38,6 +39,9 @@ export default function ChecklistLinkCard({ url, mode }) {
           {copied ? <Check size={14} /> : <Copy size={14} />} {copied ? 'Copied' : 'Copy'}
         </button>
       </div>
+      <Link className="till-linkcard-more" to="/asset-checklist/links?from=till">
+        See the till’s checklists, signed and waiting
+      </Link>
     </div>
   );
 }

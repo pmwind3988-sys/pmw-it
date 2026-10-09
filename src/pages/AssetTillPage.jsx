@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMsal } from '@azure/msal-react';
 import AppShell from '../components/AppShell';
 import Button from '../components/ui/Button';
 import { ErrorBanner } from '../components/ui/Surfaces';
 import {
-  Camera, Check, ScanLine, Truck, UserPlus, Inbox, Boxes,
+  Camera, Check, ScanLine, Truck, UserPlus, Inbox, Boxes, ClipboardList,
 } from '../components/ui/Icons';
 import { useAssets, SHAREPOINT_SITE_URL } from '../features/assets/useAssets';
 import { useHandovers } from '../features/assets/useHandovers';
@@ -74,6 +74,9 @@ const MODES = [
   { id: 'count', label: 'Count', icon: Boxes },
 ];
 
+// The checklists the till sent for a signature, signed or still waiting.
+const TILL_CHECKLISTS = '/asset-checklist/links?from=till';
+
 const PHASE = {
   provisioning: 'Setting up SharePoint',
   reading: 'Checking the register',
@@ -125,6 +128,7 @@ const stamp = () => new Date().toLocaleString('en-MY', {
 
 export default function AssetTillPage() {
   const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
   const mode = MODES.some((entry) => entry.id === params.get('mode')) ? params.get('mode') : 'in';
 
   const { instance } = useMsal();
@@ -807,7 +811,15 @@ export default function AssetTillPage() {
   const setPurchase = (field, value) => setBatch((current) => ({ ...current, purchase: { ...current.purchase, [field]: value } }));
 
   return (
-    <AppShell title="Till" subtitle="Scan things onto the receipt. One button to finish.">
+    <AppShell
+      title="Till"
+      subtitle="Scan things onto the receipt. One button to finish."
+      actions={(
+        <Button variant="ghost" icon={ClipboardList} onClick={() => navigate(TILL_CHECKLISTS)}>
+          Signed checklists
+        </Button>
+      )}
+    >
       <div className="till">
         {assetsError && <ErrorBanner message={assetsError} onRetry={reloadAssets} />}
         {failure && <ErrorBanner message={failure} onRetry={onCheckout} />}

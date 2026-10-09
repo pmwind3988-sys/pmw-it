@@ -858,4 +858,5 @@ select.till-chip { padding-right: 8px; }
 .till-linkcard img { border-radius: 8px; }
 .till-linkcard-row { display: flex; align-items: center; gap: 8px; max-width: 100%; }
 .till-linkcard-row .till-mono { font-size: 13px; overflow-wrap: anywhere; text-align: left; }
+.till-linkcard-more { font-size: 13px; font-weight: 600; color: #15171a; text-decoration: underline; }
 .till-linkcard .till-chip { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; color: #15171a; background: #ffffff; border-color: #c9ced6; }

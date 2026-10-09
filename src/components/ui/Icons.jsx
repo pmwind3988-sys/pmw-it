@@ -243,6 +243,14 @@ export const Inbox = make('Inbox', (
 
 export const Check = make('Check', <polyline points="20 6 9 17 4 12" />);
 
+export const MoreHorizontal = make('MoreHorizontal', (
+  <>
+    <circle cx="5" cy="12" r="1" />
+    <circle cx="12" cy="12" r="1" />
+    <circle cx="19" cy="12" r="1" />
+  </>
+));
+
 export const HardDrive = make('HardDrive', (
   <>
     <line x1="22" y1="12" x2="2" y2="12" />

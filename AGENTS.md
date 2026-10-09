@@ -79,7 +79,7 @@ pmw-it/
 | `/it-boarding-form` | HR/manager raises an onboarding or offboarding event; several employees per submission, `?edit=<id>` opens a record |
 | `/asset-checklist` | The EMPLOYEE's own signed record of what they received or handed back — IN / OUT / INDIVIDUAL REQUEST, following the supplied reference form |
 | `/asset-checklist/share` | IT pre-fills a checklist, chooses per field what the employee may change, and copies a short link |
-| `/asset-checklist/links` | Every shared link: waiting / signed / expired / cancelled; copy, open, change expiry, expire now, cancel, reopen, delete |
+| `/asset-checklist/links` | Every shared link: waiting / signed / expired / cancelled; copy, open, change expiry, expire now, cancel, reopen, delete. Drawn as a timeline grouped by day, with a detail panel (a bottom sheet on a phone). Every choice is in the query string: `?show=waiting\|signed\|closed`, `from=till\|share`, `kind=handout\|return`, `q=` (name, item or serial), `open=<id>`; the rules are `links/linkFilter.js`. The till's "Signed checklists" button opens it at `?from=till` |
 | `/asset-checklist/links/:id` | IT correcting a SIGNED checklist; the record then says "Edited by … after signing" |
 | `/c/:code` | **Public, no sign-in.** A separate page (`checklist.html`), not a portal route: the employee fills and signs; afterwards the same link is the locked, printable copy |
 | `/devices` | Device list. `?view=map` (default): locations → departments → machines, with the IT Stash and the Graveyard; `?location=`, `&department=`, `?place=stash\|graveyard\|nolocation`. Also `dashboard`, `register`, `import`, `standards` (where IT sets the grading standard and colours) |

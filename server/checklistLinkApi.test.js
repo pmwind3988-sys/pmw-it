@@ -3,7 +3,9 @@ import { createLinkApi } from './checklistLinkApi.js';
 import { createFakeGraph, ConflictError } from './fakeGraph.js';
 import { toLinkItem, fromLinkItem, LINK_STATUS } from '../src/features/forms/links/linkSchema.js';
 import { reopenFields } from '../src/features/forms/links/linkChanges.js';
-import { IN } from '../src/features/forms/checklistForm.js';
+import { IN, OUT, INDIVIDUAL } from '../src/features/forms/checklistForm.js';
+import { checklistFromTill } from '../src/features/assets/till/checklistFromTill.js';
+import { draftLink } from '../src/features/forms/sharepoint/checklistLinks.js';
 
 const NOW = Date.parse('2026-10-05T04:00:00Z');
 const DAY = 86400000;
@@ -314,5 +316,84 @@ describe('a checklist made at the till', () => {
     const { graph, api } = setup();
     await api.submit(CODE, answer());
     expect(graph.handoverRows.size).toBe(0);
+  });
+});
+
+/**
+ * The whole till path, with nothing hand-made: the receipt becomes checklist
+ * values, the link is drafted and stored exactly as the till stores it, the
+ * employee opens it, fills in only what the till left blank, and signs. If the
+ * till ever pre-fills something the form refuses and then locks it, the
+ * employee is stuck on a form they cannot submit -- this is what catches that.
+ */
+describe('a till receipt, signed end to end', () => {
+  const OPTIONS = {
+    entities: [{ value: 'PMW', label: 'PMW' }],
+    departments: { PMW: [{ value: 'ENG', label: 'Engineering' }] },
+  };
+
+  const tillLink = (formMode, rows, handovers) => {
+    const values = checklistFromTill({
+      formMode, person: { name: 'Amir Hakim', title: 'Engineer' }, rows, date: '2026-10-05',
+    });
+    const link = {
+      ...draftLink({ formMode, values, editable: ['position'], options: OPTIONS, expiresInDays: 14, now: NOW, code: CODE }),
+      handovers,
+    };
+    return toLinkItem(link, { createdByName: 'IT Desk', createdByEmail: 'it@pmw.test' });
+  };
+
+  // What the employee adds: only the fields the opened form leaves editable.
+  const fillIn = (opened) => {
+    const extra = { employeeNo: 'E-1042', entity: 'PMW', department: 'ENG', position: 'Engineer' };
+    const values = {};
+    for (const field of opened.editable) if (field in extra) values[field] = extra[field];
+    return { values: { ...values, signature } };
+  };
+
+  const cases = [
+    ['a new joiner (IN)', IN, 'issue', 'IssueSignature'],
+    ['an individual request', INDIVIDUAL, 'issue', 'IssueSignature'],
+    ['a return (OUT)', OUT, 'return', 'ReturnSignature'],
+  ];
+
+  for (const [label, formMode, kind, field] of cases) {
+    it(`saves ${label} and signs its handover rows`, async () => {
+      const rows = [
+        { category: 'Laptop', name: 'Dell Latitude 5440', serial: 'SN-LAP-1', qty: 1 },
+        { category: 'Mouse', name: 'Logitech M90', serial: '', qty: 2 },
+        { category: 'Dock', name: 'Dell WD19', serial: 'SN-DOCK-9', qty: 1 },
+      ];
+      const graph = createFakeGraph({
+        links: [tillLink(formMode, rows, { kind, ids: [7, 8] })],
+        handovers: { 7: {}, 8: {} },
+      });
+      const api = createLinkApi({ graph, now: () => NOW, log: { error: vi.fn(), warn: vi.fn() } });
+
+      const opened = await api.get(CODE);
+      expect(opened.status).toBe(200);
+      const { status, body } = await api.submit(CODE, fillIn(opened.body));
+
+      expect(body.errors).toBeUndefined();
+      expect(status).toBe(200);
+      expect(graph.checklists).toHaveLength(1);
+      const saved = graph.checklists[0].fields;
+      expect(saved.EmployeeName).toBe('Amir Hakim');
+      expect(saved.SerialNumbers).toMatch(/SN-LAP-1/);
+      expect(saved.SerialNumbers).toMatch(/SN-DOCK-9/);
+      expect(graph.handoverRows.get('7')[field]).toMatch(/Signatures/);
+      expect(graph.handoverRows.get('8')[field]).toMatch(/Signatures/);
+      expect(fromLinkItem({ ...graph.rows.get(1).fields }).status).toBe(LINK_STATUS.SIGNED);
+    });
+  }
+
+  it('lets the employee name an item when nothing handed out fits a request line', async () => {
+    const graph = createFakeGraph({
+      links: [tillLink(INDIVIDUAL, [{ category: 'Dock', name: 'Dell WD19', serial: '', qty: 1 }], { kind: 'issue', ids: [7] })],
+      handovers: { 7: {} },
+    });
+    const api = createLinkApi({ graph, now: () => NOW, log: { error: vi.fn(), warn: vi.fn() } });
+    const opened = await api.get(CODE);
+    expect(opened.body.editable).toContain('items');
   });
 });

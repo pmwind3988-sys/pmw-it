@@ -15,6 +15,7 @@ const here = (path) => fileURLToPath(new URL(path, import.meta.url))
  */
 function checklistLinks(env) {
   let devApi = null
+  let devServices = null
 
   return {
     name: 'checklist-links',
@@ -27,11 +28,34 @@ function checklistLinks(env) {
           try {
             const { handleLinkRequest, apiFromEnv } = await server.ssrLoadModule('/server/linkHandler.js')
             if (env.CHECKLIST_FAKE === '1' && !devApi) {
-              const { createDevApi } = await server.ssrLoadModule('/server/devApi.js')
-              devApi = await createDevApi()
+              const { createDevServices } = await server.ssrLoadModule('/server/devApi.js')
+              devServices = await createDevServices()
+              devApi = devServices.api
             }
             await handleLinkRequest(req, res, decodeURIComponent(api[1]), {
               api: devApi ?? apiFromEnv(env),
+            })
+          } catch (error) {
+            next(error)
+          }
+          return
+        }
+
+        if (path === '/api/checklist-email') {
+          try {
+            const { handleMailRequest } = await server.ssrLoadModule('/server/mailHandler.js')
+            if (env.CHECKLIST_FAKE === '1' && !devServices) {
+              const { createDevServices } = await server.ssrLoadModule('/server/devApi.js')
+              devServices = await createDevServices()
+              devApi = devServices.api
+            }
+            await handleMailRequest(req, res, {
+              env,
+              services: devServices ?? undefined,
+              // The fake has no tenant to check a sign-in against.
+              verifyCaller: devServices
+                ? async () => ({ name: 'IT Support (demo)', email: 'demo@example.test' })
+                : undefined,
             })
           } catch (error) {
             next(error)

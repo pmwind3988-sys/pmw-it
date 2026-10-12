@@ -25,7 +25,9 @@ const SAVE_FAILED = 'Your form could not be saved just now. Your answers are sti
 
 const bytesToDataUrl = (bytes) => `data:image/png;base64,${Buffer.from(bytes).toString('base64')}`;
 
-export function createLinkApi({ graph, now = Date.now, log = console }) {
+export function createLinkApi({
+  graph, now = Date.now, log = console, mailer = null,
+}) {
   /**
    * A checklist made at the till is the signature for the handover (or the
    * return) it was made with: once signed, that signature goes onto those
@@ -108,7 +110,11 @@ export function createLinkApi({ graph, now = Date.now, log = console }) {
     };
   }
 
-  async function submit(code, body) {
+  /**
+   * `origin` is the portal's address, for the buttons in the email sent to
+   * IT when this signing goes through.
+   */
+  async function submit(code, body, { origin = '' } = {}) {
     const found = await load(code);
     if (!found) return GONE;
     const { row, link } = found;
@@ -184,6 +190,20 @@ export function createLinkApi({ graph, now = Date.now, log = console }) {
       });
 
       if (signatureUrl) await attachToHandovers(link, signatureUrl);
+
+      // The group IT chose hears about it. Awaited, because a serverless
+      // function may be frozen once it has answered; never allowed to fail
+      // the signing, which is already recorded.
+      if (mailer) {
+        await mailer.onSigned({
+          rowId: row.id,
+          link,
+          values: stored,
+          signedOn,
+          origin,
+          signatureBytes: signature ? dataUrlToBytes(signature) : null,
+        }).catch((error) => log.error('[checklist-link] email on signing failed', error));
+      }
 
       return { status: 200, body: signedCopyBody };
     } catch (error) {

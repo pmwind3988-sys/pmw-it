@@ -1,4 +1,5 @@
 import { FORM_MODES } from '../checklistForm.js';
+import { parseEmailLog } from './emailLog.js';
 
 /**
  * The list that holds shared checklist links, one row per link.
@@ -51,6 +52,9 @@ export const LINK_COLUMNS = [
   // { kind: 'issue' | 'return', ids: [handover row id] }. When the employee
   // signs, the server attaches that signature to those rows.
   note('Handovers', 'Till handover rows'),
+  // Every email sent for this checklist, newest last (`emailLog.js`). Written
+  // by the server on signing and on a resend; empty means never emailed.
+  note('EmailLog', 'Emails sent'),
 ];
 
 export const LINK_VIEWS = [
@@ -125,5 +129,6 @@ export function fromLinkItem(fields = {}) {
     editedOn: fields.EditedOn ?? '',
     originalSubmitted: parse(fields.OriginalSubmitted, null, isObject),
     handovers: parse(fields.Handovers, null, isObject),
+    emailLog: parseEmailLog(fields.EmailLog),
   };
 }

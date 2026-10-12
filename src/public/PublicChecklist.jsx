@@ -74,6 +74,22 @@ function Message({ icon: Icon = AlertTriangle, title, children, action }) {
 }
 
 function SignedCopy({ copy, justSigned }) {
+  // The email's "Print / Save as PDF" button opens the copy at `?print=1`:
+  // open the print dialog once, then drop the flag so a reload does not.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (justSigned || url.searchParams.get('print') !== '1') return undefined;
+    // A moment for the signature image to paint before the page is printed.
+    // The flag is dropped inside the timer, not before it: StrictMode runs
+    // this twice, and the first cleanup would otherwise cancel the print.
+    const timer = window.setTimeout(() => {
+      url.searchParams.delete('print');
+      window.history.replaceState(null, '', url);
+      window.print();
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [justSigned]);
+
   return (
     <>
       <div className="pc-signed-bar">

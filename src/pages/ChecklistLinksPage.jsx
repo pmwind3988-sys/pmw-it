@@ -6,8 +6,11 @@ import Button from '../components/ui/Button';
 import Spinner from '../components/ui/Spinner';
 import { Card, ErrorBanner, EmptyState } from '../components/ui/Surfaces';
 import {
-  Copy, Check, Plus, X, RefreshCw, Pencil, Trash2, Clock, Calendar, Search, MoreHorizontal,
+  Copy, Check, Plus, X, RefreshCw, Pencil, Trash2, Clock, Calendar, Search, MoreHorizontal, Mail,
 } from '../components/ui/Icons';
+import EmailSettingsDialog from '../features/forms/links/ui/EmailSettingsDialog';
+import LinkEmailStatus from '../features/forms/links/ui/LinkEmailStatus';
+import { LINK_STATUS } from '../features/forms/links/linkSchema';
 import { DateInput } from '../components/form/Inputs';
 import { useConfirm } from '../components/ui/useConfirm';
 import { useSharePointToken } from '../hooks/useRequests';
@@ -81,6 +84,9 @@ const KIND_OPTIONS = [
 
 // The actions that can lead the detail panel, in order of preference.
 const PRIMARY_ORDER = ['view', 'open', 'reopen'];
+// Editing the form is what IT reaches for most after the primary action, so it
+// sits beside it rather than in the More menu.
+const BESIDE_PRIMARY = ['change', 'edit'];
 
 const when = (value, style = 'date') => {
   const time = Date.parse(value);
@@ -179,6 +185,7 @@ export default function ChecklistLinksPage() {
   // Which link's "More" menu is open, by its key.
   const [menuFor, setMenuFor] = useState(null);
   const [seen, setSeen] = useState(readSeen);
+  const [emailOpen, setEmailOpen] = useState(false);
 
   useEffect(() => {
     document.title = 'PMW IT — Shared checklists';
@@ -307,7 +314,7 @@ export default function ChecklistLinksPage() {
       case 'edit':
         return { label: 'Edit', icon: Pencil, onClick: () => navigate(`/asset-checklist/links/${link.id}`) };
       case 'change':
-        return { label: 'Change details', icon: Pencil, onClick: () => navigate(`/asset-checklist/share?link=${link.id}`) };
+        return { label: 'Edit form', icon: Pencil, onClick: () => navigate(`/asset-checklist/share?link=${link.id}`) };
       case 'expiry':
         return { label: 'Change expiry', icon: Calendar, onClick: () => setPanel({ id: link.id, kind: 'expiry' }) };
       case 'expireNow':
@@ -461,7 +468,8 @@ export default function ChecklistLinksPage() {
     const steps = linkSteps(link, now);
     const acts = linkActions(link, now);
     const primary = PRIMARY_ORDER.find((action) => acts.includes(action));
-    const menu = acts.filter((action) => action !== 'copy' && action !== primary);
+    const beside = acts.filter((action) => BESIDE_PRIMARY.includes(action));
+    const menu = acts.filter((action) => action !== 'copy' && action !== primary && !beside.includes(action));
     const menuOpen = menuFor === keyOf(link);
     const handoverCount = link.handovers?.ids?.length ?? 0;
     const handoverWord = link.handovers?.kind === 'return' ? 'return' : 'handover';
@@ -560,9 +568,14 @@ export default function ChecklistLinksPage() {
 
           {renderPanel(link)}
 
+          {link.status === LINK_STATUS.SIGNED && (
+            <LinkEmailStatus key={link.id} link={link} onChanged={load} />
+          )}
+
           <div className="cl-dactions">
             {acts.includes('copy') && <CopyButton url={linkUrl(window.location.origin, link.code)} />}
             {primary && renderButton(primary, link, 'primary')}
+            {beside.map((action) => renderButton(action, link, 'beside'))}
             {menu.length > 0 && (
               <div className="cl-more">
                 <button
@@ -609,6 +622,7 @@ export default function ChecklistLinksPage() {
       >
         {refreshing ? <Spinner size={14} /> : <RefreshCw size={16} />}
       </button>
+      <Button variant="ghost" icon={Mail} onClick={() => setEmailOpen(true)}>Email settings</Button>
       <button type="button" className="cl-new" onClick={() => navigate('/asset-checklist/share')}>
         <span className="cl-new-dot"><Plus size={14} /></span>
         New checklist
@@ -721,6 +735,9 @@ export default function ChecklistLinksPage() {
       )}
 
       {dialog}
+      {emailOpen && (
+        <EmailSettingsDialog siteUrl={SHAREPOINT_SITE_URL} onClose={() => setEmailOpen(false)} />
+      )}
     </AppShell>
   );
 }

@@ -1,5 +1,5 @@
 /**
- * An in-memory stand-in for `createGraph`, with the same six methods.
+ * An in-memory stand-in for `createGraph`, with the same methods.
  *
  * Used by the handler tests, and by `npm run dev` when `CHECKLIST_FAKE=1` so
  * the public page can be driven end to end on a machine with no app secret.
@@ -11,12 +11,17 @@ import { ConflictError } from './errors.js';
 
 export { ConflictError };
 
-export function createFakeGraph({ links = [], handovers = {}, fail = {} } = {}) {
+export function createFakeGraph({
+  links = [], handovers = {}, settings = {}, fail = {},
+} = {}) {
   let version = 1;
   let nextChecklistId = 100;
   const rows = new Map();
   const checklists = [];
   const files = new Map();
+  // Every email "sent": { from, to, subject, html, attachments }.
+  const sent = [];
+  const settingRows = new Map(Object.entries(settings));
   // Till handover rows by id: { IssueSignature, ReturnSignature, ... }.
   const handoverRows = new Map(Object.entries(handovers).map(([id, fields]) => [String(id), { ...fields }]));
 
@@ -32,6 +37,8 @@ export function createFakeGraph({ links = [], handovers = {}, fail = {} } = {}) 
     checklists,
     files,
     handoverRows,
+    sent,
+    settingRows,
 
     async findLink(code) {
       const row = [...rows.values()].find((entry) => entry.fields.Title === code);
@@ -73,6 +80,22 @@ export function createFakeGraph({ links = [], handovers = {}, fail = {} } = {}) 
       if (String(row[field] ?? '').trim()) return false;
       row[field] = url;
       return true;
+    },
+
+    async getLink(id) {
+      const row = rows.get(Number(id));
+      return row ? structuredClone(row) : null;
+    },
+
+    async readSetting(key) {
+      const value = settingRows.get(key);
+      if (value === undefined) return null;
+      return typeof value === 'string' ? value : JSON.stringify(value);
+    },
+
+    async sendMail(mail) {
+      if (fail.sendMail) throw new Error('sendMail failed (403): ErrorAccessDenied');
+      sent.push(structuredClone(mail));
     },
 
     async readSignature(fileName) {

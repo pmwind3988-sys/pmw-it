@@ -126,6 +126,10 @@ pmw-it/
 | What IT may do to a link, and what an edit / reopen writes | `src/features/forms/links/linkChanges.js` |
 | Entity / Department choices, live or carried by a link | `src/features/forms/formOptions.js`, `src/hooks/useOrgDirectory.js` |
 | The Azure / Vercel setup the links need | `docs/checklist-links-setup.md` |
+| The email sent when a checklist is signed | `server/checklistEmail.js` (what it says), `server/checklistMailer.js` (when it goes) |
+| Who it goes to, and its on/off switch | `src/features/forms/links/emailSettings.js`, the `IT Portal Settings` list |
+| Every email sent for a link | `src/features/forms/links/emailLog.js` (`EmailLog` column) |
+| Resend / test, and who may ask | `server/mailHandler.js`, `api/checklist-email.js` |
 | Adding options to an existing choice column | `mergeChoices` in `src/features/sharepoint/provision.js` |
 | Which values on a device page read red or green | `src/features/devices/fieldTone.js` |
 | What counts as Critical … Optimal, per part and profile | `src/features/devices/standards/defaultStandard.js`, the Standards tab, the `IT Device Standards` list |
@@ -808,7 +812,7 @@ change writes; `checklistLinks.js` carries it out as the signed-in user.
   so a half-finished delete leaves something to press again. The dialog
   warns about the record whenever one EXISTS (`checklistId`), not by state:
   a reopened or expired link can still have one.
-- *Change details* (waiting links only) opens the share page at
+- *Edit form* (waiting links only; beside Open, not in More) opens the share page at
   `?link=<id>` with the link's pre-filled values and "Employee can edit"
   switches, and saves them back onto the SAME link -- code, QR and dropdown
   choices unchanged, form type fixed (`planPresetChange`,
@@ -819,6 +823,32 @@ change writes; `checklistLinks.js` carries it out as the signed-in user.
 
 `npm run dev:links` runs both against an in-memory SharePoint with five demo
 links (`server/devApi.js`), including one reopened and one edited after signing, for trying it without the app secret.
+
+**A signed checklist emails the group IT chose -- once, when it is signed.**
+The server sends it (`checklistMailer.onSigned`), right after the signing is
+recorded, from the mailbox in `CHECKLIST_MAIL_FROM`, with `Mail.Send`
+limited to that one mailbox by an Exchange application access policy
+(`docs/checklist-links-setup.md` step 7). The group and the switch are ONE
+value in `IT Portal Settings` (`checklistEmail`), saved from Shared
+checklists → Email settings. "Only new ones" holds because nothing scans old
+checklists: only a signing passes through `onSigned`, and only while the
+switch is on. Anything older is sent by hand from its panel (`resend`), which
+works while the switch is off as long as a group is saved.
+- The signature is ATTACHED inline (`cid:signature`), never linked: mail
+  clients cannot read SharePoint, which is why the old notification showed a
+  broken image.
+- Every value the employee typed is HTML-escaped in `buildChecklistEmail`;
+  the form is anonymous.
+- Recipients always come from the saved setting, never from a request, so a
+  resend cannot be pointed elsewhere.
+- `/api/checklist-email` believes a caller only when Graph accepts their token
+  (`/me`) AND its claims say this tenant, the PORTAL's app (`VITE_CLIENT_ID`)
+  and Graph's audience. The portal sends it via `useGraphToken()`.
+- Every attempt, sent or failed, is appended to the link's `EmailLog`. A
+  failed send or a failed log write NEVER fails a signing.
+- Buttons in the email use `PORTAL_URL` / `VITE_REDIRECT_URI`, not the
+  anonymous request's Host header. "Print / Save as PDF" opens the signed copy
+  at `?print=1`, which opens the print dialog once.
 
 **What the checklist READS and what it STORES are deliberately different.** The
 form says IN / OUT / INDIVIDUAL REQUEST, as the reference form does; the list

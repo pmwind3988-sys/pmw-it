@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useIsAuthenticated } from '@azure/msal-react';
 import { fetchAllListItems, fetchAllColumnChoices } from '../services/sharePointService';
-import { sharePointRequest } from '../authConfig';
+import { sharePointRequest, loginRequest } from '../authConfig';
 import { useSession } from './useSession';
 
 export const SHAREPOINT_SITE_URL =
@@ -28,6 +28,16 @@ export const CHOICE_COLUMNS = [
 export function useSharePointToken() {
   const { acquireToken } = useSession();
   return useCallback(() => acquireToken(sharePointRequest), [acquireToken]);
+}
+
+/**
+ * A Microsoft Graph token with the sign-in's own `User.Read`, through the same
+ * guard. Not for Graph calls from the page: it is what the portal shows its
+ * own server to prove who is asking (`server/mailHandler.js`).
+ */
+export function useGraphToken() {
+  const { acquireToken } = useSession();
+  return useCallback(() => acquireToken(loginRequest), [acquireToken]);
 }
 
 /**

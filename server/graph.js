@@ -4,6 +4,7 @@ import {
   CHECKLIST_LIST_NAME, SIGNATURE_LIBRARY_NAME,
 } from '../src/features/forms/sharepoint/checklistSchema.js';
 import { HANDOVER_LIST_NAME } from '../src/features/assets/sharepoint/handoverSchema.js';
+import { SETTINGS_LIST_NAME } from '../src/features/forms/links/emailSettings.js';
 
 /**
  * SharePoint, reached through Microsoft Graph under the portal's OWN identity
@@ -15,8 +16,12 @@ import { HANDOVER_LIST_NAME } from '../src/features/assets/sharepoint/handoverSc
  * `Sites.Selected` and write on the IThelpdesk site only — see
  * `docs/checklist-links-setup.md`.
  *
- * Exposes exactly the six calls the link handlers need, so the fake in
- * `fakeGraph.js` can stand in for it method for method.
+ * Exposes exactly the calls the link handlers and the mailer need, so the
+ * fake in `fakeGraph.js` can stand in for it method for method.
+ *
+ * Sending mail needs one more permission than the rest: `Mail.Send`
+ * (application), limited by an Exchange application access policy to the
+ * one mailbox it sends from — see `docs/checklist-links-setup.md`.
  */
 
 const GRAPH = 'https://graph.microsoft.com/v1.0';
@@ -161,6 +166,63 @@ export function createGraph({
       if (String(current ?? '').trim()) return false;
       await call(`${path}/fields`, { method: 'PATCH', body: { [field]: url } });
       return true;
+    },
+
+    /** One link row by its item id, in the same shape as `findLink`. */
+    async getLink(id) {
+      try {
+        const response = await call(`${await itemsPath(LINKS_LIST_NAME)}/${encodeURIComponent(id)}?$expand=fields`);
+        const item = await response.json();
+        return { id: item.id, eTag: item.eTag, fields: item.fields };
+      } catch (error) {
+        if (/(404)/.test(String(error?.message))) return null;
+        throw error;
+      }
+    },
+
+    /**
+     * One value from `IT Portal Settings`, or null when nobody has saved it —
+     * including when the list itself does not exist yet.
+     */
+    async readSetting(key) {
+      let path;
+      try {
+        path = await itemsPath(SETTINGS_LIST_NAME);
+      } catch {
+        return null;
+      }
+      // `key` is one of this app's constants, never a visitor's input.
+      const filter = encodeURIComponent(`fields/Title eq '${key.replace(/'/g, "''")}'`);
+      const response = await call(`${path}?$expand=fields($select=Title,SettingValue)&$filter=${filter}&$top=1`, {
+        headers: { Prefer: 'HonorNonIndexedQueriesWarningMayFailRandomly' },
+      });
+      return (await response.json()).value?.[0]?.fields?.SettingValue ?? null;
+    },
+
+    /**
+     * An email from `from` (a mailbox the app may send as). `attachments` are
+     * `{ name, contentType, bytes, contentId }`; one with a `contentId` is
+     * inline, which is how the signature shows in the body.
+     */
+    async sendMail({ from, to, subject, html, attachments = [] }) {
+      await call(`/users/${encodeURIComponent(from)}/sendMail`, {
+        method: 'POST',
+        body: {
+          message: {
+            subject,
+            body: { contentType: 'HTML', content: html },
+            toRecipients: to.map((address) => ({ emailAddress: { address } })),
+            attachments: attachments.map((file) => ({
+              '@odata.type': '#microsoft.graph.fileAttachment',
+              name: file.name,
+              contentType: file.contentType,
+              contentBytes: Buffer.from(file.bytes).toString('base64'),
+              ...(file.contentId ? { isInline: true, contentId: file.contentId } : {}),
+            })),
+          },
+          saveToSentItems: true,
+        },
+      });
     },
 
     async readSignature(fileName) {

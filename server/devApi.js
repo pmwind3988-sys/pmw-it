@@ -1,5 +1,6 @@
 import { createFakeGraph } from './fakeGraph.js';
 import { createLinkApi } from './checklistLinkApi.js';
+import { createChecklistMailer } from './checklistMailer.js';
 import { toLinkItem, fromLinkItem } from '../src/features/forms/links/linkSchema.js';
 import { reopenFields } from '../src/features/forms/links/linkChanges.js';
 import { IN, OUT, INDIVIDUAL } from '../src/features/forms/checklistForm.js';
@@ -33,7 +34,11 @@ const OPTIONS = {
   },
 };
 
-export async function createDevApi() {
+/**
+ * Emails are ON in the demo, to a made-up group, and are only written to the
+ * console: `npm run dev:links` sends nothing anywhere.
+ */
+export async function createDevServices() {
   const expiresOn = new Date(Date.now() + 14 * DAY).toISOString();
   const link = (code, formMode, preset, editable = []) => toLinkItem(
     { code, formMode, preset, editable, expiresOn, options: OPTIONS },
@@ -61,9 +66,16 @@ export async function createDevApi() {
       link('DemoReopen', IN, { employeeName: 'Lee Wei', employeeNo: 'E-3301', entity: 'PMW', checkedItems: ['Laptop'] }),
       link('DemoEdited', OUT, { employeeName: 'Nur Aisyah', employeeNo: 'E-4120', entity: 'PCI', checkedItems: ['Laptop', 'Mouse'] }),
     ],
+    settings: { checklistEmail: { enabled: true, to: ['it-assets@example.test'] } },
   });
+  const realSend = graph.sendMail;
+  graph.sendMail = async (mail) => {
+    await realSend(mail);
+    console.log(`[dev mail] "${mail.subject}" → ${mail.to.join(', ')} (${mail.attachments?.length ?? 0} attachment)`);
+  };
 
-  const api = createLinkApi({ graph });
+  const mailer = createChecklistMailer({ graph, from: 'it-portal@example.test' });
+  const api = createLinkApi({ graph, mailer });
 
   // Sign the last two, then put them in the state IT's actions would leave.
   const signAs = (code, values) => api.submit(code, {
@@ -78,5 +90,11 @@ export async function createDevApi() {
   const edited = await rowFor('DemoEdited');
   await graph.updateLink(edited.id, { EditedBy: 'IT Support (demo)', EditedOn: new Date().toISOString() });
 
-  return api;
+  return {
+    api, graph, mailer, config: { tenantId: 'demo', portalClientId: 'demo' },
+  };
+}
+
+export async function createDevApi() {
+  return (await createDevServices()).api;
 }

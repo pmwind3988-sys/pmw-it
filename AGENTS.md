@@ -156,6 +156,7 @@ pmw-it/
 | What a return writes | `src/features/assets/handover/planReturn.js` |
 | What one scan does at the till, per mode | `src/features/assets/till/stockIn.js`, `handOut.js`, `takeBack.js` |
 | Type-to-find and the desk's quick keys | `src/features/assets/till/tillSearch.js` |
+| Handing out a spare machine from the IT Stash at the till | `src/features/assets/till/stashMachines.js` |
 | Which barcode the till believes, and when it asks | `src/features/assets/till/readGate.js` |
 | Entering the unlabelled backlog (catch-up count) | `src/features/assets/till/count.js`, `till/ui/CountPanel.jsx` |
 | The till page and its sheets | `src/pages/AssetTillPage.jsx`, `src/features/assets/till/ui/`, `src/styles/till.css` |
@@ -601,6 +602,16 @@ and when the employee signs, the SERVER (`attachToHandovers` in
 rows' `IssueSignature` / `ReturnSignature` -- only where blank, and a failure
 there is logged, never fails the signing. A link that cannot be created leaves
 the handover recorded and says so on the done receipt.
+
+**A spare machine in the IT Stash can be handed out at the till.** Hand out
+lists the device list's `Spare` machines, finds one by its serial or computer
+name when scanned or typed, and puts it on the receipt beside the basket
+(`till/stashMachines.js`). A machine is not an asset-register row, so checkout
+writes no handover for it: it does the device page's Assign (`performLifecycle`,
+`expectedStatus: Spare`, so one taken meanwhile is refused and stays on the
+receipt) and adds it to the checklist link as a ticked Laptop/Desktop with its
+serial. A receipt of machines only has nothing a phone signature could land on,
+so it is signed on a checklist link.
 
 **"Who has it" is one line per PERSON.** `groupHolders` in
 `handover/availability.js` gathers the open handovers on an item by email:

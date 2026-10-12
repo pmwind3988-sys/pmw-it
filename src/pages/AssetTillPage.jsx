@@ -49,6 +49,13 @@ import {
   scanBack, addHandover, chooseHolder, setReturnQuantity, toReturns, itemCount as itemsBack, BACK_RESULT,
 } from '../features/assets/till/takeBack';
 import { tillSearch, quickKeys } from '../features/assets/till/tillSearch';
+import {
+  inStash, findInStash, searchStash, machineRow, machineTitle, machineSub,
+} from '../features/assets/till/stashMachines';
+import { useDevices } from '../features/devices/useDevices';
+import { performLifecycle } from '../features/devices/sharepoint/writeLifecycle';
+import { ACTIONS } from '../features/devices/lifecycle/planLifecycle';
+import { SPARE } from '../features/devices/lifecycle/status';
 import { createReadGate, guessKind } from '../features/assets/till/readGate';
 import { findScanTarget } from '../features/assets/handover/scanMatch';
 import TillCamera from '../features/assets/till/ui/TillCamera';
@@ -86,6 +93,7 @@ const PHASE = {
   delivery: 'Recording the delivery',
   signature: 'Saving the signature',
   link: 'Creating the checklist link',
+  machine: 'Giving out the machine',
   updating: 'Updating the register',
 };
 
@@ -135,6 +143,8 @@ export default function AssetTillPage() {
   const getToken = useSharePointToken();
   const { assets, error: assetsError, reload: reloadAssets } = useAssets();
   const { handovers, reload: reloadHandovers } = useHandovers();
+  // Spare machines in the IT Stash can be handed out too (`till/stashMachines.js`).
+  const { devices, reload: reloadDevices } = useDevices();
   const assetsById = useMemo(() => new Map(assets.map((asset) => [asset.id, asset])), [assets]);
   // Entity and department choices a checklist link carries for the employee.
   const directory = useOrgDirectory();
@@ -148,6 +158,8 @@ export default function AssetTillPage() {
   const [countBatch, setCountBatch, finishCount] = useStoredBatch(COUNT_KEY, newCount);
   const [basket, setBasket] = useState(() => newBasket());
   const [missesOut, setMissesOut] = useState([]);
+  // Machines from the IT Stash on the handover receipt, beside the basket.
+  const [machines, setMachines] = useState([]);
   const [terms, setTerms] = useState({ loan: false, dueChoice: '2w' });
   const [backLines, setBackLines] = useState([]);
   const [missesBack, setMissesBack] = useState([]);
@@ -180,7 +192,7 @@ export default function AssetTillPage() {
   // closed over.
   const live = useRef({});
   useEffect(() => {
-    live.current = { mode, batch, basket, backLines, assets, handovers };
+    live.current = { mode, batch, basket, backLines, assets, handovers, devices, machines };
   });
 
   useEffect(() => () => clearTimeout(flashTimer.current), []);
@@ -214,6 +226,15 @@ export default function AssetTillPage() {
     if (state.mode === 'out') {
       const out = scanOut(state.basket, raw, state.assets);
       if (out.result === OUT_RESULT.MISSING) {
+        // Not in the asset register, but it may be a machine in the IT Stash.
+        const machine = findInStash(state.devices, raw);
+        if (machine) {
+          if (state.machines.some((device) => device.id === machine.id)) { say('ask', 'Already on this receipt'); return; }
+          live.current = { ...state, machines: [...state.machines, machine] };
+          setMachines((list) => [...list, machine]);
+          say('ok', `Added from the IT Stash · ${machineTitle(machine)}`);
+          return;
+        }
         setMissesOut((list) => (list.some((miss) => miss.code === raw) ? list : [...list, { id: `${raw}-${Date.now()}`, code: String(raw).trim() }]));
         say('bad', 'Not in the register');
         return;
@@ -290,10 +311,16 @@ export default function AssetTillPage() {
 
   // ── Picks without a scan: search results, quick keys, the holder list ────
 
-  const results = useMemo(
-    () => tillSearch(mode, typed, { assets, handovers }),
-    [mode, typed, assets, handovers],
-  );
+  const results = useMemo(() => {
+    const found = tillSearch(mode, typed, { assets, handovers });
+    return mode === 'out' ? [...found, ...searchStash(devices, typed, machines)] : found;
+  }, [mode, typed, assets, handovers, devices, machines]);
+
+  const addMachine = (device) => {
+    if (machines.some((entry) => entry.id === device.id)) { say('ask', 'Already on this receipt'); return; }
+    setMachines((list) => [...list, device]);
+    say('ok', `Added from the IT Stash · ${machineTitle(device)}`);
+  };
 
   const pick = (result) => {
     setTyped('');
@@ -301,6 +328,8 @@ export default function AssetTillPage() {
       const out = addModel(batch, result.asset);
       setBatch(out.batch);
       say('ok', out.result === STOCK_RESULT.COUNTED ? `+1 · ${result.name}` : `Added · ${result.name}`);
+    } else if (result.kind === 'machine') {
+      addMachine(result.device);
     } else if (result.kind === 'asset') {
       const out = addAsset(basket, result.asset);
       if (out.result === OUT_RESULT.DUPLICATE) { say('ask', 'Already on this receipt'); return; }
@@ -336,6 +365,10 @@ export default function AssetTillPage() {
   };
 
   const keys = useMemo(() => quickKeys(assets, handovers), [assets, handovers]);
+  const stashLeft = useMemo(
+    () => inStash(devices).filter((device) => !machines.some((entry) => entry.id === device.id)),
+    [devices, machines],
+  );
   const outNow = useMemo(() => handovers
     .filter((row) => isOpen(row))
     .sort((a, b) => Number(isOverdue(b)) - Number(isOverdue(a)))
@@ -473,23 +506,58 @@ export default function AssetTillPage() {
     const token = (await getToken()).accessToken;
     const toSend = sendable(withTerms(basket, terms), refusals);
     // Signed on the checklist link instead: no phone signature now — theirs
-    // arrives on these rows when they sign.
-    const report = await commitHandover({
-      siteUrl: SHAREPOINT_SITE_URL, token, basket: toSend, issuedBy: who(), signature: formMode ? null : signature, onProgress: setProgress,
-    });
-    reloadAssets();
-    reloadHandovers();
+    // arrives on these rows when they sign. A receipt of stash machines only
+    // has no handover rows to write.
+    const report = toSend.lines.length
+      ? await commitHandover({
+        siteUrl: SHAREPOINT_SITE_URL, token, basket: toSend, issuedBy: who(), signature: formMode ? null : signature, onProgress: setProgress,
+      })
+      : { blocked: [], handoverIds: [] };
+    if (toSend.lines.length) {
+      reloadAssets();
+      reloadHandovers();
+    }
+
+    // Stash machines go to the person in the device list — the same move as
+    // "Assign" on the device page, refused if somebody took it meanwhile.
+    const given = [];
+    const stuck = [];
+    for (const device of machines) {
+      setProgress({ phase: 'machine' });
+      try {
+        await performLifecycle({
+          siteUrl: SHAREPOINT_SITE_URL,
+          token,
+          deviceId: device.id,
+          action: ACTIONS.ASSIGN,
+          input: {
+            owner: basket.person.name,
+            location: device.location,
+            note: `Handed out at the till${basket.person.email ? ` to ${basket.person.email}` : ''}`,
+          },
+          expectedStatus: SPARE,
+          recordedBy: who(),
+        });
+        given.push(device);
+      } catch (thrown) {
+        stuck.push({ device, reason: thrown.message || 'could not be saved' });
+      }
+    }
+    if (machines.length) reloadDevices();
 
     const blocked = new Set(report.blocked.map((entry) => entry.line.lineId));
     const sent = toSend.lines.filter((line) => !blocked.has(line.lineId));
     const due = withTerms(basket, terms).dueOn;
-    const checklist = formMode && sent.length
+    const checklist = formMode && (sent.length || given.length)
       ? await makeChecklistLink(token, {
         formMode,
         person: basket.person,
-        rows: sent.map((line) => ({
-          category: line.category, name: line.itemTitle, serial: serialOfLine(line), qty: line.quantity,
-        })),
+        rows: [
+          ...given.map(machineRow),
+          ...sent.map((line) => ({
+            category: line.category, name: line.itemTitle, serial: serialOfLine(line), qty: line.quantity,
+          })),
+        ],
         kind: 'issue',
         ids: report.handoverIds ?? [],
       })
@@ -506,15 +574,19 @@ export default function AssetTillPage() {
         { k: 'Terms', v: terms.loan ? (due ? `Loan · back by ${new Date(due).toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })}` : 'Loan · no date') : 'Theirs to keep' },
         { k: 'Signature', v: checklist?.url ? 'Waiting for the checklist' : (report.signed ? 'Signed' : (report.signatureFailed ? 'Did not upload' : 'Not signed')) },
       ],
-      rows: sent.map((line) => ({
-        id: line.lineId,
-        name: line.itemTitle,
-        sub: serialOfLine(line),
-        qty: line.quantity,
-      })),
-      total: sent.reduce((sum, line) => sum + line.quantity, 0),
+      rows: [
+        ...given.map((device) => ({ id: `machine:${device.id}`, name: machineTitle(device), sub: machineSub(device), qty: 1 })),
+        ...sent.map((line) => ({
+          id: line.lineId,
+          name: line.itemTitle,
+          sub: serialOfLine(line),
+          qty: line.quantity,
+        })),
+      ],
+      total: given.length + sent.reduce((sum, line) => sum + line.quantity, 0),
       warning: [
         blocked.size ? `${plural(blocked.size, 'line')} could not go out and are still on the receipt.` : '',
+        ...stuck.map(({ device, reason }) => `${machineTitle(device)} is still on the receipt: ${reason}`),
         checklist?.error ? `The handover is recorded, but the checklist link could not be made: ${checklist.error}` : '',
       ].filter(Boolean).join(' '),
       next: 'Next person',
@@ -525,6 +597,7 @@ export default function AssetTillPage() {
     // refused before checkout were left off on purpose and mean nothing to
     // the next person at the till.
     setBasket((current) => ({ ...current, lines: current.lines.filter((line) => blocked.has(line.lineId)) }));
+    setMachines(stuck.map(({ device }) => device));
     setMissesOut([]);
   });
 
@@ -581,7 +654,7 @@ export default function AssetTillPage() {
   });
 
   const nextJob = () => {
-    if (done?.mode === 'out' && !basket.lines.length) {
+    if (done?.mode === 'out' && !basket.lines.length && !machines.length) {
       setBasket(newBasket());
       setMissesOut([]);
     }
@@ -685,6 +758,15 @@ export default function AssetTillPage() {
   const rowsCount = draftRows(countBatch, setCountBatch, countHolds, 'count');
 
   const rowsOut = [
+    ...machines.map((device) => ({
+      id: `machine:${device.id}`,
+      badge: device.deviceType === 'Desktop' ? 'DT' : 'LT',
+      name: machineTitle(device),
+      sub: machineSub(device),
+      tone: 'ok',
+      qty: 1,
+      onRemove: () => setMachines((list) => list.filter((entry) => entry.id !== device.id)),
+    })),
     ...basket.lines.map((line) => {
       const reason = refusals.get(line.lineId);
       const countable = line.trackingMode !== TRACKED && !isUnitLine(line);
@@ -773,7 +855,7 @@ export default function AssetTillPage() {
     onCheckout = () => saveDrafts('count');
   } else if (mode === 'out') {
     rows = rowsOut;
-    total = itemsOut(basket, refusals);
+    total = itemsOut(basket, refusals) + machines.length;
     const left = refusals.size + missesOut.length;
     if (left) { note = `${plural(left, 'line')} can’t go out and will be left off`; noteBad = true; }
     cta = !total ? 'Scan what they are getting'
@@ -805,7 +887,7 @@ export default function AssetTillPage() {
   };
 
   const counts = {
-    in: itemsIn(batch), out: itemsOut(basket, refusals), back: itemsBack(backLines), count: itemsIn(countBatch),
+    in: itemsIn(batch), out: itemsOut(basket, refusals) + machines.length, back: itemsBack(backLines), count: itemsIn(countBatch),
   };
   const purchase = batch.purchase;
   const setPurchase = (field, value) => setBatch((current) => ({ ...current, purchase: { ...current.purchase, [field]: value } }));
@@ -928,6 +1010,24 @@ export default function AssetTillPage() {
                     );
                   })}
                 </div>
+              </section>
+            )}
+
+            {mode === 'out' && stashLeft.length > 0 && (
+              <section className="till-keys" aria-label="In the IT Stash">
+                <h2 className="till-kicker">In the IT Stash · {stashLeft.length}</h2>
+                <ul className="till-outnow">
+                  {stashLeft.slice(0, 6).map((device) => (
+                    <li key={device.id}>
+                      <span>
+                        <strong>{machineTitle(device)}</strong>
+                        <span>{device.serialNumber ? `S/N ${device.serialNumber}` : (device.deviceType || 'Machine')}</span>
+                      </span>
+                      <button type="button" className="till-chip" onClick={() => addMachine(device)}>Hand out</button>
+                    </li>
+                  ))}
+                </ul>
+                {stashLeft.length > 6 && <p className="till-foot-note">Type a model, name or serial to find the rest.</p>}
               </section>
             )}
 
@@ -1074,10 +1174,16 @@ export default function AssetTillPage() {
       {sheet === 'signhow' && basket.person && (
         <ChoiceSheet
           title={`How will ${firstName(basket.person.name)} sign?`}
-          lede="A checklist link is the employee's own signed record. Their signature is added to this handover when they sign it."
+          lede={machines.length
+            ? 'Machines from the IT Stash go to them in the device list. A checklist link is their signed record of the machine.'
+            : "A checklist link is the employee's own signed record. Their signature is added to this handover when they sign it."}
           onClose={() => setSheet(null)}
           options={[
-            { key: 'phone', title: 'Sign on this phone', body: 'Hand them the phone now.', onPick: () => setSheet('sign') },
+            // A phone signature lands on handover rows; a stash machine has
+            // none, so a receipt of machines only is signed on a checklist.
+            ...(itemsOut(basket, refusals) > 0
+              ? [{ key: 'phone', title: 'Sign on this phone', body: machines.length ? 'Hand them the phone now. The machine is not on what they sign — use a checklist link for that.' : 'Hand them the phone now.', onPick: () => setSheet('sign') }]
+              : []),
             { key: 'in', title: 'Checklist link · New joiner (IN)', body: 'Items ticked, serials filled in. They sign on the link.', onPick: () => { setSheet(null); handOver(IN); } },
             { key: 'request', title: 'Checklist link · Individual request', body: 'Items listed with quantities, serials filled in. They sign on the link.', onPick: () => { setSheet(null); handOver(INDIVIDUAL); } },
           ]}
@@ -1153,7 +1259,7 @@ export default function AssetTillPage() {
       {sheet === 'sign' && basket.person && (
         <SignStep
           person={basket.person}
-          count={total}
+          count={itemsOut(basket, refusals)}
           terms={terms.loan ? `On loan · ${DUE_CHOICES.find((c) => c.id === terms.dueChoice)?.label ?? ''}` : 'Theirs to keep'}
           rows={sendable(basket, refusals).lines.map((line) => ({
             id: line.lineId,

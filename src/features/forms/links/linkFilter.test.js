@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  filterLinks, countLinks, readFilter, fromTill, linkItems, linkSerials,
+  filterLinks, countLinks, readFilter, fromTill, linkMachines, linkItems, linkSerials,
   dayGroupLabel, linkTime, groupByDay, linkSteps, avatarTone,
 } from './linkFilter.js';
 import { LINK_STATUS } from './linkSchema.js';
@@ -61,7 +61,7 @@ const links = [
     formMode: OUT,
     created: at(2),
     expiresOn: tomorrow,
-    handovers: { kind: 'issue', ids: [] },
+    handovers: null,
   },
 ];
 const ids = (list) => list.map((link) => link.id);
@@ -87,7 +87,15 @@ describe('the shared-checklists filter', () => {
   it('keeps only links the till made, and only links it did not make', () => {
     expect(ids(filterLinks(links, { source: 'till' }, NOW))).toEqual([1, 2]);
     expect(ids(filterLinks(links, { source: 'share' }, NOW))).toEqual([3, 4, 5]);
-    expect(fromTill(links[4])).toBe(false);
+  });
+
+  it('counts a till link for stash machines alone, which has no handover rows', () => {
+    const machine = { id: 12, name: 'Dell Latitude 5420 (PMW-LT-02)', serial: 'ABC' };
+    const stashOnly = { ...links[0], handovers: { kind: 'issue', ids: [], machines: [machine] } };
+    expect(fromTill(stashOnly)).toBe(true);
+    expect(ids(filterLinks([stashOnly], { source: 'till' }, NOW))).toEqual([1]);
+    expect(linkMachines(stashOnly)).toEqual([machine]);
+    expect(linkMachines(links[0])).toEqual([]);
   });
 
   it('still honours the older till boolean', () => {

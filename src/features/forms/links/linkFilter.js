@@ -17,7 +17,14 @@ export const SHOW = ['all', 'waiting', 'signed', 'closed'];
 export const SOURCES = ['any', 'till', 'share'];
 export const KINDS = ['any', 'handout', 'return'];
 
-export const fromTill = (link) => Array.isArray(link?.handovers?.ids) && link.handovers.ids.length > 0;
+// Only the till writes `Handovers`. A receipt of stash machines alone has no
+// handover rows (`ids` empty) and is still the till's.
+export const fromTill = (link) => Boolean(link?.handovers?.kind);
+
+/** Stash machines a till link covers: [{ id, name, serial }]. */
+export const linkMachines = (link) => (Array.isArray(link?.handovers?.machines)
+  ? link.handovers.machines.filter((machine) => machine && machine.id != null)
+  : []);
 
 const STATES = {
   waiting: new Set(['open', 'busy']),

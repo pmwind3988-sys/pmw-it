@@ -15,7 +15,7 @@ import { modeLabel } from '../features/forms/checklistForm';
 import { linkState } from '../features/forms/links/linkRules';
 import { linkActions, endOfDay, dayOf } from '../features/forms/links/linkChanges';
 import {
-  filterLinks, countLinks, readFilter, fromTill, linkItems, linkSerials, linkSteps,
+  filterLinks, countLinks, readFilter, fromTill, linkMachines, linkItems, linkSerials, linkSteps,
   linkTime, groupByDay, dayGroupLabel, avatarTone,
 } from '../features/forms/links/linkFilter';
 import {
@@ -306,6 +306,8 @@ export default function ChecklistLinksPage() {
         return { label: 'View signed copy', onClick: () => openLink(link) };
       case 'edit':
         return { label: 'Edit', icon: Pencil, onClick: () => navigate(`/asset-checklist/links/${link.id}`) };
+      case 'change':
+        return { label: 'Change details', icon: Pencil, onClick: () => navigate(`/asset-checklist/share?link=${link.id}`) };
       case 'expiry':
         return { label: 'Change expiry', icon: Calendar, onClick: () => setPanel({ id: link.id, kind: 'expiry' }) };
       case 'expireNow':
@@ -527,7 +529,7 @@ export default function ChecklistLinksPage() {
           {state === 'signed' && (
             <p className="cl-strip cl-strip-good">
               Signed {when(link.signedOn, 'datetime12')}
-              {tillLink && ` · added to ${handoverCount} ${handoverWord} records`}
+              {tillLink && handoverCount > 0 && ` · added to ${handoverCount} ${handoverWord} records`}
             </p>
           )}
 
@@ -535,6 +537,19 @@ export default function ChecklistLinksPage() {
             <p className="cl-strip cl-strip-warn">
               Waiting for {firstName(link.employeeName)} · link works until {when(link.expiresOn)}
             </p>
+          )}
+
+          {linkMachines(link).length > 0 && (
+            <div className="cl-strip cl-strip-machine">
+              {linkMachines(link).map((machine) => (
+                <p key={machine.id}>
+                  {machine.name}{machine.serial ? ` · S/N ${machine.serial}` : ''}
+                  {' — '}{link.handovers?.kind === 'return' ? 'back in the IT Stash' : `with ${firstName(link.employeeName) || 'them'} on the device list`}
+                  {' · '}
+                  <button type="button" className="cl-link" onClick={() => navigate(`/devices/${machine.id}`)}>Open it</button>
+                </p>
+              ))}
+            </div>
           )}
 
           {link.editedBy && state === 'signed' && (

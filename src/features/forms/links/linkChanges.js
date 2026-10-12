@@ -1,5 +1,6 @@
 import { LINK_STATUS } from './linkSchema.js';
-import { linkState, cleanPreset, editableFields } from './linkRules.js';
+import { linkState, cleanPreset, editableFields, isBlankValue } from './linkRules.js';
+import { fieldsFor } from '../checklistForm.js';
 import { validateChecklist } from '../validate.js';
 import { toChecklistItem } from '../toChecklistItem.js';
 import { formatMYT } from '../../../utils/malaysiaTime.js';
@@ -12,7 +13,7 @@ import { formatMYT } from '../../../utils/malaysiaTime.js';
  */
 
 const ACTIONS = {
-  open: ['copy', 'open', 'expiry', 'expireNow', 'cancel', 'delete'],
+  open: ['copy', 'open', 'change', 'expiry', 'expireNow', 'cancel', 'delete'],
   // Somebody is submitting it this second. Changing it under them would make
   // their submission land on a link that no longer says what they saw.
   busy: ['open'],
@@ -121,4 +122,30 @@ export function planEdit(link, values, { by, at = Date.now() }) {
   }
 
   return { errors, values: clean, checklist, link: linkFields };
+}
+
+/**
+ * IT changing what a link pre-fills, and what the employee may change, before
+ * anybody has signed it. Same link, same code, same QR: nothing to resend.
+ * The form type stays: it decides which checklist the link makes.
+ *
+ * Only while it WAITS. Mid-signing, the employee's submission would land on a
+ * link that no longer says what they saw; once signed, it is "Edit" instead,
+ * which leaves a note on the record.
+ */
+export function planPresetChange(link, { values, editable = [] }, now = Date.now()) {
+  if (linkState(link, now) !== 'open') {
+    throw new Error('Only a link still waiting to be signed can be changed — reload to see it as it is now');
+  }
+  const preset = cleanPreset(values, link.options ?? null);
+  const shown = new Set(fieldsFor(link.formMode));
+  return {
+    preset,
+    fields: {
+      EmployeeName: String(preset.employeeName ?? '').trim(),
+      Preset: JSON.stringify(preset),
+      // A blank field is the employee's anyway; listing it would say nothing.
+      Editable: JSON.stringify(editable.filter((field) => shown.has(field) && !isBlankValue(field, preset[field]))),
+    },
+  };
 }

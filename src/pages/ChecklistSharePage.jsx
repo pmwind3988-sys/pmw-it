@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMsal } from '@azure/msal-react';
 import QRCode from 'qrcode';
 import AppShell from '../components/AppShell';
@@ -16,7 +16,10 @@ import { useOrgDirectory } from '../hooks/useOrgDirectory';
 import { snapshotOptions, withEntity } from '../features/forms/formOptions';
 import { FORM_MODES, emptyChecklist, modeLabel } from '../features/forms/checklistForm';
 import { isBlankValue } from '../features/forms/links/linkRules';
-import { createLink, draftLink, linkUrl } from '../features/forms/sharepoint/checklistLinks';
+import {
+  createLink, draftLink, linkUrl, getLink, changeWaitingLink,
+} from '../features/forms/sharepoint/checklistLinks';
+import { linkState } from '../features/forms/links/linkRules';
 
 const SHAREPOINT_SITE_URL =
   import.meta.env.VITE_SHAREPOINT_SITE_URL || 'https://pmwgroupcom.sharepoint.com/sites/IThelpdesk';
@@ -95,11 +98,21 @@ function CopyLink({ url }) {
 
 export default function ChecklistSharePage() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
   const { instance } = useMsal();
   const getToken = useSharePointToken();
   // HR's entities and departments. The link keeps a copy of them, because the
   // employee opening it cannot read HR's lists.
-  const options = snapshotOptions(useOrgDirectory());
+  const liveOptions = snapshotOptions(useOrgDirectory());
+
+  // `?link=<id>`: changing a link that is still waiting to be signed, in
+  // place — same code, same QR. It keeps the dropdown choices it was made
+  // with, because those are what the server checks the employee's answers
+  // against.
+  const changingId = params.get('link');
+  const [existing, setExisting] = useState(null);
+  const [loadFailure, setLoadFailure] = useState('');
+  const options = existing?.options ?? liveOptions;
 
   const [values, setValues] = useState(emptyChecklist);
   const [editable, setEditable] = useState([]);
@@ -110,8 +123,31 @@ export default function ChecklistSharePage() {
   const [qr, setQr] = useState('');
 
   useEffect(() => {
-    document.title = 'PMW IT — Share a checklist';
-  }, []);
+    document.title = changingId ? 'PMW IT — Change a checklist link' : 'PMW IT — Share a checklist';
+  }, [changingId]);
+
+  useEffect(() => {
+    if (!changingId) return undefined;
+    let live = true;
+    (async () => {
+      try {
+        const tokenRes = await getToken();
+        const link = await getLink({ siteUrl: SHAREPOINT_SITE_URL, token: tokenRes.accessToken, id: changingId });
+        if (!live) return;
+        if (!link) { setLoadFailure('That link is no longer on the list.'); return; }
+        if (linkState(link) !== 'open') {
+          setLoadFailure('That link is no longer waiting to be signed, so it cannot be changed here.');
+          return;
+        }
+        setExisting(link);
+        setValues({ ...emptyChecklist(), ...link.preset, formMode: link.formMode });
+        setEditable(link.editable ?? []);
+      } catch (thrown) {
+        if (live) setLoadFailure(thrown.message || 'The link could not be loaded');
+      }
+    })();
+    return () => { live = false; };
+  }, [changingId, getToken]);
 
   const url = created ? linkUrl(window.location.origin, created.code) : '';
 
@@ -163,6 +199,26 @@ export default function ChecklistSharePage() {
     }
   };
 
+  const saveChanges = async () => {
+    setBusy(true);
+    setFailure('');
+    try {
+      const tokenRes = await getToken();
+      const link = await changeWaitingLink({
+        siteUrl: SHAREPOINT_SITE_URL,
+        token: tokenRes.accessToken,
+        id: existing.id,
+        values,
+        editable,
+      });
+      setCreated({ ...link, changed: true });
+    } catch (thrown) {
+      setFailure(thrown.message || 'The changes could not be saved');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const startAgain = () => {
     setValues(emptyChecklist());
     setEditable([]);
@@ -178,12 +234,16 @@ export default function ChecklistSharePage() {
 
   if (created) {
     return (
-      <AppShell title="Checklist link ready" subtitle={`${modeLabel(created.formMode)} — ${created.preset.employeeName || 'no name set'}`} actions={listButton}>
+      <AppShell title={created.changed ? 'Checklist link updated' : 'Checklist link ready'} subtitle={`${modeLabel(created.formMode)} — ${created.preset.employeeName || 'no name set'}`} actions={listButton}>
         <Card className="ff-panel cl-ready">
           <div className="cl-ready-head">
             <Link2 size={22} />
             <div>
-              <h2 className="ff-panel-title">Copy this link and send it to the employee</h2>
+              <h2 className="ff-panel-title">
+                {created.changed
+                  ? 'Saved. The link and QR code are the same — anyone opening it now sees the changes'
+                  : 'Copy this link and send it to the employee'}
+              </h2>
               <p className="ff-help">
                 Anyone with the link can open it, so send it only to them. It works until{' '}
                 {new Date(created.expiresOn).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
@@ -203,28 +263,40 @@ export default function ChecklistSharePage() {
 
           <div className="ff-actions">
             <Button variant="ghost" onClick={() => window.open(url, '_blank', 'noopener')}>Open it</Button>
-            <Button icon={Plus} onClick={startAgain}>Share another</Button>
+            {created.changed
+              ? <Button icon={ClipboardList} onClick={() => navigate('/asset-checklist/links')}>Back to shared checklists</Button>
+              : <Button icon={Plus} onClick={startAgain}>Share another</Button>}
           </div>
         </Card>
       </AppShell>
     );
   }
 
+  if (changingId && !existing) {
+    return (
+      <AppShell title="Change a checklist link" subtitle="Loading the link" actions={listButton}>
+        {loadFailure ? <ErrorBanner message={loadFailure} /> : <Card className="ff-panel"><p className="ff-help">Loading…</p></Card>}
+      </AppShell>
+    );
+  }
+
   return (
     <AppShell
-      title="Share a checklist"
-      subtitle="Fill in what you know, then copy a link for the employee to complete and sign"
+      title={existing ? 'Change a checklist link' : 'Share a checklist'}
+      subtitle={existing
+        ? 'Not signed yet. Change what it pre-fills and what the employee may edit — the link and QR stay the same'
+        : 'Fill in what you know, then copy a link for the employee to complete and sign'}
       actions={listButton}
     >
-      {failure && <ErrorBanner message={failure} onRetry={values.formMode ? create : undefined} />}
+      {failure && <ErrorBanner message={failure} onRetry={existing ? saveChanges : (values.formMode ? create : undefined)} />}
 
       <Card className="ff-panel">
-        <Field label="Form Type" required help="The employee cannot change this.">
+        <Field label="Form Type" required help={existing ? 'Fixed once the link is made. For another type, share a new link.' : 'The employee cannot change this.'}>
           <RadioCards
             name="formMode"
             value={values.formMode}
-            onChange={update('formMode')}
-            options={FORM_MODES}
+            onChange={existing ? () => {} : update('formMode')}
+            options={existing ? FORM_MODES.filter((mode) => mode.value === existing.formMode) : FORM_MODES}
             icons={MODE_ICONS}
           />
         </Field>
@@ -246,6 +318,7 @@ export default function ChecklistSharePage() {
               )}
             />
 
+            {!existing && (
             <div className="ff-grid">
               <Field label="Link works for" htmlFor="expiry" help="After this it stops opening, unless it was already signed.">
                 <SelectInput
@@ -257,11 +330,18 @@ export default function ChecklistSharePage() {
                 />
               </Field>
             </div>
+            )}
 
             <div className="ff-wizard-foot">
-              <Button icon={Link2} onClick={create} disabled={busy}>
-                {busy ? 'Creating link…' : 'Create link'}
-              </Button>
+              {existing ? (
+                <Button icon={Check} onClick={saveChanges} loading={busy}>
+                  {busy ? 'Saving…' : 'Save changes'}
+                </Button>
+              ) : (
+                <Button icon={Link2} onClick={create} disabled={busy}>
+                  {busy ? 'Creating link…' : 'Create link'}
+                </Button>
+              )}
             </div>
           </>
         )}

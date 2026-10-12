@@ -615,7 +615,10 @@ so it is signed on a checklist link. Take back is the reverse: a machine In use
 or In repair, scanned, typed or found by its owner's name, goes on the return
 receipt and checkout does the device page's To stash; an OUT checklist can list
 it. A machine's own page links to the till for both (`?machine=<id>` puts it on
-the receipt once the device list loads).
+the receipt once the device list loads). The link records the machines it covers
+in `handovers.machines` so its detail panel can open each one, and a till link
+is recognised by `handovers.kind` (`fromTill`), not by having handover ids --
+a receipt of machines alone has none.
 
 **"Who has it" is one line per PERSON.** `groupHolders` in
 `handover/availability.js` gathers the open handovers on an item by email:
@@ -805,6 +808,12 @@ change writes; `checklistLinks.js` carries it out as the signed-in user.
   so a half-finished delete leaves something to press again. The dialog
   warns about the record whenever one EXISTS (`checklistId`), not by state:
   a reopened or expired link can still have one.
+- *Change details* (waiting links only) opens the share page at
+  `?link=<id>` with the link's pre-filled values and "Employee can edit"
+  switches, and saves them back onto the SAME link -- code, QR and dropdown
+  choices unchanged, form type fixed (`planPresetChange`,
+  `changeWaitingLink`, which re-reads the link and refuses one signed,
+  cancelled, expired or mid-signing since the page loaded).
 - *Expire now* is a new end date of now, so a link expired by mistake is one
   "Change expiry" away from working.
 

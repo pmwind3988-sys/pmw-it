@@ -8,7 +8,9 @@ import {
   LINKS_LIST_NAME, LINK_COLUMNS, LINK_VIEWS, LINK_STATUS, toLinkItem, fromLinkItem,
 } from '../links/linkSchema.js';
 import { newLinkCode } from '../links/linkCode.js';
-import { expiryFields, reopenFields, planEdit } from '../links/linkChanges.js';
+import {
+  expiryFields, reopenFields, planEdit, planPresetChange,
+} from '../links/linkChanges.js';
 import { fileApiPath } from '../../assets/sharepoint/fileUrl.js';
 import { cleanPreset, isBlankValue } from '../links/linkRules.js';
 import { ENTITIES, fieldsFor } from '../checklistForm.js';
@@ -160,6 +162,21 @@ export function setLinkExpiry({ siteUrl, token, id, expiresAt }) {
   return updateLinkRow({
     siteUrl, token, id, fields: expiryFields(expiresAt), what: 'change when the link expires',
   });
+}
+
+/**
+ * A waiting link's pre-filled values and locks, changed in place: same code,
+ * same QR. Re-read first, so a link signed or cancelled since the page loaded
+ * is refused rather than overwritten.
+ */
+export async function changeWaitingLink({
+  siteUrl, token, id, values, editable,
+}) {
+  const link = await getLink({ siteUrl, token, id });
+  if (!link) throw new Error('That link is no longer on the list');
+  const plan = planPresetChange(link, { values, editable });
+  await updateLinkRow({ siteUrl, token, id, fields: plan.fields, what: 'save the changes to the link' });
+  return { ...link, preset: plan.preset, editable: JSON.parse(plan.fields.Editable) };
 }
 
 /** Back to waiting. A signed record and its signature stay until signed again. */

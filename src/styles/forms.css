@@ -872,6 +872,12 @@
 }
 .cl-strip-good { background: var(--it-good-wash); color: color-mix(in srgb, var(--it-good) 55%, var(--text-primary)); }
 .cl-strip-warn { background: var(--it-accent-wash); color: color-mix(in srgb, var(--it-accent) 45%, var(--text-primary)); }
+.cl-strip-machine { background: var(--surface-2, var(--it-accent-wash)); color: var(--text-primary); }
+.cl-strip-machine p { margin: 0; }
+.cl-link {
+  padding: 0; border: 0; background: none; font: inherit; font-weight: 600;
+  color: inherit; text-decoration: underline; cursor: pointer;
+}
 .cl-edited { margin: 0; font-size: 13px; color: color-mix(in srgb, var(--it-accent) 45%, var(--text-primary)); }
 
 .cl-dactions { position: relative; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }

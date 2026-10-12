@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { IN, INDIVIDUAL } from '../checklistForm.js';
 import { LINK_STATUS, fromLinkItem, toLinkItem } from './linkSchema.js';
 import {
-  linkActions, planEdit, reopenFields, expiryFields, editNote, isReopened, endOfDay, dayOf,
+  linkActions, planEdit, reopenFields, expiryFields, editNote, isReopened, endOfDay, dayOf, planPresetChange,
 } from './linkChanges.js';
 
 const NOW = Date.parse('2026-10-05T04:00:00Z');
@@ -51,8 +51,8 @@ const signed = (overrides = {}) => link({
 });
 
 describe('what IT can do with a link', () => {
-  it('offers expiry, cancel and delete while it waits', () => {
-    expect(linkActions(link(), NOW)).toEqual(['copy', 'open', 'expiry', 'expireNow', 'cancel', 'delete']);
+  it('offers change, expiry, cancel and delete while it waits', () => {
+    expect(linkActions(link(), NOW)).toEqual(['copy', 'open', 'change', 'expiry', 'expireNow', 'cancel', 'delete']);
   });
 
   it('offers edit, reopen and delete once signed', () => {
@@ -181,5 +181,36 @@ describe('the new link columns', () => {
     expect(back.editedBy).toBe('IT Desk');
     expect(back.editedOn).toBe('2026-10-05T04:00:00Z');
     expect(back.originalSubmitted).toEqual(signedValues);
+  });
+});
+
+describe('changing a link before it is signed', () => {
+  it('rewrites the pre-filled values and the locks on the same link', () => {
+    const { fields, preset } = planPresetChange(link(), {
+      values: { employeeName: ' Amir Hakim ', checkedItems: ['Laptop', 'Mouse'], serialNumbers: 'SN-1\nSN-2' },
+      editable: ['employeeName', 'serialNumbers'],
+    }, NOW);
+    expect(preset.checkedItems).toEqual(['Laptop', 'Mouse']);
+    expect(fields.EmployeeName).toBe('Amir Hakim');
+    expect(JSON.parse(fields.Preset).serialNumbers).toBe('SN-1\nSN-2');
+    expect(JSON.parse(fields.Editable)).toEqual(['employeeName', 'serialNumbers']);
+    expect(fields).not.toHaveProperty('FormMode');
+  });
+
+  it('does not list a blank field, or one this form type does not show, as editable', () => {
+    const { fields } = planPresetChange(link(), {
+      values: { employeeName: 'Amir' },
+      editable: ['employeeNo', 'items', 'employeeName'],
+    }, NOW);
+    expect(JSON.parse(fields.Editable)).toEqual(['employeeName']);
+  });
+
+  it('refuses once signed, expired, cancelled or mid-signing', () => {
+    const values = { values: {}, editable: [] };
+    expect(() => planPresetChange(signed(), values, NOW)).toThrow(/waiting/);
+    expect(() => planPresetChange(link({ expiresOn: new Date(NOW - 1).toISOString() }), values, NOW)).toThrow();
+    expect(() => planPresetChange(link({ status: LINK_STATUS.CANCELLED }), values, NOW)).toThrow();
+    const busy = link({ status: LINK_STATUS.SIGNING, modified: new Date(NOW - 1000).toISOString() });
+    expect(() => planPresetChange(busy, values, NOW)).toThrow();
   });
 });

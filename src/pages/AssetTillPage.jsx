@@ -511,13 +511,23 @@ export default function AssetTillPage() {
    * signature lands on them. The handover is already recorded either way; a
    * link that cannot be made is reported, never a reason to undo it.
    */
-  const makeChecklistLink = async (token, { formMode, person, rows, kind, ids }) => {
+  const makeChecklistLink = async (token, {
+    formMode, person, rows, kind, ids, machines: onLink = [],
+  }) => {
     setProgress({ phase: 'link' });
     try {
       const values = checklistFromTill({ formMode, person, rows });
       const link = {
         ...draftLink({ formMode, values, editable: ['position'], options: linkOptions, expiresInDays: 14 }),
-        handovers: { kind, ids },
+        // The machines are kept on the link so it can say where each went
+        // and open it; only `ids` get the employee's signature.
+        handovers: {
+          kind,
+          ids,
+          ...(onLink.length ? {
+            machines: onLink.map((device) => ({ id: device.id, name: machineTitle(device), serial: device.serialNumber || '' })),
+          } : {}),
+        },
       };
       const account = instance.getActiveAccount();
       const created = await createLink({
@@ -591,6 +601,7 @@ export default function AssetTillPage() {
         ],
         kind: 'issue',
         ids: report.handoverIds ?? [],
+        machines: given,
       })
       : null;
     signalDone();
@@ -621,7 +632,11 @@ export default function AssetTillPage() {
         checklist?.error ? `The handover is recorded, but the checklist link could not be made: ${checklist.error}` : '',
       ].filter(Boolean).join(' '),
       next: 'Next person',
-      link: { to: `/assets/people/${encodeURIComponent(basket.person.email)}`, label: `Open ${firstName(basket.person.name)}’s page` },
+      // A machine went to them in the DEVICE list, not the asset register:
+      // with nothing else handed over, that is where to look for it.
+      link: !sent.length && given.length === 1
+        ? { to: `/devices/${given[0].id}`, label: `Open ${machineTitle(given[0])}` }
+        : { to: `/assets/people/${encodeURIComponent(basket.person.email)}`, label: `Open ${firstName(basket.person.name)}’s page` },
     });
     if (!report.signatureFailed) setSignature(null);
     // Only what the write itself refused stays, to be pressed again. Lines
@@ -687,6 +702,7 @@ export default function AssetTillPage() {
         })],
         kind: 'return',
         ids: report.returnedIds ?? [],
+        machines: stashed,
       })
       : null;
     signalDone();

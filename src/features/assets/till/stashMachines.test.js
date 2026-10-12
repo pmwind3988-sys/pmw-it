@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  inStash, findInStash, searchStash, machineRow, machineTitle,
+  inStash, findInStash, searchStash, machineRow, machineTitle, machineSub,
+  outOfStash, findOutOfStash, searchOutOfStash,
 } from './stashMachines.js';
 import { checklistFromTill } from './checklistFromTill.js';
 import { IN } from '../../forms/checklistForm.js';
@@ -8,7 +9,7 @@ import { IN } from '../../forms/checklistForm.js';
 const devices = [
   { id: 1, computerName: 'PMW-LT-02', computerModel: 'Dell Latitude 5420', serialNumber: 'ABC123', deviceType: 'Laptop', status: 'Spare' },
   { id: 2, computerName: 'PMW-DT-01', computerModel: 'HP ProDesk 400', serialNumber: 'DT999', deviceType: 'Desktop', status: 'Spare' },
-  { id: 3, computerName: 'PMW-LT-01', computerModel: 'Dell Latitude 5420', serialNumber: 'XYZ', deviceType: 'Laptop', status: 'In use' },
+  { id: 3, computerName: 'PMW-LT-01', computerModel: 'Dell Latitude 5420', serialNumber: 'XYZ', deviceType: 'Laptop', status: 'In use', owner: 'Aina Rahman' },
   { id: 4, computerName: 'PMW-LT-03', computerModel: 'Lenovo T14', serialNumber: 'L14', deviceType: 'Laptop', status: 'Retired' },
   { id: 5, computerName: 'OLD', deviceType: 'Laptop' },
 ];
@@ -46,5 +47,25 @@ describe('the IT Stash at the till', () => {
     const values = checklistFromTill({ formMode: IN, rows: [row] });
     expect(values.otherRemarks).toContain('X1 · S/N S1');
     expect(machineTitle({})).toBe('Machine');
+  });
+});
+
+describe('taking a machine back to the stash', () => {
+  it('offers machines somebody has, never spare or retired ones', () => {
+    // A blank status reads as In use.
+    expect(outOfStash(devices).map((d) => d.id)).toEqual([5, 3]);
+  });
+
+  it('finds one by serial or name, once', () => {
+    expect(findOutOfStash(devices, 'xyz')?.id).toBe(3);
+    expect(findOutOfStash(devices, 'ABC123')).toBeNull();
+    expect(findOutOfStash(devices, 'XYZ', [devices[2]])).toBeNull();
+  });
+
+  it('finds one by who has it, and says so', () => {
+    const [hit] = searchOutOfStash(devices, 'aina');
+    expect(hit.device.id).toBe(3);
+    expect(hit.sub).toBe('S/N XYZ · With Aina Rahman');
+    expect(machineSub(devices[0])).toBe('S/N ABC123 · IT Stash');
   });
 });

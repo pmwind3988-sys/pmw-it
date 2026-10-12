@@ -611,7 +611,11 @@ writes no handover for it: it does the device page's Assign (`performLifecycle`,
 `expectedStatus: Spare`, so one taken meanwhile is refused and stays on the
 receipt) and adds it to the checklist link as a ticked Laptop/Desktop with its
 serial. A receipt of machines only has nothing a phone signature could land on,
-so it is signed on a checklist link.
+so it is signed on a checklist link. Take back is the reverse: a machine In use
+or In repair, scanned, typed or found by its owner's name, goes on the return
+receipt and checkout does the device page's To stash; an OUT checklist can list
+it. A machine's own page links to the till for both (`?machine=<id>` puts it on
+the receipt once the device list loads).
 
 **"Who has it" is one line per PERSON.** `groupHolders` in
 `handover/availability.js` gathers the open handovers on an item by email:

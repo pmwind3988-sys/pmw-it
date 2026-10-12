@@ -50,12 +50,12 @@ import {
 } from '../features/assets/till/takeBack';
 import { tillSearch, quickKeys } from '../features/assets/till/tillSearch';
 import {
-  inStash, findInStash, searchStash, machineRow, machineTitle, machineSub,
+  inStash, findInStash, searchStash, findOutOfStash, searchOutOfStash, machineRow, machineTitle, machineSub,
 } from '../features/assets/till/stashMachines';
 import { useDevices } from '../features/devices/useDevices';
 import { performLifecycle } from '../features/devices/sharepoint/writeLifecycle';
 import { ACTIONS } from '../features/devices/lifecycle/planLifecycle';
-import { SPARE } from '../features/devices/lifecycle/status';
+import { SPARE, statusOf, inFleet } from '../features/devices/lifecycle/status';
 import { createReadGate, guessKind } from '../features/assets/till/readGate';
 import { findScanTarget } from '../features/assets/handover/scanMatch';
 import TillCamera from '../features/assets/till/ui/TillCamera';
@@ -93,7 +93,7 @@ const PHASE = {
   delivery: 'Recording the delivery',
   signature: 'Saving the signature',
   link: 'Creating the checklist link',
-  machine: 'Giving out the machine',
+  machine: 'Updating the device list',
   updating: 'Updating the register',
 };
 
@@ -163,6 +163,19 @@ export default function AssetTillPage() {
   const [terms, setTerms] = useState({ loan: false, dueChoice: '2w' });
   const [backLines, setBackLines] = useState([]);
   const [missesBack, setMissesBack] = useState([]);
+  // Machines somebody had, coming back to the IT Stash.
+  const [machinesBack, setMachinesBack] = useState([]);
+
+  // `?machine=<id>`: opened from a machine's own page, which puts it on the
+  // receipt as soon as the device list has loaded. Adjusted during render,
+  // once, rather than from an effect.
+  const [wantedMachine, setWantedMachine] = useState(() => params.get('machine'));
+  if (wantedMachine && devices.length) {
+    setWantedMachine(null);
+    const device = devices.find((entry) => String(entry.id) === wantedMachine);
+    if (device && mode === 'out' && statusOf(device) === SPARE) setMachines((list) => (list.some((entry) => entry.id === device.id) ? list : [...list, device]));
+    if (device && mode === 'back' && inFleet(device)) setMachinesBack((list) => (list.some((entry) => entry.id === device.id) ? list : [...list, device]));
+  }
   const [condition, setCondition] = useState('Good');
 
   const [typed, setTyped] = useState('');
@@ -192,7 +205,7 @@ export default function AssetTillPage() {
   // closed over.
   const live = useRef({});
   useEffect(() => {
-    live.current = { mode, batch, basket, backLines, assets, handovers, devices, machines };
+    live.current = { mode, batch, basket, backLines, assets, handovers, devices, machines, machinesBack };
   });
 
   useEffect(() => () => clearTimeout(flashTimer.current), []);
@@ -249,6 +262,17 @@ export default function AssetTillPage() {
     }
 
     const out = scanBack(state.backLines, raw, state.assets, state.handovers);
+    if (out.result === BACK_RESULT.MISSING) {
+      // Not in the asset register, but it may be a machine somebody has.
+      const machine = findOutOfStash(state.devices, raw);
+      if (machine) {
+        if (state.machinesBack.some((device) => device.id === machine.id)) { say('ask', 'Already on this receipt'); return; }
+        live.current = { ...state, machinesBack: [...state.machinesBack, machine] };
+        setMachinesBack((list) => [...list, machine]);
+        say('ok', `Back to the IT Stash · ${machineTitle(machine)}`);
+        return;
+      }
+    }
     if (out.result === BACK_RESULT.MISSING || out.result === BACK_RESULT.NOT_OUT) {
       const reason = out.result === BACK_RESULT.MISSING ? 'Not in the register' : 'Not out with anyone — it is in stock';
       setMissesBack((list) => [...list, { id: `${raw}-${Date.now()}`, code: String(raw).trim(), name: out.asset?.title, reason }]);
@@ -313,13 +337,20 @@ export default function AssetTillPage() {
 
   const results = useMemo(() => {
     const found = tillSearch(mode, typed, { assets, handovers });
-    return mode === 'out' ? [...found, ...searchStash(devices, typed, machines)] : found;
-  }, [mode, typed, assets, handovers, devices, machines]);
+    if (mode === 'out') return [...found, ...searchStash(devices, typed, machines)];
+    if (mode === 'back') return [...found, ...searchOutOfStash(devices, typed, machinesBack)];
+    return found;
+  }, [mode, typed, assets, handovers, devices, machines, machinesBack]);
 
   const addMachine = (device) => {
     if (machines.some((entry) => entry.id === device.id)) { say('ask', 'Already on this receipt'); return; }
     setMachines((list) => [...list, device]);
     say('ok', `Added from the IT Stash · ${machineTitle(device)}`);
+  };
+  const addMachineBack = (device) => {
+    if (machinesBack.some((entry) => entry.id === device.id)) { say('ask', 'Already on this receipt'); return; }
+    setMachinesBack((list) => [...list, device]);
+    say('ok', `Back to the IT Stash · ${machineTitle(device)}`);
   };
 
   const pick = (result) => {
@@ -329,7 +360,7 @@ export default function AssetTillPage() {
       setBatch(out.batch);
       say('ok', out.result === STOCK_RESULT.COUNTED ? `+1 · ${result.name}` : `Added · ${result.name}`);
     } else if (result.kind === 'machine') {
-      addMachine(result.device);
+      if (mode === 'back') addMachineBack(result.device); else addMachine(result.device);
     } else if (result.kind === 'asset') {
       const out = addAsset(basket, result.asset);
       if (out.result === OUT_RESULT.DUPLICATE) { say('ask', 'Already on this receipt'); return; }
@@ -604,19 +635,47 @@ export default function AssetTillPage() {
   const recordReturn = (withLink = false) => run(async () => {
     const token = (await getToken()).accessToken;
     const returns = toReturns(backLines, condition);
-    const report = await commitReturn({
-      siteUrl: SHAREPOINT_SITE_URL, token, returns, returnedBy: who(), signature: null, onProgress: setProgress,
-    });
-    reloadAssets();
-    reloadHandovers();
+    const report = returns.length
+      ? await commitReturn({
+        siteUrl: SHAREPOINT_SITE_URL, token, returns, returnedBy: who(), signature: null, onProgress: setProgress,
+      })
+      : { blocked: [], returnedIds: [] };
+    if (returns.length) {
+      reloadAssets();
+      reloadHandovers();
+    }
+
+    // Machines go back to the IT Stash in the device list -- the device
+    // page's "To stash", which ends the owner's stint. Refused if somebody
+    // moved it meanwhile.
+    const stashed = [];
+    const stuck = [];
+    for (const device of machinesBack) {
+      setProgress({ phase: 'machine' });
+      try {
+        await performLifecycle({
+          siteUrl: SHAREPOINT_SITE_URL,
+          token,
+          deviceId: device.id,
+          action: ACTIONS.TO_STASH,
+          input: { note: `Taken back at the till · ${condition}` },
+          expectedStatus: statusOf(device),
+          recordedBy: who(),
+        });
+        stashed.push(device);
+      } catch (thrown) {
+        stuck.push({ device, reason: thrown.message || 'could not be saved' });
+      }
+    }
+    if (machinesBack.length) reloadDevices();
 
     const blocked = new Set(report.blocked.map((entry) => entry.entry.handoverId));
     const sent = backLines.filter((line) => line.handoverId != null && !blocked.has(line.handoverId));
-    const checklist = withLink && sent.length
+    const checklist = withLink && (sent.length || stashed.length)
       ? await makeChecklistLink(token, {
         formMode: OUT,
-        person: { name: sent[0].from, title: '' },
-        rows: sent.map((line) => {
+        person: { name: sent[0]?.from || stashed[0]?.owner || '', title: '' },
+        rows: [...stashed.map(machineRow), ...sent.map((line) => {
           const row = handovers.find((entry) => entry.id === line.handoverId);
           const asset = assets.find((entry) => entry.assetKey === line.assetKey);
           return {
@@ -625,7 +684,7 @@ export default function AssetTillPage() {
             serial: row?.serialNumber || (asset?.trackingMode === TRACKED ? asset.serialNumber : '') || '',
             qty: line.quantity,
           };
-        }),
+        })],
         kind: 'return',
         ids: report.returnedIds ?? [],
       })
@@ -637,19 +696,24 @@ export default function AssetTillPage() {
       title: 'Return recorded',
       when: stamp(),
       meta: [
-        { k: 'From', v: [...new Set(sent.map((line) => line.from))].join(', ') || '—' },
+        { k: 'From', v: [...new Set([...stashed.map((device) => device.owner || 'Unknown owner'), ...sent.map((line) => line.from)])].join(', ') || '—' },
         { k: 'Condition', v: condition },
       ],
-      rows: sent.map((line) => ({ id: line.lineId, name: line.name, sub: `From ${line.from}`, qty: line.quantity })),
-      total: sent.reduce((sum, line) => sum + line.quantity, 0),
+      rows: [
+        ...stashed.map((device) => ({ id: `machine:${device.id}`, name: machineTitle(device), sub: `From ${device.owner || 'unknown owner'} · to the IT Stash`, qty: 1 })),
+        ...sent.map((line) => ({ id: line.lineId, name: line.name, sub: `From ${line.from}`, qty: line.quantity })),
+      ],
+      total: stashed.length + sent.reduce((sum, line) => sum + line.quantity, 0),
       warning: [
         blocked.size ? `${plural(blocked.size, 'line')} could not be recorded and are still on the receipt.` : '',
+        ...stuck.map(({ device, reason }) => `${machineTitle(device)} is still on the receipt: ${reason}`),
         checklist?.error ? `The return is recorded, but the checklist link could not be made: ${checklist.error}` : '',
       ].filter(Boolean).join(' '),
       next: 'Next return',
       link: { to: '/assets/people', label: 'Open who has what' },
     });
     setBackLines((current) => current.filter((line) => line.handoverId == null || blocked.has(line.handoverId)));
+    setMachinesBack(stuck.map(({ device }) => device));
     setMissesBack([]);
   });
 
@@ -794,6 +858,15 @@ export default function AssetTillPage() {
   ];
 
   const rowsBack = [
+    ...machinesBack.map((device) => ({
+      id: `machine:${device.id}`,
+      badge: '↩',
+      name: machineTitle(device),
+      sub: [device.serialNumber && `S/N ${device.serialNumber}`, `From ${device.owner || 'unknown owner'} · to the IT Stash`].filter(Boolean).join(' · '),
+      tone: 'ok',
+      qty: 1,
+      onRemove: () => setMachinesBack((list) => list.filter((entry) => entry.id !== device.id)),
+    })),
     ...backLines.map((line) => ({
       id: line.lineId,
       badge: line.handoverId ? '↩' : '?',
@@ -830,7 +903,14 @@ export default function AssetTillPage() {
 
   // A checklist is one employee's, so an OUT link is offered only when every
   // returned line came from the same person.
-  const oneHolder = new Set(backLines.filter((line) => line.handoverId != null).map((line) => line.fromEmail || line.from)).size === 1;
+  // A machine knows its owner only by name, so with machines on the receipt
+  // the holders are compared by name.
+  const oneHolder = (machinesBack.length
+    ? new Set([
+      ...backLines.filter((line) => line.handoverId != null).map((line) => String(line.from).trim().toLowerCase()),
+      ...machinesBack.map((device) => String(device.owner ?? '').trim().toLowerCase()),
+    ])
+    : new Set(backLines.filter((line) => line.handoverId != null).map((line) => line.fromEmail || line.from))).size === 1;
 
   let rows; let total; let note = ''; let noteBad = false; let cta; let ctaOk; let onCheckout;
   if (mode === 'in') {
@@ -865,7 +945,7 @@ export default function AssetTillPage() {
     onCheckout = () => setSheet(basket.person ? 'signhow' : 'person');
   } else {
     rows = rowsBack;
-    total = itemsBack(backLines);
+    total = itemsBack(backLines) + machinesBack.length;
     const asking = backLines.filter((line) => !line.handoverId).length;
     if (asking) { note = `Say whose ${asking === 1 ? 'it is' : 'they are'} on ${plural(asking, 'line')}`; noteBad = true; }
     cta = total ? `Record return of ${total}` : 'Scan what came back';
@@ -887,7 +967,7 @@ export default function AssetTillPage() {
   };
 
   const counts = {
-    in: itemsIn(batch), out: itemsOut(basket, refusals) + machines.length, back: itemsBack(backLines), count: itemsIn(countBatch),
+    in: itemsIn(batch), out: itemsOut(basket, refusals) + machines.length, back: itemsBack(backLines) + machinesBack.length, count: itemsIn(countBatch),
   };
   const purchase = batch.purchase;
   const setPurchase = (field, value) => setBatch((current) => ({ ...current, purchase: { ...current.purchase, [field]: value } }));

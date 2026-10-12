@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Button from '../../../components/ui/Button';
 import AssignDialog from './AssignDialog';
 import { ACTIONS, actionsFor } from '../lifecycle/planLifecycle';
+import { statusOf, inFleet, SPARE } from '../lifecycle/status';
 import { useConfirm } from '../../../components/ui/useConfirm';
 
 const LABEL = {
@@ -21,6 +23,9 @@ export default function LifecycleActions({
   // Which button started the work, so only THAT one spins while `busy`.
   const [pressed, setPressed] = useState(null);
   const { ask, dialog: confirm } = useConfirm();
+  const navigate = useNavigate();
+  // The till does the same move AND makes the checklist the employee signs.
+  const tillMode = statusOf(device) === SPARE ? 'out' : (inFleet(device) ? 'back' : null);
 
   const press = async (action) => {
     if (action === ACTIONS.CHANGE_OWNER || action === ACTIONS.ASSIGN) {
@@ -51,6 +56,12 @@ export default function LifecycleActions({
           {LABEL[action]}
         </Button>
       ))}
+      {tillMode && device.id != null && (
+        <Button variant="secondary" size="sm" disabled={busy}
+          onClick={() => navigate(`/assets/till?mode=${tillMode}&machine=${encodeURIComponent(device.id)}`)}>
+          {tillMode === 'out' ? 'Hand out on a checklist' : 'Take back at the till'}
+        </Button>
+      )}
       {dialog && (
         <AssignDialog
           title={dialog === ACTIONS.ASSIGN ? `Bring back ${device.computerName}` : `Change owner of ${device.computerName}`}

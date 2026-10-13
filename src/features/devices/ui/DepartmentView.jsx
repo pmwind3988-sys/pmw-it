@@ -1,14 +1,13 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import MachineCard from './MachineCard';
-import PartBars from './PartBars.jsx';
 import { Search } from '../../../components/ui/Icons';
 import { machinesIn, searchMachines, summarise, PLACES } from '../map/zones';
 import { mapHref, parentHref } from '../map/mapLinks';
 import { statusOf, IN_REPAIR } from '../lifecycle/status';
 
 const PLACE_TITLE = {
-  [PLACES.STASH]: 'IT Stash', [PLACES.GRAVEYARD]: 'Graveyard', [PLACES.NO_LOCATION]: 'No location yet',
+  [PLACES.STASH]: 'IT Stash', [PLACES.GRAVEYARD]: 'Retired', [PLACES.NO_LOCATION]: 'No location',
 };
 
 export default function DepartmentView({ devices, location, department, place }) {
@@ -39,13 +38,11 @@ export default function DepartmentView({ devices, location, department, place })
         <span className="dm-eyebrow">{place ? 'Place' : `${location} · department`}</span>
         <h2 className="dv-level-title">{title}</h2>
         <div className="dv-level-stats">
-          <span><strong>{summary.count}</strong> machines</span>
-          <span><strong>{summary.laptops}</strong> laptops</span>
-          <span><strong>{summary.desktops}</strong> desktops</span>
-          {!place && <span><strong>{summary.criticalMachines}</strong> with a critical part</span>}
-          {!place && <span><strong>{summary.attentionMachines}</strong> needing attention</span>}
+          <span><strong>{summary.count}</strong> {summary.count === 1 ? 'machine' : 'machines'}</span>
+          <span><strong>{summary.workMachines}</strong> need work</span>
+          <span><strong>{summary.laptops}</strong> {summary.laptops === 1 ? 'laptop' : 'laptops'}</span>
+          <span><strong>{summary.desktops}</strong> {summary.desktops === 1 ? 'desktop' : 'desktops'}</span>
         </div>
-        {!place && <PartBars bars={summary.partBars} />}
       </header>
       <label className="dv-search">
         <Search size={18} />

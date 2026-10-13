@@ -17,6 +17,15 @@ const m = (over) => {
 };
 
 describe('summarise', () => {
+  it('counts each machine once, at its worst part, and the machines that need work', () => {
+    const s = summarise('F1', [m({ installedRamGB: 4 }), m({ storageType: 'HDD only' }), m()]);
+    // Two machines with a Critical part each count once, and the healthy one is not counted as needing work.
+    expect(s.worst.Critical).toBe(2);
+    expect(s.worst.Optimal + s.worst.Moderate).toBe(1);
+    expect(s.workMachines).toBe(2);
+    expect(Object.values(s.worst).reduce((a, b) => a + b, 0)).toBe(3);
+  });
+
   it('counts laptops, desktops and anything else apart', () => {
     const s = summarise('F1', [m(), m({ deviceType: 'Desktop' }), m({ deviceType: 'Unknown' })]);
     expect(s).toMatchObject({ count: 3, laptops: 1, desktops: 1, other: 1 });

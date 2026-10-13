@@ -1,107 +1,33 @@
-import { useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, EmptyState } from '../../../components/ui/Surfaces';
 import Button from '../../../components/ui/Button';
 import Spinner from '../../../components/ui/Spinner';
-import Collapsible from '../../../components/ui/Collapsible';
 import Pager from '../../../components/ui/Pager';
 import { paginate } from '../../../components/ui/paginate';
 import {
-  Download, Search, X, Pencil, Check, AlertTriangle, Trash2,
+  Download, Search, X, Pencil, Check, AlertTriangle, Trash2, MoreHorizontal,
 } from '../../../components/ui/Icons';
 import { formatMYT } from '../../../utils/malaysiaTime';
 import { formatScalar } from '../formatValue';
 import ValueCell from './ValueCell';
-import { applyFilters, toCsv } from '../deviceFilters';
+import FilterMenu from './FilterMenu';
+import { applyFilters, IN_FLEET, toCsv } from '../deviceFilters';
+import { buildFilterGroups, chipLabel } from '../filterOptions';
+import {
+  ALL_COLUMNS, COLUMN_SETS, COLUMN_SET_IDS, DEFAULT_SET, columnsForSet, parseColumnSet,
+} from '../columnSets';
+import { gradeRank, securityRiskOf, worstGradeOf } from '../health';
 import { EDITABLE_FIELDS } from '../sharepoint/updateDevice';
-import { DEVICE_COLUMNS } from '../sharepoint/deviceSchema';
 import { GRADE_SLUG } from '../standards/gradeColors';
-import { GRADES, UNKNOWN, PARTS } from '../standards/defaultStandard';
+import { GRADES, UNKNOWN } from '../standards/defaultStandard';
 import {
   describeSelection, headerState, isSelectable, selectedDevices,
   toggleAll, toggleId, visibleSelection,
 } from '../selection';
 
-/**
- * The columns worth seeing first, in this order. Everything else the scan
- * produced follows in schema order -- the table is deliberately wider than the
- * screen and scrolls sideways, because a field read out of a report and then
- * hidden here is a field nobody knows was collected.
- */
-const LEAD_KEYS = [
-  'computerName', 'status', 'owner', 'location', 'department', 'personaLabel', 'gradeCpu', 'gradeRam', 'gradeStorage', 'gradeGraphics', 'gradeWindows', 'actionRequired',
-  'suggestedFormFactor', 'deviceType', 'licenseStatus', 'computerModel', 'cpuModel',
-  'installedRamGB', 'storageTotalGB', 'storageType', 'windowsVersion',
-  'antivirusStatus', 'riskScore', 'riskLevel',
-];
-
-/**
- * Columns worked out on the way in rather than stored. They are not in the
- * SharePoint schema and never will be — the verdict is recomputed on every read
- * — so the table has to name them itself.
- */
-const CALCULATED_COLUMNS = [
-  { key: 'personaLabel', label: 'Workload Profile' },
-  { key: 'gradeCpu', label: 'CPU Grade' },
-  { key: 'gradeRam', label: 'RAM Grade' },
-  { key: 'gradeStorage', label: 'Storage Grade' },
-  { key: 'gradeGraphics', label: 'Graphics Grade' },
-  { key: 'gradeWindows', label: 'Windows Grade' },
-  { key: 'actionRequired', label: 'Action Required' },
-  { key: 'suggestedFormFactor', label: 'Suggested Form Factor' },
-  { key: 'licenseStatus', label: 'Office Licence' },
-  { key: 'licenseNote', label: 'Licence Detail' },
-  { key: 'gpuClass', label: 'Graphics' },
-  { key: 'networkRisk', label: 'Server Link' },
-  { key: 'networkNote', label: 'Server Link Detail' },
-];
-
-/**
- * `scannedOn` has its own column at the far right, formatted in Malaysia time;
- * `scannedOnMYT` is that same instant again; `rawReport` is the whole report
- * file, one cell of which is taller than the screen.
- */
-const SKIP_KEYS = new Set(['scannedOn', 'scannedOnMYT', 'rawReport']);
-
-/** camelCase record key for a StaticName: first letter lowered. */
-const keyFor = (staticName) => staticName.charAt(0).toLowerCase() + staticName.slice(1);
-
-const SCHEMA_COLUMNS = [
-  // `Title` holds the computer name, so the schema never lists it.
-  { key: 'computerName', label: 'Computer' },
-  ...CALCULATED_COLUMNS,
-  ...DEVICE_COLUMNS
-    .map((column) => ({
-      key: keyFor(column.StaticName),
-      label: column.Title,
-      kind: column.kind,
-      numeric: column.kind === 'number',
-    }))
-    .filter((column) => !SKIP_KEYS.has(column.key)),
-];
-
-const rank = (key) => {
-  const lead = LEAD_KEYS.indexOf(key);
-  return lead === -1 ? LEAD_KEYS.length : lead;
-};
-
-// A stable sort, so the columns outside LEAD_KEYS keep their schema order.
-const COLUMNS = [...SCHEMA_COLUMNS].sort((a, b) => rank(a.key) - rank(b.key));
-
 const NAME_KEY = 'computerName';
-const NAME_COLUMN = COLUMNS.find((column) => column.key === NAME_KEY);
-
-/**
- * The tick box and the computer name share ONE frozen cell rather than two
- * pinned side by side. Two would need the second one's `left` offset to be the
- * exact rendered width of the first, which a table decides for itself and no
- * hard-coded pixel figure can promise. One cell needs no arithmetic, so the
- * pinned edge cannot drift.
- *
- * The scrolling columns therefore skip the name -- the frozen cell has already
- * drawn it. The CSV still exports every column, name included.
- */
-const BODY_COLUMNS = COLUMNS.filter((column) => column.key !== NAME_KEY);
+const NAME_COLUMN = ALL_COLUMNS.find((column) => column.key === NAME_KEY);
 
 /**
  * How many entries of a multi-value field a row shows before collapsing the
@@ -110,42 +36,8 @@ const BODY_COLUMNS = COLUMNS.filter((column) => column.key !== NAME_KEY);
  */
 const CELL_ENTRIES = 2;
 
-const FILTER_LABELS = {
-  risk: 'Risk', attention: 'Needs attention', type: 'Type', department: 'Department',
-  status: 'Status', location: 'Location',
-  os: 'OS', av: 'Antivirus', storage: 'Storage', ram: 'RAM', cpu: 'CPU age',
-  windows: 'Windows', stale: 'Stale scans', q: 'Search',
-  part: 'Part grade', critical: 'Has a critical part', persona: 'Workload profile', license: 'Office licence',
-  server: 'Server link', formfit: 'Form factor mismatch',
-};
-
-/**
- * The on/off filters carry no value worth reading -- their chip is the label
- * alone, not "Needs attention: 1".
- */
-const FLAG_FILTERS = new Set(['attention', 'stale', 'formfit', 'critical']);
-
-const chipText = (key, value) => {
-  if (FLAG_FILTERS.has(key)) return FILTER_LABELS[key] ?? key;
-  if (key === 'part') {
-    // "ram:Critical" reads "RAM: Critical"
-    const [part, grade] = String(value).split(':');
-    const label = PARTS.find((p) => p.key === part)?.label;
-    if (label && grade) return `${label}: ${grade}`;
-  }
-  return `${FILTER_LABELS[key] ?? key}: ${value}`;
-};
-
-function download(name, text) {
-  const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8;' }));
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = name;
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
 const TYPE_OPTIONS = ['Laptop', 'Desktop', 'Unknown'];
+const NO_LOCATIONS = [];
 
 const GRADE_KEYS = new Set(['gradeCpu', 'gradeRam', 'gradeStorage', 'gradeGraphics', 'gradeWindows']);
 
@@ -156,18 +48,91 @@ const severityOf = (grade) => {
   return at === -1 ? GRADE_ORDER.length : at;
 };
 
-const toneClassFor = (device, key) => {
-  if (key === 'riskLevel') return `rg-risk rg-risk-${String(device.riskLevel).toLowerCase()}`;
-  return undefined;
-};
+const DEFAULT_SORT = { key: 'worst', dir: 'asc' };
+
+/** The sort dropdown's choices. A column-header sort that matches none of them shows as "Column order". */
+const SORT_PRESETS = [
+  { id: 'worst', label: 'Needs work first', sort: DEFAULT_SORT },
+  { id: 'name', label: 'Computer A–Z', sort: { key: NAME_KEY, dir: 'asc' } },
+  { id: 'scanned', label: 'Newest scan', sort: { key: 'scannedOn', dir: 'desc' } },
+];
+
+const presetFor = (sort) =>
+  SORT_PRESETS.find((p) => p.sort.key === sort.key && p.sort.dir === sort.dir)?.id ?? 'custom';
+
+const sortLabelOf = (sort) =>
+  (sort.key === 'worst'
+    ? 'Needs work first'
+    : ALL_COLUMNS.find((column) => column.key === sort.key)?.label ?? sort.key);
+
+const COLUMN_STORAGE_KEY = 'deviceColumns';
+
+/** The stored choice, or Essentials. Storage can be blocked, and then the choice is simply not remembered. */
+function readColumnSet() {
+  try {
+    return parseColumnSet(window.localStorage.getItem(COLUMN_STORAGE_KEY));
+  } catch {
+    return DEFAULT_SET;
+  }
+}
+
+function writeColumnSet(id) {
+  try {
+    window.localStorage.setItem(COLUMN_STORAGE_KEY, id);
+  } catch {
+    // A private window cannot remember it; the table still works.
+  }
+}
+
+/** Epoch milliseconds of a scan, or null when it has none. */
+function scannedAt(device) {
+  if (device.scannedOn === null || device.scannedOn === undefined || device.scannedOn === '') return null;
+  const time = new Date(device.scannedOn).getTime();
+  return Number.isFinite(time) ? time : null;
+}
+
+function scannedText(device) {
+  try {
+    return formatMYT(device.scannedOn, 'datetime12');
+  } catch {
+    return '—';
+  }
+}
+
+function valueForSort(device, key) {
+  if (key === 'worst') return gradeRank(worstGradeOf(device));
+  if (key === 'scannedOn') return scannedAt(device);
+  return device[key];
+}
+
+const byName = (a, b) =>
+  String(a.computerName ?? '').localeCompare(String(b.computerName ?? ''));
+
+function download(name, text) {
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8;' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = name;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+const GRADE_CLASS = (grade) => `pc-chip g-${GRADE_SLUG[grade] ?? 'unknown'}`;
 
 export default function DeviceTable({
   devices, filters, onFilterChange, onSave, onDelete, onDeleteMany, busy,
+  locationOptions = NO_LOCATIONS,
 }) {
-  const [sort, setSort] = useState({ key: 'riskScore', dir: 'desc' });
+  const [sort, setSort] = useState(DEFAULT_SORT);
+  const [columnSet, setColumnSet] = useState(readColumnSet);
   const [editingId, setEditingId] = useState(null);
   const [draft, setDraft] = useState({});
+  // The row key (id, or name for a row with none) whose remove is awaiting a yes.
   const [confirming, setConfirming] = useState(null);
+  // The row whose ⋯ menu is open.
+  const [menuFor, setMenuFor] = useState(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuFocus, setMenuFocus] = useState(null);
   const [selected, setSelected] = useState(() => new Set());
   const [confirmingMany, setConfirmingMany] = useState(false);
   const [removing, setRemoving] = useState(null);
@@ -175,6 +140,24 @@ export default function DeviceTable({
   // thousand machines and every row of it carries fifty cells.
   const [pageSize, setPageSize] = useState(25);
   const [at, setAt] = useState({ of: '', page: 1 });
+
+  const columns = useMemo(() => columnsForSet(columnSet), [columnSet]);
+
+  // The status filter has ONE default: In use or in repair. Everything else
+  // the menu can ask for is an explicit choice, and 'All' lifts the status
+  // filter altogether.
+  const effectiveFilters = useMemo(() => ({
+    ...filters,
+    status: filters.status === 'All' ? '' : (filters.status || IN_FLEET),
+  }), [filters]);
+
+  const groups = useMemo(
+    () => buildFilterGroups(devices, locationOptions),
+    [devices, locationOptions],
+  );
+
+  // A row's menu and its confirm are keyed by id, or by name for a row with none.
+  const rowKeyOf = (device) => device.id ?? device.computerName;
 
   const startEdit = (device) => {
     setConfirming(null);
@@ -189,25 +172,29 @@ export default function DeviceTable({
   };
 
   const rows = useMemo(() => {
-    const filtered = applyFilters(devices, filters);
-    const column = COLUMNS.find((c) => c.key === sort.key);
+    const filtered = applyFilters(devices, effectiveFilters);
+    const column = ALL_COLUMNS.find((c) => c.key === sort.key);
+    const numeric = sort.key === 'worst' || sort.key === 'scannedOn' || Boolean(column?.numeric);
 
     return [...filtered].sort((a, b) => {
-      const left = a[sort.key];
-      const right = b[sort.key];
+      const left = valueForSort(a, sort.key);
+      const right = valueForSort(b, sort.key);
 
       // Nulls sink to the bottom whichever way the column is sorted — a blank
       // is never the "most" or "least" of anything.
-      if (left === null || left === undefined) return 1;
+      if (left === null || left === undefined) return right === null || right === undefined ? byName(a, b) : 1;
       if (right === null || right === undefined) return -1;
 
       let compared;
       if (GRADE_KEYS.has(sort.key)) compared = severityOf(left) - severityOf(right);
-      else if (column?.numeric) compared = left - right;
+      else if (numeric) compared = left - right;
       else compared = String(left).localeCompare(String(right));
+
+      // Machines that tie keep a stable, readable order.
+      if (compared === 0) return byName(a, b);
       return sort.dir === 'asc' ? compared : -compared;
     });
-  }, [devices, filters, sort]);
+  }, [devices, effectiveFilters, sort]);
 
   /**
    * A tick can never reach off screen. Both readings below are scoped to the
@@ -232,7 +219,7 @@ export default function DeviceTable({
    * shortens the list puts the reader back on page 1 in the same render. An
    * effect would show page 7 of the old list first and correct it afterwards.
    */
-  const of = `${JSON.stringify(filters)}|${sort.key}|${sort.dir}|${pageSize}`;
+  const of = `${JSON.stringify(effectiveFilters)}|${sort.key}|${sort.dir}|${pageSize}`;
   const page = at.of === of ? at.page : 1;
   const setPage = (next) => setAt({ of, page: next });
   const paged = useMemo(() => paginate(rows, page, pageSize), [rows, page, pageSize]);
@@ -243,6 +230,24 @@ export default function DeviceTable({
   // what somebody pressing it is looking at.
   const chosen = useMemo(() => selectedDevices(selected, rows), [selected, rows]);
   const headBox = headerState(selected, paged.rows);
+
+  // Closes a row's ⋯ menu on an outside press or Escape. Listeners exist only while one is open.
+  useEffect(() => {
+    if (menuFor === null) return undefined;
+
+    const onPointer = (event) => {
+      if (!event.target.closest?.('.dt-rowmenu')) setMenuFor(null);
+    };
+    const onKey = (event) => {
+      if (event.key === 'Escape') setMenuFor(null);
+    };
+    document.addEventListener('pointerdown', onPointer);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onPointer);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [menuFor]);
 
   const removeChosen = async () => {
     setRemoving({ done: 0, total: chosen.length });
@@ -258,7 +263,28 @@ export default function DeviceTable({
     }
   };
 
-  const activeFilters = Object.entries(filters).filter(([, value]) => value);
+  const activeFilters = Object.entries(filters).filter(([key, value]) =>
+    value && key !== 'q' && key !== 'status');
+  const hasStatusFilter = Boolean(filters.status);
+  const anyFilter = activeFilters.length > 0 || hasStatusFilter || Boolean(filters.q);
+
+  // One call for every key: separate calls in a row would each start from the
+  // same address and undo one another.
+  const clearAll = () => {
+    onFilterChange(Object.fromEntries(
+      Object.entries(filters).filter(([, value]) => value).map(([key]) => [key, '']),
+    ));
+  };
+
+  const openMenu = (focusFilter = null) => {
+    setMenuFocus(focusFilter);
+    setMenuOpen(true);
+  };
+
+  const pick = (filter, value) => {
+    setMenuOpen(false);
+    onFilterChange(filter, value);
+  };
 
   const toggleSort = (key) =>
     setSort((current) =>
@@ -270,6 +296,16 @@ export default function DeviceTable({
     (sort.key === key
       ? <span aria-hidden="true">{sort.dir === 'asc' ? ' ▲' : ' ▼'}</span>
       : null);
+
+  const chooseColumnSet = (next) => {
+    writeColumnSet(next);
+    setColumnSet(next);
+  };
+
+  const chooseSortPreset = (id) => {
+    const preset = SORT_PRESETS.find((p) => p.id === id);
+    if (preset) setSort(preset.sort);
+  };
 
   let selectionBar;
   if (removing) {
@@ -321,64 +357,111 @@ export default function DeviceTable({
     );
   }
 
-  return (
-    <Card className="rg-card">
-      {/* The search box and the filter chips fold away together. On a phone
-          they took the top third of the screen before a single machine was
-          visible, and most visits here come from a dashboard card that has
-          already chosen the filter. What is ON is still said while they are
-          folded, because a hidden filter is a list lying about what it shows. */}
-      <Collapsible
-        id="devices-filters"
-        className="dt-fold"
-        title="Search and filters"
-        defaultOpen={false}
-        summary={[
-          `${rows.length} of ${devices.length} devices`,
-          ...activeFilters.map(([key, value]) => chipText(key, value)),
-        ].join(' · ')}
-        actions={(
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={Download}
-            disabled={rows.length === 0}
-            onClick={() => download('device-list.csv', toCsv(rows, COLUMNS))}
-          >
-            CSV
-          </Button>
-        )}
-      >
-        <div className="dt-head">
-          <div className="dt-search">
-            <Search size={14} />
-            <input
-              type="search"
-              value={filters.q ?? ''}
-              placeholder="Search computer or owner"
-              aria-label="Search computer or owner"
-              onChange={(event) => onFilterChange('q', event.target.value)}
-            />
-          </div>
-        </div>
+  const statusValue = filters.status || IN_FLEET;
 
-        {activeFilters.length > 0 && (
-          <div className="dt-chips">
-            {activeFilters.map(([key, value]) => (
-              <button
-                type="button"
-                className="dt-chip"
-                key={key}
-                onClick={() => onFilterChange(key, '')}
-                aria-label={`Remove the ${FILTER_LABELS[key] ?? key} filter`}
-              >
-                {chipText(key, value)}
-                <X size={12} />
-              </button>
-            ))}
-          </div>
+  return (
+    <Card className="rg-card dl-card">
+      <div className="dl-search">
+        <Search size={16} />
+        <input
+          type="search"
+          value={filters.q ?? ''}
+          placeholder="Search name, owner, serial or AnyDesk ID"
+          aria-label="Search name, owner, serial or AnyDesk ID"
+          onChange={(event) => onFilterChange('q', event.target.value)}
+        />
+      </div>
+
+      <div className="dl-filterbar">
+        <strong className="dl-count">
+          {rows.length} <span>of {devices.length}</span>
+        </strong>
+
+        <span className="dt-chip dt-chip-status">
+          <button
+            type="button"
+            className="dt-chip-main"
+            aria-expanded={menuOpen}
+            onClick={() => openMenu('status')}
+          >
+            {chipLabel('status', statusValue)}
+            <span aria-hidden="true"> ▾</span>
+          </button>
+          {hasStatusFilter && (
+            <button
+              type="button"
+              className="dt-chip-x"
+              aria-label="Go back to the default status filter"
+              onClick={() => onFilterChange('status', '')}
+            >
+              <X size={12} />
+            </button>
+          )}
+        </span>
+
+        {activeFilters.map(([key, value]) => (
+          <span className="dt-chip" key={key}>
+            <span className="dt-chip-main">{chipLabel(key, value)}</span>
+            <button
+              type="button"
+              className="dt-chip-x"
+              onClick={() => onFilterChange(key, '')}
+              aria-label={`Remove the ${chipLabel(key, value)} filter`}
+            >
+              <X size={12} />
+            </button>
+          </span>
+        ))}
+
+        <FilterMenu
+          open={menuOpen}
+          onOpenChange={setMenuOpen}
+          focusFilter={menuFocus}
+          groups={groups}
+          onPick={pick}
+        />
+
+        {anyFilter && (
+          <button type="button" className="dl-clear" onClick={clearAll}>
+            Clear all
+          </button>
         )}
-      </Collapsible>
+
+        <span className="dl-spacer" />
+
+        <label className="dl-select">
+          Sort
+          <select
+            value={presetFor(sort)}
+            onChange={(event) => chooseSortPreset(event.target.value)}
+          >
+            {SORT_PRESETS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+            {presetFor(sort) === 'custom' && <option value="custom">Column order</option>}
+          </select>
+        </label>
+
+        <label className="dl-select">
+          Columns
+          <select value={columnSet} onChange={(event) => chooseColumnSet(event.target.value)}>
+            {COLUMN_SET_IDS.map((id) => (
+              <option key={id} value={id}>{COLUMN_SETS[id].label}</option>
+            ))}
+          </select>
+        </label>
+
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={Download}
+          disabled={rows.length === 0}
+          onClick={() => download(
+            'device-list.csv',
+            toCsv(rows.map((device) => ({ ...device, scannedOn: scannedText(device) })), ALL_COLUMNS),
+          )}
+        >
+          CSV
+        </Button>
+      </div>
 
       {chosen.length > 0 && <div className="dt-bulk">{selectionBar}</div>}
 
@@ -414,7 +497,7 @@ export default function DeviceTable({
                   </button>
                 </th>
 
-                {BODY_COLUMNS.map((column) => (
+                {columns.map((column) => (
                   <th key={column.key}>
                     <button
                       type="button"
@@ -427,15 +510,16 @@ export default function DeviceTable({
                     </button>
                   </th>
                 ))}
-                <th>Scanned</th>
-                <th className="dt-actions"><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>
-              {paged.rows.map((device) => {
-                const editing = editingId === device.id;
+              {paged.rows.map((device, rowIndex) => {
+                const rowKey = rowKeyOf(device);
+                const editing = editingId === device.id && device.id != null;
                 const ticked = isSelectable(device) && selected.has(device.id);
+                const menuOpenHere = menuFor === rowKey;
                 const manual = new Set(device.manualFields ?? []);
+                const name = formatScalar(device.computerName, 'text');
 
                 const rowClass = [
                   editing ? 'dt-editing' : '',
@@ -443,135 +527,183 @@ export default function DeviceTable({
                 ].filter(Boolean).join(' ');
 
                 return (
-                  <tr key={device.id ?? device.computerName} className={rowClass || undefined}>
-                    <td className="dt-identity">
-                      <input
-                        type="checkbox"
-                        className="dt-tick"
-                        checked={ticked}
-                        // A row with no id cannot be removed, so offering to
-                        // tick it would only lead to an error.
-                        disabled={!isSelectable(device) || busy}
-                        onChange={() => updateSelection((current) => toggleId(current, device.id))}
-                        aria-label={`Select ${device.computerName}`}
-                      />
-                      {device.id != null ? (
-                        <Link className="dt-link" to={`/devices/${device.id}`}>
-                          {formatScalar(device.computerName, 'text')}
-                        </Link>
-                      ) : (
-                        formatScalar(device.computerName, 'text')
-                      )}
-                    </td>
-
-                    {BODY_COLUMNS.map((column) => {
-                      const editable = EDITABLE_FIELDS.includes(column.key);
-
-                      if (editing && editable) {
-                        return (
-                          <td key={column.key} className="rg-editable">
-                            {column.key === 'deviceType' ? (
-                              <select
-                                value={draft.deviceType ?? 'Unknown'}
-                                aria-label={`Type for ${device.computerName}`}
-                                onChange={(e) => setDraft((d) => ({ ...d, deviceType: e.target.value }))}
-                              >
-                                {TYPE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
-                              </select>
-                            ) : (
-                              <input
-                                type="text"
-                                value={draft[column.key] ?? ''}
-                                placeholder="from the scan"
-                                aria-label={`${column.label} for ${device.computerName}`}
-                                onChange={(e) => setDraft((d) => ({ ...d, [column.key]: e.target.value }))}
-                              />
-                            )}
-                          </td>
-                        );
-                      }
-
-                      return (
-                        <td key={column.key} className={toneClassFor(device, column.key)}>
-                          {GRADE_KEYS.has(column.key) ? (
-                            <span className={`pc-chip g-${GRADE_SLUG[device[column.key]] ?? 'unknown'}`}>{device[column.key] ?? UNKNOWN}</span>
+                  <Fragment key={rowKey}>
+                    <tr className={rowClass || undefined}>
+                      <td className="dt-identity">
+                        <div className="dt-name">
+                          <input
+                            type="checkbox"
+                            className="dt-tick"
+                            checked={ticked}
+                            // A row with no id cannot be removed, so offering to
+                            // tick it would only lead to an error.
+                            disabled={!isSelectable(device) || busy}
+                            onChange={() => updateSelection((current) => toggleId(current, device.id))}
+                            aria-label={`Select ${device.computerName}`}
+                          />
+                          {device.id != null ? (
+                            <Link className="dt-link" to={`/devices/${device.id}`}>{name}</Link>
                           ) : (
+                            <span className="dt-link">{name}</span>
+                          )}
+
+                          <div className="dt-rowmenu">
+                            <button
+                              type="button"
+                              className="dt-more"
+                              aria-label={`Actions for ${device.computerName}`}
+                              aria-haspopup="menu"
+                              aria-expanded={menuOpenHere}
+                              onClick={() => setMenuFor(menuOpenHere ? null : rowKey)}
+                            >
+                              <MoreHorizontal size={16} />
+                            </button>
+
+                            {/* The last rows open upward, or the table's own scroll box cuts the menu off. */}
+                            {menuOpenHere && (
+                              <div className={`dt-menu${rowIndex >= paged.rows.length - 3 && rowIndex > 2 ? ' dt-menu-up' : ''}`} role="menu">
+                                {device.id != null && (
+                                  <Link
+                                    role="menuitem"
+                                    className="dt-menu-item"
+                                    to={`/devices/${device.id}`}
+                                    onClick={() => setMenuFor(null)}
+                                  >
+                                    Open
+                                  </Link>
+                                )}
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  className="dt-menu-item"
+                                  onClick={() => { setMenuFor(null); startEdit(device); }}
+                                >
+                                  <Pencil size={14} />
+                                  Edit details
+                                </button>
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  className="dt-menu-item dt-menu-bad"
+                                  onClick={() => { setMenuFor(null); setConfirming(rowKey); }}
+                                >
+                                  Remove…
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {editing && (
+                          <div className="dt-edit-actions">
+                            <button
+                              type="button"
+                              className="dt-icon dt-icon-go"
+                              disabled={busy}
+                              aria-busy={busy || undefined}
+                              onClick={async () => { await onSave(device, draft); cancelEdit(); }}
+                              aria-label={`Save ${device.computerName}`}
+                            >
+                              {busy ? <Spinner size={12} /> : <Check size={14} />}
+                              Save
+                            </button>
+                            <button type="button" className="dt-icon" onClick={cancelEdit}>
+                              Cancel
+                            </button>
+                          </div>
+                        )}
+                      </td>
+
+                      {columns.map((column) => {
+                        const editable = EDITABLE_FIELDS.includes(column.key);
+
+                        if (editing && editable) {
+                          return (
+                            <td key={column.key} className="rg-editable">
+                              {column.key === 'deviceType' ? (
+                                <select
+                                  value={draft.deviceType ?? 'Unknown'}
+                                  aria-label={`Type for ${device.computerName}`}
+                                  onChange={(e) => setDraft((d) => ({ ...d, deviceType: e.target.value }))}
+                                >
+                                  {TYPE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+                                </select>
+                              ) : (
+                                <input
+                                  type="text"
+                                  value={draft[column.key] ?? ''}
+                                  placeholder="blank = use the scan"
+                                  aria-label={`${column.label} for ${device.computerName}`}
+                                  onChange={(e) => setDraft((d) => ({ ...d, [column.key]: e.target.value }))}
+                                />
+                              )}
+                            </td>
+                          );
+                        }
+
+                        let content;
+                        if (GRADE_KEYS.has(column.key)) {
+                          content = (
+                            <span className={GRADE_CLASS(device[column.key])}>
+                              {device[column.key] ?? UNKNOWN}
+                            </span>
+                          );
+                        } else if (column.key === 'scannedOn') {
+                          content = scannedText(device);
+                        } else if (column.key === 'riskLevel' && device.riskLevel) {
+                          content = (
+                            <span className={`rg-risk rg-risk-${String(device.riskLevel).toLowerCase()}`}>
+                              {securityRiskOf(device.riskLevel)}
+                            </span>
+                          );
+                        } else {
+                          content = (
                             <ValueCell
                               value={device[column.key]}
                               fieldKey={column.key}
                               kind={column.kind}
                               limit={CELL_ENTRIES}
                             />
-                          )}
-                          {manual.has(column.key) && (
-                            <span className="dt-manual" title="Set by hand — imports leave this alone">
-                              edited
-                            </span>
-                          )}
+                          );
+                        }
+
+                        return (
+                          <td key={column.key} className={column.key === 'scannedOn' ? 'dt-when' : undefined}>
+                            {content}
+                            {manual.has(column.key) && (
+                              <span className="dt-manual" title="Set by hand — imports leave this alone">
+                                edited
+                              </span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+
+                    {confirming === rowKey && (
+                      <tr className="dt-confirm-row">
+                        <td colSpan={columns.length + 1}>
+                          <div className="dt-confirm">
+                            <AlertTriangle size={14} />
+                            Remove {device.computerName}?
+                            <button
+                              type="button"
+                              className="dt-icon dt-icon-bad"
+                              disabled={busy}
+                              aria-busy={busy || undefined}
+                              onClick={async () => { await onDelete(device); cancelEdit(); }}
+                            >
+                              {busy && <Spinner size={12} />}
+                              Yes, remove
+                            </button>
+                            <button type="button" className="dt-icon" onClick={() => setConfirming(null)}>
+                              Keep
+                            </button>
+                          </div>
                         </td>
-                      );
-                    })}
-
-                    <td title="Malaysia time">{formatMYT(device.scannedOn, 'datetime12')}</td>
-
-                    <td className="dt-actions">
-                      {!editing && (
-                        <button
-                          type="button"
-                          className="dt-icon"
-                          onClick={() => startEdit(device)}
-                          aria-label={`Edit ${device.computerName}`}
-                        >
-                          <Pencil size={14} />
-                        </button>
-                      )}
-
-                      {editing && confirming !== device.id && (
-                        <>
-                          <button
-                            type="button"
-                            className="dt-icon dt-icon-go"
-                            disabled={busy}
-                            aria-busy={busy || undefined}
-                            onClick={async () => { await onSave(device, draft); cancelEdit(); }}
-                            aria-label={`Save ${device.computerName}`}
-                          >
-                            {busy ? <Spinner size={12} /> : <Check size={14} />}
-                          </button>
-                          <button type="button" className="dt-icon" onClick={cancelEdit}>
-                            Cancel
-                          </button>
-                          <button
-                            type="button"
-                            className="dt-icon dt-icon-bad"
-                            onClick={() => setConfirming(device.id)}
-                          >
-                            Remove
-                          </button>
-                        </>
-                      )}
-
-                      {confirming === device.id && (
-                        <span className="dt-confirm">
-                          <AlertTriangle size={14} />
-                          Remove {device.computerName}?
-                          <button
-                            type="button"
-                            className="dt-icon dt-icon-bad"
-                            disabled={busy}
-                            aria-busy={busy || undefined}
-                            onClick={async () => { await onDelete(device); cancelEdit(); }}
-                          >
-                            {busy && <Spinner size={12} />}
-                            Yes, remove
-                          </button>
-                          <button type="button" className="dt-icon" onClick={() => setConfirming(null)}>
-                            Keep
-                          </button>
-                        </span>
-                      )}
-                    </td>
-                  </tr>
+                      </tr>
+                    )}
+                  </Fragment>
                 );
               })}
             </tbody>
@@ -585,7 +717,7 @@ export default function DeviceTable({
           onPage={setPage}
           size={pageSize}
           onSize={setPageSize}
-          label="devices"
+          label={`devices · sorted: ${sortLabelOf(sort)}`}
         />
       )}
     </Card>

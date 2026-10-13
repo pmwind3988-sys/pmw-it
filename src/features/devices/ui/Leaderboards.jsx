@@ -1,10 +1,11 @@
+import { Link } from 'react-router-dom';
 import { Card, EmptyState } from '../../../components/ui/Surfaces';
 import { formatMYT } from '../../../utils/malaysiaTime';
 import { leaderboards } from '../stats/deviceStats';
 
 function Board({ title, blurb, rows, render, emptyText }) {
   return (
-    <Card className="lb-card">
+    <Card className="lb-card todo-board">
       <div className="chart-head">
         <h3>{title}</h3>
         <p>{blurb}</p>
@@ -16,7 +17,9 @@ function Board({ title, blurb, rows, render, emptyText }) {
           {rows.map((device) => (
             <li key={device.id ?? device.computerName}>
               <span className="lb-name">
-                {device.computerName}
+                {device.id != null ? (
+                  <Link to={`/devices/${device.id}`}>{device.computerName}</Link>
+                ) : device.computerName}
                 {device.owner && <span className="lb-owner"> · {device.owner}</span>}
               </span>
               <span className="lb-figure">{render(device)}</span>
@@ -28,45 +31,14 @@ function Board({ title, blurb, rows, render, emptyText }) {
   );
 }
 
+/** The two boards the To do view keeps: the cheap upgrade and the stale scan. */
 export default function Leaderboards({ devices }) {
   const boards = leaderboards(devices);
 
   return (
-    <div className="lb-grid">
+    <div className="lb-grid todo-boards">
       <Board
-        title="Most RAM"
-        blurb="Measured from the sticks fitted."
-        rows={boards.highestRam}
-        render={(d) => `${d.installedRamGB} GB`}
-        emptyText="No devices imported yet."
-      />
-
-      <Board
-        title="Least RAM"
-        blurb="The first machines people complain about."
-        rows={boards.lowestRam}
-        render={(d) => `${d.installedRamGB} GB`}
-        emptyText="No devices imported yet."
-      />
-
-      <Board
-        title="Oldest hardware"
-        blurb="Ranked by processor generation."
-        rows={boards.oldest}
-        render={(d) => `${d.cpuAgeBand}${d.cpuGeneration ? ` · gen ${d.cpuGeneration}` : ''}`}
-        emptyText="No devices imported yet."
-      />
-
-      <Board
-        title="Newest scans"
-        blurb="What was collected most recently."
-        rows={boards.recent}
-        render={(d) => formatMYT(d.scannedOn, 'datetime12')}
-        emptyText="No devices imported yet."
-      />
-
-      <Board
-        title="Upgrade candidates"
+        title="Cheap RAM upgrades"
         blurb="8 GB or less with a slot free — one stick, not a new machine."
         rows={boards.upgradeCandidates}
         render={(d) => `${d.installedRamGB} GB in ${d.ramSlotsUsed} of ${d.ramSlotsTotal} slots`}

@@ -82,7 +82,7 @@ pmw-it/
 | `/asset-checklist/links` | Every shared link: waiting / signed / expired / cancelled; copy, open, change expiry, expire now, cancel, reopen, delete. Drawn as a timeline grouped by day, with a detail panel (a bottom sheet on a phone). Every choice is in the query string: `?show=waiting\|signed\|closed`, `from=till\|share`, `kind=handout\|return`, `q=` (name, item or serial), `open=<id>`; the rules are `links/linkFilter.js`. The till's "Signed checklists" button opens it at `?from=till` |
 | `/asset-checklist/links/:id` | IT correcting a SIGNED checklist; the record then says "Edited by … after signing" |
 | `/c/:code` | **Public, no sign-in.** A separate page (`checklist.html`), not a portal route: the employee fills and signs; afterwards the same link is the locked, printable copy |
-| `/devices` | Device list. `?view=map` (default): locations → departments → machines, with the IT Stash and the Graveyard; `?location=`, `&department=`, `?place=stash\|graveyard\|nolocation`. Also `dashboard`, `register`, `import`, `standards` (where IT sets the grading standard and colours) |
+| `/devices` | Devices. Three views, URL keys unchanged: Places (`?view=map`, default; a mind map: locations → departments → machines, with the IT Stash, No location and Retired; `?location=`, `&department=`, `?place=stash\|graveyard\|nolocation`), List (`register`), To do (`dashboard`). "Import scans" opens `import`; the ⚙ menu opens `standards` (where IT sets the grading standard and colours). "Find a machine" sits above Places and To do |
 | `/devices/:id` | One machine: status, change owner / repair / stash / retire / bring back, owner history, spec history, every scanned field |
 | `/assets` | Asset inventory: what IT owns, its figures, and the deliveries still unsaved on this device (`?category=`, `?status=`, `?condition=`, `?location=`, `?unlabelled=1`) |
 | `/assets/scan` | Purchase details, then the camera. Scans become a batch on this device — nothing reaches SharePoint here |
@@ -181,10 +181,14 @@ pmw-it/
 | How an import recognises a machine (serial, then name) | `src/features/devices/lifecycle/matchIncoming.js` |
 | "Is this a replacement?" during import | `lifecycle/replacements.js`, `ui/ReplacementPrompt.jsx` |
 | Location out of the scan file name | `derive/deriveLocation.js`, `map/locations.js` |
-| The map's numbers and layout | `map/zones.js`, `map/mapLayout.js`, `map/mapLinks.js` |
+| The map's numbers and layout | `map/zones.js`, `map/mindMap.js` (wide and phone positions, branches), `ui/MindMap.jsx`, `map/mapLinks.js` |
+| What "needs work" means, a machine's worst part, the Security risk wording | `src/features/devices/health.js` |
+| The To do list and its counts | `src/features/devices/stats/todoItems.js`, `ui/ToDoView.jsx` |
+| Find a machine (name, owner, serial, AnyDesk) | `src/features/devices/finder.js`, `ui/DeviceFinder.jsx` |
+| The List's column sets and + Filter menu | `src/features/devices/columnSets.js`, `filterOptions.js`, `ui/FilterMenu.jsx` |
 | Which buttons spin while work runs | `src/components/ui/Button.jsx` (`loading`), `src/components/ui/Spinner.jsx` |
 | Why a dashboard card opens the register at "In use or in repair" | `IN_FLEET` in `src/features/devices/deviceFilters.js`, `openRegister` in `src/pages/DevicesPage.jsx` |
-| Bar and column charts | `src/components/ui/Charts.jsx` (shared by both dashboards) |
+| Bar and column charts | `src/components/ui/Charts.jsx` (the requests dashboard) |
 | SharePoint writes | `src/services/sharePointService.js` |
 | Theme | `src/context/ThemeContext.jsx`; toggle lives in the shell's bar |
 | Spreadsheet parsing / header detection | `src/features/semantic/ingest/` |
@@ -218,7 +222,9 @@ its own body. The bar, the nav, the theme toggle, sign-out and the sign-in gate
 all belong to the shell — do not re-add per-page copies of them.
 
 **Stylesheet order** (`src/main.jsx`): `index.css` → `App.css` → `styles/shell.css`
-→ `styles/auth.css` → `styles/devices.css` → `styles/semantic.css`.
+→ `styles/auth.css` → `styles/devices.css` → `styles/devices-page.css`, `devices-places.css`,
+`devices-list.css`, `devices-todo.css`, `devices-machine.css` (the Oct 2026 redesign, overriding
+devices.css) → `styles/semantic.css`.
 shell.css re-points the older `--bg` / `--surface` /
 `--border` / `--text-*` tokens at the new palette, so it must load last.
 `--accent` is deliberately left alone: it fills `.ms-button`, whose text colour
@@ -283,6 +289,25 @@ Everything the plan decided is disclosed by `intent/AutoBrief.jsx` at the top of
 the canvas, and every part of it is reversible from there in one click. That
 card is not decoration: it is the reason an autopilot that reads header names
 with a lexicon is safe to ship at all.
+
+**The device section speaks one health language: the part grade.** A machine
+"needs work" when any part is Critical or Needs attention (`health.js`); the
+map's rings count each machine once at its WORST part, the List sorts "Needs
+work first", and a machine card names only the parts that are not fine. The
+risk score keeps its job but never says "Critical" to a person -- it reads
+"Security risk: High / Medium / Low" (`securityRiskOf`). Stored values are
+unchanged, and `?risk=` takes a band or a stored level, so old links still work.
+
+**The map is a mind map, on purpose.** The user asked to keep it, with fewer
+rectangles: a hub circle, donut rings for places, a hexagon for the IT Stash, a
+diamond for No location, a tombstone for Retired. Every node carries two
+positions as CSS variables -- the wide board's and the phone's (`phoneLayout`,
+which grows the board downward instead of overlapping) -- so the same links
+serve both widths.
+
+**Several filter changes go out as ONE update.** `setParam` on the devices page
+takes an object for that reason: react-router's updater reads the address as
+rendered, so a loop of single calls (Clear all) keeps only the last.
 
 **The scan is run off a USB disk, and that disk is in the reports.**
 `derive/itMedia.js` lists it by exact model (`WDC WD10 JPVX-60JC3T1`) and
@@ -366,7 +391,7 @@ no stints, and its first change writes the outgoing owner in "since at least"
 its creation date. Every lifecycle write re-reads the machine first and goes
 device row → stints → change log, so a failure leaves a status the history
 cannot yet explain (retryable), never history describing a move that did not
-happen. Every device-dashboard card opens the register filtered to `In fleet` (In use or In repair), the same machines it counted -- the register's own default hides only Retired, so without that a card would open a list with spares in it.
+happen. Every To do row opens the List filtered to `In fleet` (In use or In repair), the same machines it counted, and that is also the List's own default: one default, so a count and the list it opens cannot disagree. "Everything" (`status=All`) lifts it.
 
 **Location comes first in the file name's bracket.** `[F1 ENGINEERING] X.txt`
 is location F1, department ENGINEERING; `[ENGINEERING] X.txt` still reads as it

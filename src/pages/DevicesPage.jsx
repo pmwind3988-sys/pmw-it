@@ -1,28 +1,27 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import AppShell from '../components/AppShell';
 import { gradeCssVars } from '../features/devices/standards/gradeColors';
-import StatCard from '../components/ui/StatCard';
 import { Card, EmptyState, ErrorBanner } from '../components/ui/Surfaces';
 import Button from '../components/ui/Button';
+import Spinner from '../components/ui/Spinner';
 import {
-  Laptop, AlertTriangle, ShieldCheck, MemoryStick, Clock, RefreshCw, Tag, WifiOff, Archive,
+  RefreshCw, ChevronLeft, Check, Settings,
 } from '../components/ui/Icons';
 import { useSharePointToken } from '../hooks/useRequests';
 import DropZone from '../features/devices/ui/DropZone';
 import ReviewGrid from '../features/devices/ui/ReviewGrid';
 import SaveProgress from '../features/devices/ui/SaveProgress';
 import DeviceTable from '../features/devices/ui/DeviceTable';
-import DeviceCharts from '../features/devices/ui/DeviceCharts';
-import DepartmentHeatmap from '../features/devices/ui/DepartmentHeatmap';
-import Leaderboards from '../features/devices/ui/Leaderboards';
 import DeviceMap from '../features/devices/ui/DeviceMap';
+import DeviceFinder from '../features/devices/ui/DeviceFinder';
+import ToDoView from '../features/devices/ui/ToDoView';
 import StandardsPage from '../features/devices/ui/StandardsPage';
 import { importFiles, mergeImports } from '../features/devices/importFiles';
 import { issuesFor, sortForReview } from '../features/devices/reviewIssues';
 import { useDevices } from '../features/devices/useDevices';
-import { fleetSummary, complianceSummary } from '../features/devices/stats/deviceStats';
 import { labelOf, IN_FLEET } from '../features/devices/deviceFilters';
+import { todoItems } from '../features/devices/stats/todoItems';
 import { syncDevices } from '../features/devices/sharepoint/syncDevices';
 import { updateDevice, deleteDevice, deleteDevices } from '../features/devices/sharepoint/updateDevice';
 import { provisionLists } from '../features/devices/sharepoint/provisionLists';
@@ -30,11 +29,10 @@ import { matchIncoming, noticeFor } from '../features/devices/lifecycle/matchInc
 import { replacementsFor, unanswered } from '../features/devices/lifecycle/replacements';
 import { locationsIn, cleanLocation } from '../features/devices/map/locations';
 import { fileNameLocations } from '../features/devices/map/fileNameLocations';
-import { inFleet, statusOf, STATUSES, RETIRED, SPARE } from '../features/devices/lifecycle/status';
+import { inFleet, statusOf, SPARE } from '../features/devices/lifecycle/status';
 import { performLifecycle } from '../features/devices/sharepoint/writeLifecycle';
 import { ACTIONS } from '../features/devices/lifecycle/planLifecycle';
-import { mapHref } from '../features/devices/map/mapLinks';
-import { PLACES } from '../features/devices/map/zones';
+import { formatMYT } from '../utils/malaysiaTime';
 
 const SHAREPOINT_SITE_URL =
   import.meta.env.VITE_SHAREPOINT_SITE_URL || 'https://pmwgroupcom.sharepoint.com/sites/IThelpdesk';
@@ -48,8 +46,19 @@ const IDLE_SAVE = {
 const FILTER_KEYS = [
   'risk', 'attention', 'type', 'department', 'os', 'av',
   'storage', 'ram', 'cpu', 'windows', 'stale', 'q',
-  'part', 'critical', 'persona', 'license', 'server', 'formfit', 'status', 'location',
+  'part', 'critical', 'persona', 'license', 'server', 'formfit', 'status', 'location', 'work',
 ];
+
+/** The three views a person switches between. The URL keys are the old tab keys. */
+const VIEWS = [
+  { key: 'map', label: 'Places' },
+  { key: 'register', label: 'List' },
+  { key: 'dashboard', label: 'To do' },
+];
+
+const IMPORT_STEPS = ['Drop', 'Check', 'Save'];
+
+const plural = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`;
 
 export default function DevicesPage() {
   const getToken = useSharePointToken();
@@ -57,6 +66,21 @@ export default function DevicesPage() {
   const { devices: saved, loading, error, reload, standards } = useDevices();
 
   const view = params.get('view') ?? 'map';
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+  const menuButtonRef = useRef(null);
+  const switchRefs = useRef([]);
+
+  // Close the settings menu on an outside press. Escape is handled on the
+  // menu itself, so no page-wide key listener is needed.
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const onPress = (event) => {
+      if (!menuRef.current?.contains(event.target)) setMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onPress);
+    return () => document.removeEventListener('mousedown', onPress);
+  }, [menuOpen]);
 
   const [stage, setStage] = useState('drop');
   const [parsed, setParsed] = useState([]);
@@ -91,16 +115,20 @@ export default function DevicesPage() {
     [params],
   );
 
-  const navigate = useNavigate();
   // Figures count the machines people are working on. A retired laptop
   // reported as a critical risk would be a figure lying about the fleet.
   const fleet = useMemo(() => saved.filter(inFleet), [saved]);
   const spareCount = useMemo(() => saved.filter((d) => statusOf(d) === SPARE).length, [saved]);
-  // The register hides retired machines unless a status filter asks for them.
-  const registerRows = useMemo(
-    () => (filters.status ? saved : saved.filter((d) => statusOf(d) !== RETIRED)),
-    [saved, filters.status],
-  );
+  const newestScan = useMemo(() => {
+    let newest = null;
+    for (const device of saved) {
+      if (typeof device.scannedOn === 'number' && Number.isFinite(device.scannedOn)
+        && (newest === null || device.scannedOn > newest)) {
+        newest = device.scannedOn;
+      }
+    }
+    return newest;
+  }, [saved]);
   const locationOptions = useMemo(() => locationsIn(saved), [saved]);
 
   // The dashboard reads one department at a time when asked to. It shares the
@@ -120,20 +148,52 @@ export default function DevicesPage() {
     [fleet, department],
   );
 
-  const summary = useMemo(() => fleetSummary(scoped), [scoped]);
-  const compliance = useMemo(() => complianceSummary(scoped), [scoped]);
+  const todoCount = useMemo(() => todoItems(scoped, Date.now()).length, [scoped]);
 
   const flagged = merged.filter((device) => issuesFor(device).length > 0).length;
   const included = merged.filter((device) => !excluded.has(device.sourceFileName)).length;
 
+  /**
+   * One key, or several at once as an object. Several changes must go out as
+   * ONE update: the router's updater reads the address as it was rendered, so
+   * a loop of single calls would leave only the last one applied.
+   */
   const setParam = useCallback((key, value) => {
+    const changes = typeof key === 'object' ? key : { [key]: value };
     setParams((current) => {
       const next = new URLSearchParams(current);
-      if (value) next.set(key, value);
-      else next.delete(key);
+      for (const [name, wanted] of Object.entries(changes)) {
+        if (wanted) next.set(name, wanted);
+        else next.delete(name);
+      }
       return next;
     });
   }, [setParams]);
+
+  /**
+   * Switch views. The map's own drill-down keys (location, place) never carry
+   * over; `department` is cleared only on the way INTO the map, because it is
+   * the map's drill-down there and a plain filter everywhere else.
+   */
+  const switchView = useCallback((key) => {
+    setParams((current) => {
+      const next = new URLSearchParams(current);
+      next.set('view', key);
+      next.delete('location');
+      next.delete('place');
+      if (key === 'map') next.delete('department');
+      return next;
+    });
+  }, [setParams]);
+
+  const onSwitchKey = (event, position) => {
+    if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+    event.preventDefault();
+    const step = event.key === 'ArrowRight' ? 1 : -1;
+    const target = (position + step + VIEWS.length) % VIEWS.length;
+    switchRefs.current[target]?.focus();
+    switchView(VIEWS[target].key);
+  };
 
   /** Open the register, optionally filtered. `key` null means "no filter". */
   const openRegister = useCallback((key, value, extra) => {
@@ -363,9 +423,9 @@ export default function DevicesPage() {
     </ul>
   );
 
-  const scopePicker = view === 'dashboard' && departments.length > 0 && (
-    <label className="dv-scope">
-      <span>Department</span>
+  const scopePicker = departments.length > 0 && (
+    <label className="dvp-scope">
+      <span className="dvp-sr">Department</span>
       <select
         value={department}
         onChange={(event) => setParam('department', event.target.value)}
@@ -378,54 +438,95 @@ export default function DevicesPage() {
     </label>
   );
 
-  const tabs = (
-    <div className="dv-tabs" role="tablist">
-      {[
-        ['map', 'Map'],
-        ['dashboard', 'Dashboard'],
-        ['register', 'Register'],
-        ['import', 'Import'],
-        ['standards', 'Standards'],
-      ].map(([key, label]) => (
+  const stepIndex = { drop: 0, review: 1, save: 2 }[stage] ?? 0;
+  const showFinder = view === 'map' || view === 'register' || view === 'dashboard';
+  const settingsNote = standards.note || standards.error;
+  const factLine = [
+    `${fleet.length} in use`,
+    `${spareCount} in the IT Stash`,
+    newestScan !== null && `newest scan ${formatMYT(newestScan, 'date')}`,
+  ].filter(Boolean).join(' · ');
+
+  const actions = (
+    <div className="dvp-actions">
+      <Button size="md" onClick={() => switchView('import')}>Import scans</Button>
+      <div
+        className="dvp-menu"
+        ref={menuRef}
+        onKeyDown={(event) => {
+          if (event.key !== 'Escape') return;
+          setMenuOpen(false);
+          menuButtonRef.current?.focus();
+        }}
+      >
         <button
           type="button"
-          role="tab"
-          key={key}
-          aria-selected={view === key}
-          className={`dv-tab${view === key ? ' dv-tab-active' : ''}`}
-          onClick={() => setParams((current) => {
-            const next = new URLSearchParams(current);
-            next.set('view', key);
-            ['location', 'place'].forEach((k) => next.delete(k));
-            if (view === 'map') next.delete('department');
-            return next;
-          })}
+          ref={menuButtonRef}
+          className="dvp-gear"
+          aria-label="Settings"
+          aria-haspopup="true"
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((open) => !open)}
         >
-          {label}
+          {loading ? <Spinner size={16} /> : <Settings size={18} />}
+          {settingsNote && <span className="dvp-dot" aria-hidden="true" />}
         </button>
-      ))}
-      {scopePicker}
+        {menuOpen && (
+          <div className="dvp-menu-pop">
+            {settingsNote && <p className="dvp-menu-note" role="status">{settingsNote}</p>}
+            <button
+              type="button"
+              className="dvp-menu-item"
+              onClick={() => { setMenuOpen(false); switchView('standards'); }}
+            >
+              Grading standard
+            </button>
+            <button
+              type="button"
+              className="dvp-menu-item"
+              disabled={loading}
+              onClick={() => { setMenuOpen(false); reload(); }}
+            >
+              <RefreshCw size={14} /> Refresh
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  const viewSwitch = (
+    <div role="group" aria-label="View" className="dvp-switch">
+      {VIEWS.map(({ key, label }, position) => {
+        const current = view === key;
+        return (
+          <button
+            type="button"
+            key={key}
+            ref={(node) => { switchRefs.current[position] = node; }}
+            aria-current={current ? 'true' : undefined}
+            className={`dvp-switch-btn${current ? ' dvp-switch-on' : ''}`}
+            onClick={() => switchView(key)}
+            onKeyDown={(event) => onSwitchKey(event, position)}
+          >
+            {label}
+            {key === 'dashboard' && <span className="dvp-count">{todoCount}</span>}
+          </button>
+        );
+      })}
     </div>
   );
 
   return (
-    <AppShell
-      title="Device list"
-      subtitle={department
-        ? `${department} — what every machine has, what needs attention, and what is getting old`
-        : 'What every machine has, what needs attention, and what is getting old'}
-      actions={(
-        <Button variant="secondary" size="sm" icon={RefreshCw} onClick={reload} loading={loading}>
-          Refresh
-        </Button>
-      )}
-    >
-      <div className="dv-graded" style={gradeCssVars(standards.standard.colors)}>
-        {(standards.note || standards.error) && (
-          <p className="dv-standard-note" role="status">{standards.note || standards.error}</p>
+    <AppShell title="Devices" subtitle={factLine} actions={actions}>
+      <div className="dv-graded dvp-page" style={gradeCssVars(standards.standard.colors)}>
+        {showFinder && (
+          <div className="dvp-toolbar">
+            {/* The List has its own search over the same fields; two boxes would be one too many. */}
+            {view !== 'register' && <DeviceFinder devices={saved} />}
+            {viewSwitch}
+          </div>
         )}
-
-        {tabs}
 
         {error && <ErrorBanner message={error} onRetry={reload} />}
 
@@ -433,113 +534,23 @@ export default function DevicesPage() {
 
         {view === 'dashboard' && (
           <>
-            <div className="stat-grid">
-              <StatCard
-                icon={Laptop}
-                label="Devices"
-                value={summary.total}
-                loading={loading}
-                onClick={() => openRegister(null, null)}
-              />
-              <StatCard
-                icon={AlertTriangle}
-                label="Need attention"
-                value={summary.needsAttention}
-                color="var(--it-danger)"
-                loading={loading}
-                onClick={() => openRegister('attention', '1')}
-              />
-              <StatCard
-                icon={ShieldCheck}
-                label="Unsupported OS"
-                value={summary.unsupportedOs}
-                color="var(--it-danger)"
-                loading={loading}
-                onClick={() => openRegister('os', 'Unsupported')}
-              />
-              <StatCard
-                icon={ShieldCheck}
-                label="Unprotected"
-                value={summary.unprotected}
-                color="var(--it-accent)"
-                loading={loading}
-                onClick={() => openRegister('av', 'Unprotected')}
-              />
-              <StatCard
-                icon={MemoryStick}
-                label="Average RAM"
-                value={summary.avgRamGB ?? '—'}
-                unit="GB"
-                loading={loading}
-              />
-              <StatCard
-                icon={Clock}
-                label="Stale scans"
-                value={summary.staleScans}
-                loading={loading}
-                onClick={() => openRegister('stale', '1')}
-              />
-              <StatCard
-                icon={AlertTriangle}
-                label="Machines with a critical part"
-                value={compliance.criticalPct ?? '—'}
-                unit={`% · ${compliance.critical} machines`}
-                color="var(--grade-critical)"
-                loading={loading}
-                onClick={() => openRegister('critical', '1')}
-              />
-              <StatCard
-                icon={ShieldCheck}
-                label="Office compliance"
-                value={compliance.complianceRate ?? '—'}
-                unit="%"
-                color={compliance.unlicensed ? 'var(--it-danger)' : 'var(--it-good)'}
-                loading={loading}
-                onClick={() => openRegister('license', 'Unlicensed')}
-              />
-              <StatCard
-                icon={Archive}
-                label="In IT Stash"
-                value={spareCount}
-                loading={loading}
-                onClick={() => navigate(mapHref({ place: PLACES.STASH }))}
-              />
-              <StatCard
-                icon={WifiOff}
-                label="Server over Wi-Fi"
-                value={compliance.networkBottlenecks}
-                color="var(--it-danger)"
-                loading={loading}
-                onClick={() => openRegister('server', 'Bottleneck')}
-              />
-              <StatCard
-                icon={Tag}
-                label="Form factor mismatch"
-                value={compliance.mismatchedFormFactor}
-                loading={loading}
-                onClick={() => openRegister('formfit', '1')}
-              />
-            </div>
-
+            {scopePicker}
             {!loading && scoped.length === 0 ? (
               <Card>
                 <EmptyState>
                   {saved.length === 0
-                    ? 'Nothing in the register yet. Open the Import tab and drop your scan reports.'
+                    ? 'Nothing in the register yet. Use Import scans to add your scan reports.'
                     : `No devices are recorded against ${department}.`}
                 </EmptyState>
               </Card>
             ) : (
-              <>
-                <DepartmentHeatmap
-                  devices={scoped}
-                  onSelect={(name, part) => {
-                    openRegister('part', `${part}:Critical`, { department: name });
-                  }}
-                />
-                <DeviceCharts devices={scoped} onFilter={openRegister} />
-                <Leaderboards devices={scoped} />
-              </>
+              <ToDoView
+                devices={scoped}
+                loading={loading}
+                spareCount={spareCount}
+                onOpen={openRegister}
+                onDepartment={(name, part) => openRegister('part', `${part}:Critical`, { department: name })}
+              />
             )}
           </>
         )}
@@ -547,94 +558,119 @@ export default function DevicesPage() {
         {view === 'register' && (
           <>
             {rowError && <ErrorBanner message={rowError} onRetry={() => setRowError('')} />}
-            <div className="dv-register-scope">
-              <label className="dv-scope">
-                <span>Location</span>
-                <select value={filters.location} onChange={(event) => setParam('location', event.target.value)}>
-                  <option value="">All locations</option>
-                  {locationOptions.map((code) => <option key={code} value={code}>{code}</option>)}
-                  <option value="Unassigned">No location yet</option>
-                </select>
-              </label>
-              <label className="dv-scope">
-                <span>Status</span>
-                <select value={filters.status} onChange={(event) => setParam('status', event.target.value)}>
-                  <option value="">All but retired</option>
-                  <option value={IN_FLEET}>In use or in repair</option>
-                  {STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
-                </select>
-              </label>
-              {!filters.status && (
-                <button type="button" className="dv-linkish" onClick={() => setParam('status', RETIRED)}>
-                  Retired machines are hidden. Show them
-                </button>
-              )}
-            </div>
             <DeviceTable
-              devices={registerRows}
+              devices={saved}
               filters={filters}
               onFilterChange={setParam}
               onSave={handleRowSave}
               onDelete={handleRowDelete}
               onDeleteMany={handleRowDeleteMany}
               busy={rowBusy}
+              locationOptions={locationOptions}
             />
           </>
         )}
 
-        {view === 'import' && stage === 'drop' && (
-          <Card className="dz-card">
-            <DropZone onFiles={handleFiles} busy={busy} />
-            {rejectedList}
-          </Card>
-        )}
-
-        {view === 'import' && stage === 'review' && (
-          <Card className="rg-card">
-            <div className="review-head">
-              <p className="review-summary">
-                {included} of {merged.length} selected
-                {flagged > 0 && <span className="review-flagged"> · {flagged} need attention</span>}
-                {waiting > 0 && <span className="review-flagged"> · {waiting} replacement{waiting === 1 ? '' : 's'} to answer</span>}
-              </p>
-              <div className="review-actions">
-                <Button variant="secondary" size="sm" onClick={resetImport}>Start over</Button>
-                <Button size="sm" disabled={included === 0 || waiting > 0} onClick={() => handleSave(null)}>
-                  {waiting > 0
-                    ? `Save — ${waiting} replacement${waiting === 1 ? '' : 's'} need${waiting === 1 ? 's' : ''} an answer`
-                    : `Save ${included} to SharePoint`}
-                </Button>
+        {view === 'import' && (
+          <section className="dvp-import" aria-labelledby="dvp-import-title">
+            <div className="dvp-import-head">
+              <button type="button" className="dvp-back" onClick={() => switchView('map')}>
+                <ChevronLeft size={14} /> Back to devices
+              </button>
+              <div className="dvp-import-title-row">
+                <h2 id="dvp-import-title" className="dvp-title">Import scans</h2>
+                <ol aria-label="Steps" className="dvp-steps">
+                  {IMPORT_STEPS.map((label, position) => {
+                    const state = position < stepIndex ? 'done' : position === stepIndex ? 'current' : 'future';
+                    return (
+                      <li
+                        key={label}
+                        className={`dvp-step dvp-step-${state}`}
+                        aria-current={state === 'current' ? 'step' : undefined}
+                      >
+                        <span className="dvp-step-dot" aria-hidden="true">
+                          {state === 'done' ? <Check size={14} /> : position + 1}
+                        </span>
+                        {label}
+                      </li>
+                    );
+                  })}
+                </ol>
               </div>
             </div>
 
-            {merged.length === 0 ? (
-              <EmptyState>Nothing to review.</EmptyState>
-            ) : (
-              <ReviewGrid
-                devices={merged}
-                excluded={excluded}
-                onChange={handleChange}
-                onToggleRow={handleToggleRow}
-                prompts={prompts}
-                answers={answers}
-                notices={notices}
-                onAnswer={(key, value) => setAnswers((current) => ({ ...current, [key]: value }))}
-              />
+            {stage === 'drop' && (
+              <Card className="dz-card">
+                <DropZone onFiles={handleFiles} busy={busy} />
+                {rejectedList}
+              </Card>
             )}
 
-            <DropZone onFiles={handleFiles} busy={busy} compact />
+            {stage === 'review' && (
+              <Card className="rg-card">
+                <div className="dvp-review-bar">
+                  <ul className="dvp-figures">
+                    <li><strong>{merged.length}</strong> files read</li>
+                    <li><strong>{included}</strong> to save</li>
+                    <li className={flagged > 0 ? 'dvp-fig-warn' : undefined}>
+                      <strong>{flagged}</strong> need attention
+                    </li>
+                    <li className={waiting > 0 ? 'dvp-fig-amber' : undefined}>
+                      <strong>{waiting}</strong> {waiting === 1 ? 'question' : 'questions'}
+                    </li>
+                  </ul>
+                  <div className="dvp-save">
+                    {waiting > 0 && (
+                      <p className="dvp-save-note" role="status">Answer {plural(waiting, 'question')} first ↓</p>
+                    )}
+                    <Button variant="secondary" size="sm" onClick={resetImport}>Start over</Button>
+                    <Button
+                      size="sm"
+                      disabled={included === 0 || waiting > 0}
+                      onClick={() => handleSave(null)}
+                    >
+                      Save {plural(included, 'machine')}
+                    </Button>
+                  </div>
+                </div>
 
-            {rejectedList}
-          </Card>
+                {merged.length === 0 ? (
+                  <EmptyState>Nothing to review.</EmptyState>
+                ) : (
+                  <ReviewGrid
+                    devices={merged}
+                    excluded={excluded}
+                    onChange={handleChange}
+                    onToggleRow={handleToggleRow}
+                    prompts={prompts}
+                    answers={answers}
+                    notices={notices}
+                    onAnswer={(key, value) => setAnswers((current) => ({ ...current, [key]: value }))}
+                  />
+                )}
+
+                <DropZone onFiles={handleFiles} busy={busy} compact />
+
+                {rejectedList}
+              </Card>
+            )}
+
+            {stage === 'save' && (
+              <Card>
+                <SaveProgress state={save} onRetry={handleSave} onDone={resetImport} />
+              </Card>
+            )}
+          </section>
         )}
 
-        {view === 'import' && stage === 'save' && (
-          <Card>
-            <SaveProgress state={save} onRetry={handleSave} onDone={resetImport} />
-          </Card>
+        {view === 'standards' && (
+          <>
+            <button type="button" className="dvp-back" onClick={() => switchView('map')}>
+              <ChevronLeft size={14} /> Back to devices
+            </button>
+            <StandardsPage devices={saved} standards={standards} />
+          </>
         )}
-
-        {view === 'standards' && <StandardsPage devices={saved} standards={standards} />}
       </div>
     </AppShell>
   );

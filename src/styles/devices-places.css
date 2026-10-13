@@ -1,0 +1,163 @@
+/* devices-places — /devices redesign (Oct 2026). Loads after devices.css.
+   The places map is a mind map: a hub circle, donut rings for locations and
+   departments, and a hexagon, diamond and tombstone for the Stash, No location
+   and Retired. Grade colours always come from the --grade-* variables. */
+
+/* ---- header and legend ---- */
+.mm-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px; }
+.mm-head .dm-head { flex: 1 1 320px; }
+.mm-legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--it-ink-soft); }
+.mm-legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.mm-dot { display: inline-block; width: 10px; height: 10px; border-radius: 999px; flex: none; }
+
+/* ---- board ---- */
+.mm { display: flex; flex-direction: column; gap: 12px; }
+.mm-board {
+  position: relative; height: 640px; border-radius: 28px; overflow: hidden;
+  border: 1px solid var(--it-line);
+  background: radial-gradient(circle at 50% 48%, var(--it-panel) 0, var(--it-panel) 30%, var(--it-canvas) 100%);
+}
+.mm-branches { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+.mm-branches-phone { display: none; }
+.mm-branches path { fill: none; stroke-width: 2.5; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.mm-branch-solid { stroke: var(--it-brand-line); opacity: .7; }
+.mm-branch-dashed { stroke: var(--it-ink-soft); stroke-width: 2 !important; stroke-dasharray: 6 6; opacity: .45; }
+.mm-branch-dotted { stroke: var(--it-accent); stroke-width: 2 !important; stroke-dasharray: 2 6; }
+
+/* Every node is positioned by its centre, so the branches meet the shape, not its label. */
+.mm-node {
+  position: absolute; z-index: 1; display: block; transform: translate(-50%, -50%);
+  left: var(--x); top: var(--y);
+  text-decoration: none; color: var(--it-ink); transition: transform 140ms cubic-bezier(.2, 0, .2, 1);
+}
+a.mm-node:hover { transform: translate(-50%, -50%) scale(1.03); }
+.mm-node:focus-visible { outline: 3px solid var(--it-brand-line); outline-offset: 6px; }
+
+.mm-hole {
+  position: absolute; inset: 13%; border-radius: 999px; background: var(--it-panel);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  padding: 8px; text-align: center; min-width: 0;
+}
+.mm-name {
+  display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 22px; font-weight: 800; letter-spacing: -0.02em; color: var(--it-ink);
+}
+.mm-sub { font-size: 12px; color: var(--it-ink-soft); }
+
+.mm-lg { width: 160px; height: 160px; border-radius: 999px; box-shadow: 0 6px 18px rgba(15, 23, 42, .10); }
+.mm-md { width: 140px; height: 140px; border-radius: 999px; box-shadow: 0 6px 18px rgba(15, 23, 42, .10); }
+.mm-sm { width: 120px; height: 120px; border-radius: 999px; box-shadow: 0 6px 18px rgba(15, 23, 42, .10); }
+.mm-md .mm-name { font-size: 19px; }
+.mm-sm .mm-name { font-size: 17px; }
+.mm-unassigned { outline: 2px dashed var(--it-ink-soft); outline-offset: 8px; }
+.mm-unassigned.mm-node:focus-visible { outline-style: solid; }
+
+/* Hub: the fleet (or the location), never a link. */
+.mm-hub {
+  width: 150px; height: 150px; border-radius: 999px; background: var(--it-brand); color: var(--it-on-brand);
+  box-shadow: 0 0 0 10px rgba(0, 120, 212, .12), 0 0 0 22px rgba(0, 120, 212, .06);
+}
+.mm-hub .mm-hole { inset: 0; background: transparent; color: inherit; }
+.mm-hub-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; opacity: .9; }
+.mm-hub-count { font-size: 38px; font-weight: 700; line-height: 1; }
+.mm-hub-sub { font-size: 13px; opacity: .9; }
+
+/* Shapes for the places that are not locations. */
+.mm-hex { width: 118px; height: 104px; }
+.mm-diamond { width: 74px; height: 74px; }
+.mm-tomb { width: 64px; height: 76px; }
+.mm-shape {
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+}
+.mm-hex .mm-shape {
+  clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+  background: var(--it-brand-wash); color: var(--it-brand);
+}
+.mm-diamond .mm-shape {
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+  background: var(--it-accent); color: #101828;
+}
+.mm-tomb .mm-shape {
+  border-radius: 32px 32px 8px 8px; border: 2px solid var(--it-line); box-sizing: border-box;
+  background: var(--it-thead); color: var(--it-ink-soft);
+}
+.mm-big { font-size: 28px; font-weight: 700; line-height: 1; }
+.mm-diamond .mm-big { font-size: 22px; }
+.mm-tomb .mm-big { font-size: 20px; }
+.mm-shape-name { font-size: 12px; font-weight: 600; }
+
+/* Captions sit under the shape and may be wider than it. */
+.mm-caption {
+  position: absolute; top: calc(100% + 10px); left: 50%; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  white-space: nowrap; text-align: center; font-size: 13px; color: var(--it-ink-soft); pointer-events: none;
+}
+.mm-caption-title { font-size: 14px; color: var(--it-ink); }
+.mm-line { font-size: 12px; color: var(--it-ink-soft); background: var(--it-panel); border-radius: 6px; padding: 0 5px; }
+.mm-amber { color: #9a5800; font-weight: 600; }
+[data-theme='dark'] .mm-amber { color: var(--it-accent); }
+
+/* The diamond and the tombstone are small and sit on the edges of the board: their words go beside them. */
+.mm-diamond .mm-caption, .mm-tomb .mm-caption {
+  top: 50%; left: calc(100% + 12px); transform: translateY(-50%); align-items: flex-start; text-align: left;
+}
+.mm-pill {
+  padding: 5px 12px; border-radius: 999px; background: var(--it-ink); color: var(--it-canvas);
+  font-size: 13px; font-weight: 600;
+}
+
+/* Keyboard hint only where there is a keyboard to use. */
+.mm-keys { display: none; margin: 0; font-size: 13px; color: var(--it-ink-soft); }
+@media (pointer: fine) { .mm-keys { display: block; } }
+.mm-keys kbd {
+  font: inherit; font-size: 12px; color: var(--it-ink-soft); border: 1px solid var(--it-line);
+  border-radius: 6px; padding: 2px 6px; margin: 0 2px;
+}
+
+/* ---- machine card ---- */
+.mc-status {
+  align-self: flex-start; font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; white-space: nowrap;
+  background: var(--it-brand-wash); color: var(--it-brand);
+}
+.mc-status-retired { background: var(--it-thead); color: var(--it-ink-soft); }
+.mc-status-repair { background: var(--it-accent-wash); color: var(--it-ink); }
+.mc-fine { font-size: 13px; font-weight: 600; color: var(--it-good); }
+
+/* ---- phone ---- */
+@media (max-width: 640px) {
+  /* Phone: the board is as tall as its layout, and every node moves to its phone position. */
+  .mm-board { height: var(--phone-h, 560px); }
+  .mm-node { left: var(--px); top: var(--py); }
+  .mm-branches-wide { display: none; }
+  .mm-branches-phone { display: block; }
+  .mm-diamond .mm-caption, .mm-tomb .mm-caption {
+    top: calc(100% + 8px); left: 50%; transform: translateX(-50%); align-items: center; text-align: center;
+  }
+  .mm-lg, .mm-md { width: 104px; height: 104px; }
+  .mm-sm { width: 96px; height: 96px; }
+  .mm-lg .mm-name, .mm-md .mm-name, .mm-sm .mm-name { font-size: 16px; }
+  .mm-lg .mm-sub, .mm-md .mm-sub, .mm-sm .mm-sub { font-size: 11px; }
+  .mm-hole { padding: 4px; }
+  .mm-hub { width: 96px; height: 96px; }
+  .mm-hub-count { font-size: 26px; }
+  .mm-hub-eyebrow, .mm-hub-sub { font-size: 11px; }
+  .mm-hex { width: 84px; height: 74px; }
+  .mm-diamond { width: 64px; height: 64px; }
+  .mm-tomb { width: 48px; height: 56px; }
+  .mm-big { font-size: 20px; }
+  .mm-shape-name { font-size: 11px; }
+  .mm-caption { font-size: 11px; }
+  .mm-caption-title { font-size: 12px; }
+  .mm-pill { font-size: 12px; padding: 3px 9px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mm-node, a.mm-node:hover { transition: none; transform: translate(-50%, -50%); }
+}
+
+/* A department name longer than a site code wraps onto two lines at a smaller size, rather than losing its end. */
+.mm-name.mm-name-long {
+  white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: break-word;
+  font-size: 13px; line-height: 1.15; letter-spacing: 0;
+}
+.mm-sm .mm-name.mm-name-long { font-size: 11px; }

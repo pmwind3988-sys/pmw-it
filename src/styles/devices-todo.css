@@ -1,0 +1,318 @@
+/* devices-todo — /devices redesign (Oct 2026). Loads after devices.css. */
+
+.todo {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+.todo-spare {
+  margin: 0;
+  font-size: 14px;
+  color: var(--it-ink-soft);
+}
+
+.todo .ui-card,
+.todo-card,
+.todo .lb-card,
+.todo .chart-card {
+  border-radius: 24px;
+}
+
+/* ---- What needs doing ---- */
+
+.todo-card {
+  background: var(--it-panel);
+  border: 1px solid var(--it-line);
+  box-shadow: var(--it-card-shadow);
+  padding: 8px 20px 8px 24px;
+  min-width: 0;
+}
+
+.todo-title {
+  margin: 16px 0 8px;
+  font-size: 20px;
+}
+
+.todo-sub {
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--it-ink-soft);
+}
+
+.todo-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.todo-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  padding: 14px 0;
+  border-top: 1px solid var(--it-line);
+}
+
+.todo-mark {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 18px;
+  box-sizing: border-box;
+}
+
+.todo-mark--circle { border-radius: 999px; }
+.todo-mark--square { border-radius: 12px; }
+.todo-mark--diamond { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.todo-mark--triangle {
+  clip-path: polygon(50% 4%, 100% 96%, 0 96%);
+  font-size: 15px;
+  padding-top: 10px;
+}
+
+.todo-mark--urgent {
+  background: var(--grade-critical);
+  color: var(--grade-critical-ink);
+}
+.todo-mark--warning {
+  background: var(--grade-attention);
+  color: var(--grade-attention-ink);
+}
+.todo-mark--suggestion {
+  background: color-mix(in srgb, var(--it-brand) 16%, transparent);
+  color: var(--it-brand);
+}
+.todo-mark--upkeep {
+  background: var(--grade-unknown);
+  color: var(--grade-unknown-ink);
+}
+
+.todo-text {
+  flex: 1 1 320px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.todo-item-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.todo-why {
+  font-size: 14px;
+  color: var(--it-ink-soft);
+}
+
+.todo-count {
+  font-size: 28px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-width: 56px;
+  text-align: right;
+}
+
+.todo-show {
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  padding: 10px 16px;
+  min-height: 44px;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--it-brand) 12%, transparent);
+  color: var(--it-brand);
+  cursor: pointer;
+}
+
+.todo-show:hover { filter: brightness(0.96); }
+
+.todo-skeleton {
+  height: 160px;
+  margin: 8px 0 16px;
+  border-radius: 16px;
+  background: linear-gradient(90deg, var(--it-line) 0%, transparent 50%, var(--it-line) 100%);
+  background-size: 200% 100%;
+  color: var(--it-ink-soft);
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: todo-shimmer 1.4s linear infinite;
+}
+
+@keyframes todo-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+/* ---- Heatmap and makeup side by side ---- */
+
+.todo-two {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.todo-two > * {
+  flex: 1 1 340px;
+  min-width: 0;
+}
+
+.todo-two > .dv-heat {
+  flex-basis: 560px;
+  flex-grow: 999;
+}
+
+.hm-total {
+  font-weight: 400;
+  color: var(--it-ink-soft);
+}
+
+.hm-dot {
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: var(--grade-critical);
+  color: var(--grade-critical-ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0;
+  cursor: pointer;
+}
+
+.hm-dot:hover { filter: brightness(0.92); }
+
+.hm-zero {
+  color: var(--it-line);
+  font-size: 18px;
+  line-height: 1;
+}
+
+/* ---- Fleet makeup ---- */
+
+.todo-makeup {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 24px;
+}
+
+.todo-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.todo-pill {
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--it-line);
+  background: var(--it-panel);
+  color: var(--it-ink);
+  cursor: pointer;
+}
+
+.todo-pill.is-on {
+  background: var(--it-ink);
+  border-color: var(--it-ink);
+  color: var(--it-panel);
+}
+
+.todo-bars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.todo-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.todo-bar-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  gap: 12px;
+}
+
+.todo-track {
+  display: block;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--it-line);
+  overflow: hidden;
+}
+
+.todo-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--it-brand);
+}
+
+.todo-fill.is-grey {
+  background: var(--grade-unknown);
+}
+
+.todo-foot {
+  margin: 0;
+  font-size: 13px;
+  color: var(--it-ink-soft);
+}
+
+/* ---- Leaderboards ---- */
+
+.todo-boards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 20px;
+}
+
+.todo-board a {
+  color: var(--it-brand);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.todo-board a:hover { text-decoration: underline; }
+
+/* ---- Phone ---- */
+
+@media (max-width: 640px) {
+  .todo-card { padding: 4px 16px 4px 16px; }
+  .todo-count { min-width: 40px; font-size: 24px; }
+  /* One row per problem: marker, words, count; the button sits under the words. */
+  .todo-row { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; gap: 6px 12px; align-items: start; }
+  .todo-mark { width: 32px; height: 32px; font-size: 15px; }
+  .todo-mark--triangle { font-size: 12px; padding-top: 8px; }
+  .todo-text { min-width: 0; }
+  .todo-show { grid-column: 2 / -1; justify-self: start; width: auto; }
+  .todo-two > .dv-heat { flex-basis: 100%; }
+}

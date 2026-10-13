@@ -215,3 +215,24 @@ describe('status and location filters', () => {
     expect(applyFilters(rows, { status: IN_FLEET }).map((r) => r.computerName)).toEqual(['A']);
   });
 });
+
+describe('risk filter by band', () => {
+  const rows = [{ riskLevel: 'Critical' }, { riskLevel: 'High' }, { riskLevel: 'Watch' }, { riskLevel: 'OK' }];
+  it('reads High as both stored top levels, and keeps old stored-value links working', () => {
+    expect(applyFilters(rows, { risk: 'High' })).toHaveLength(2);
+    expect(applyFilters(rows, { risk: 'Medium' })).toEqual([{ riskLevel: 'Watch' }]);
+    expect(applyFilters(rows, { risk: 'Critical' })).toEqual([{ riskLevel: 'Critical' }]);
+  });
+});
+
+describe('work filter and wider search', () => {
+  it('finds machines needing work and searches serial and AnyDesk', () => {
+    const rows = [
+      { computerName: 'A', parts: { cpu: { grade: 'Critical' } }, serialNumber: '7H2KQ93' },
+      { computerName: 'B', parts: { cpu: { grade: 'Optimal' } }, anydeskId: '1 284 553' },
+    ];
+    expect(applyFilters(rows, { work: '1' }).map((d) => d.computerName)).toEqual(['A']);
+    expect(applyFilters(rows, { q: 'h2kq' }).map((d) => d.computerName)).toEqual(['A']);
+    expect(applyFilters(rows, { q: '284' }).map((d) => d.computerName)).toEqual(['B']);
+  });
+});

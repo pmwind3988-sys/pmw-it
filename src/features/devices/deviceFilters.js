@@ -1,5 +1,6 @@
 import { statusOf, inFleet } from './lifecycle/status.js';
 import { cleanLocation } from './map/locations.js';
+import { needsWork, securityRiskOf } from './health.js';
 
 const STALE_MS = 180 * 86_400_000;
 
@@ -27,7 +28,9 @@ export const labelOf = (value) =>
 export const ATTENTION_LEVELS = ['Critical', 'High'];
 
 const MATCHERS = {
-  risk: (device, value) => device.riskLevel === value,
+  // A stored level (Critical, High, Watch, OK -- old links carry these) or the
+  // band a person reads (High, Medium, Low).
+  risk: (device, value) => device.riskLevel === value || securityRiskOf(device.riskLevel) === value,
   attention: (device) => ATTENTION_LEVELS.includes(device.riskLevel),
   type: (device, value) => labelOf(device.deviceType) === value,
   department: (device, value) => labelOf(device.department) === value,
@@ -46,6 +49,8 @@ const MATCHERS = {
     return device.parts?.[key]?.grade === grade;
   },
   critical: (device) => (device.criticalParts?.length ?? 0) > 0,
+  // Critical or Needs attention on any part -- the map's "need work" figure.
+  work: (device) => needsWork(device),
   persona: (device, value) => labelOf(device.personaLabel) === value,
   license: (device, value) => labelOf(device.licenseStatus) === value,
   // Two different questions, one key: 'Dependent' is everyone whose work lives
@@ -59,7 +64,8 @@ const MATCHERS = {
   location: (device, value) => labelOf(cleanLocation(device.location)) === value,
   q: (device, value) => {
     const needle = value.toLowerCase();
-    return `${device.computerName ?? ''} ${device.owner ?? ''}`.toLowerCase().includes(needle);
+    return `${device.computerName ?? ''} ${device.owner ?? ''} ${device.serialNumber ?? ''} ${device.anydeskId ?? ''}`
+      .toLowerCase().includes(needle);
   },
 };
 

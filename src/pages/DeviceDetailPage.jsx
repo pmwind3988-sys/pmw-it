@@ -1,16 +1,17 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import AppShell from '../components/AppShell';
 import { gradeCssVars } from '../features/devices/standards/gradeColors';
 import { Card, EmptyState, ErrorBanner } from '../components/ui/Surfaces';
 import Button from '../components/ui/Button';
-import { ArrowLeft, RefreshCw } from '../components/ui/Icons';
+import { RefreshCw } from '../components/ui/Icons';
 import { useDevices } from '../features/devices/useDevices';
 import { groupsFor, RAW_REPORT_KEY } from '../features/devices/fieldGroups';
 import { formatScalar } from '../features/devices/formatValue';
 import ValueCell from '../features/devices/ui/ValueCell';
 import { toneForField, toneForEntry, hasEntryTones } from '../features/devices/fieldTone';
-import { formatMYT } from '../utils/malaysiaTime';
+import { formatMYT, toEpochMs } from '../utils/malaysiaTime';
+import { relativeDays } from '../utils/relativeDays';
 import { useSharePointToken } from '../hooks/useRequests';
 import { useDeviceHistory } from '../features/devices/useDeviceHistory';
 import LifecycleActions from '../features/devices/ui/LifecycleActions';
@@ -19,15 +20,21 @@ import SpecHistory from '../features/devices/ui/SpecHistory';
 import { performLifecycle, retryStints, correctOpenStint } from '../features/devices/sharepoint/writeLifecycle';
 import { statusOf } from '../features/devices/lifecycle/status';
 import { locationsIn } from '../features/devices/map/locations';
-import { labelOf } from '../features/devices/deviceFilters';
 import { mapHref } from '../features/devices/map/mapLinks';
 import PartTable from '../features/devices/ui/PartTable';
 import PlaceFill from '../features/devices/ui/PlaceFill';
 import { updateDevice } from '../features/devices/sharepoint/updateDevice';
+import { matchingGroups } from '../features/devices/fieldSearch';
 
 /** Remembered per browser: somebody who turns the colouring off is not asked
  *  to turn it off again on the next machine they open. */
 const TONE_KEY = 'deviceValueTones';
+
+const TABS = [
+  ['details', 'Details'],
+  ['history', 'History'],
+  ['report', 'Scan report'],
+];
 
 const SHAREPOINT_SITE_URL =
   import.meta.env.VITE_SHAREPOINT_SITE_URL || 'https://pmwgroupcom.sharepoint.com/sites/IThelpdesk';
@@ -40,13 +47,66 @@ const readTonePreference = () => {
   }
 };
 
-/** One machine, everything the scan read out of it, grouped by what it is. */
+/** A scan's time as an instant, or NaN when the register holds no usable value. */
+const instantOf = (value) => {
+  if (value === null || value === undefined || value === '') return NaN;
+  try {
+    const ms = typeof value === 'number' ? value : toEpochMs(value);
+    return Number.isFinite(ms) ? ms : NaN;
+  } catch {
+    return NaN;
+  }
+};
+
+/** A field's value as the search reads it: what the page would show. */
+const searchText = (device, field) => {
+  try {
+    return formatScalar(device[field.key], field.kind);
+  } catch {
+    return String(device[field.key] ?? '');
+  }
+};
+
+/** The serial with a Copy button that says Copied for two seconds. */
+function SerialValue({ serial }) {
+  const [copied, setCopied] = useState(false);
+  const timer = useRef(null);
+  const canCopy = typeof navigator !== 'undefined' && Boolean(navigator.clipboard?.writeText);
+
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  const copy = async () => {
+    if (!canCopy) return;
+    try {
+      await navigator.clipboard.writeText(String(serial));
+      setCopied(true);
+      clearTimeout(timer.current);
+      timer.current = setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // The serial is still on screen to copy by hand.
+    }
+  };
+
+  return (
+    <div className="mh-def">
+      <span className="mh-def-k">Serial</span>
+      <span className="mh-def-v mh-mono">{serial}</span>
+      <button type="button" className="mh-copy" onClick={copy} disabled={!canCopy}>
+        {copied ? 'Copied' : 'Copy'}
+      </button>
+    </div>
+  );
+}
+
+/** One machine: its health, its owner and place, and everything the scan read. */
 export default function DeviceDetailPage() {
   const { id } = useParams();
-  const navigate = useNavigate();
   const { devices, loading, error, reload, standards } = useDevices();
+  const [params, setParams] = useSearchParams();
+  const tabBase = useId();
+  const tabRefs = useRef({});
   const [showEmpty, setShowEmpty] = useState(false);
-  const [showRaw, setShowRaw] = useState(false);
+  const [query, setQuery] = useState('');
   const [showTones, setShowTones] = useState(readTonePreference);
   const getToken = useSharePointToken();
   const [acting, setActing] = useState(false);
@@ -54,6 +114,9 @@ export default function DeviceDetailPage() {
   const [actionNote, setActionNote] = useState('');
   const [pending, setPending] = useState([]);
   const [placing, setPlacing] = useState(false);
+
+  const requestedTab = params.get('tab');
+  const tab = TABS.some(([key]) => key === requestedTab) ? requestedTab : 'details';
 
   useEffect(() => {
     try {
@@ -74,12 +137,38 @@ export default function DeviceDetailPage() {
     () => (device ? groupsFor(device, { includeEmpty: showEmpty }) : []),
     [device, showEmpty],
   );
+  const shownGroups = useMemo(
+    () => matchingGroups(groups, query, (field) => searchText(device ?? {}, field)),
+    [groups, query, device],
+  );
 
   const manual = new Set(device?.manualFields ?? []);
 
   const owners = useMemo(() => [...new Set(devices.map((d) => d.owner).filter(Boolean))].sort(), [devices]);
   const departments = useMemo(() => [...new Set(devices.map((d) => d.department).filter(Boolean))].sort(), [devices]);
   const locations = useMemo(() => locationsIn(devices), [devices]);
+
+  const chooseTab = (key) => {
+    setParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('tab', key);
+      return next;
+    }, { replace: true });
+  };
+
+  const onTabKey = (event) => {
+    const at = TABS.findIndex(([key]) => key === tab);
+    let to = null;
+    if (event.key === 'ArrowRight') to = (at + 1) % TABS.length;
+    else if (event.key === 'ArrowLeft') to = (at - 1 + TABS.length) % TABS.length;
+    else if (event.key === 'Home') to = 0;
+    else if (event.key === 'End') to = TABS.length - 1;
+    if (to === null) return;
+    event.preventDefault();
+    const [key] = TABS[to];
+    chooseTab(key);
+    tabRefs.current[key]?.focus();
+  };
 
   const act = async (action, input) => {
     setActing(true);
@@ -150,6 +239,13 @@ export default function DeviceDetailPage() {
     }
   };
 
+  const toggleTones = () => setShowTones((on) => !on);
+
+  const status = device ? statusOf(device) : '';
+  const kind = device ? [device.deviceType, device.computerModel].filter(Boolean).join(' · ') : '';
+  const scanned = device ? instantOf(device.scannedOn) : NaN;
+  const rawReport = device?.[RAW_REPORT_KEY];
+
   return (
     <AppShell
       title={device?.computerName ?? 'Device'}
@@ -157,22 +253,17 @@ export default function DeviceDetailPage() {
         ? [device.owner, device.department].filter(Boolean).join(' · ') || 'No owner recorded'
         : 'Looking this machine up in the register'}
       actions={(
-        <>
-          <Button variant="secondary" size="sm" icon={ArrowLeft} onClick={() => navigate(-1)}>
-            Back
-          </Button>
-          <Button variant="secondary" size="sm" icon={RefreshCw} onClick={reload} loading={loading}>
-            Refresh
-          </Button>
-        </>
+        <Button variant="secondary" size="sm" icon={RefreshCw} onClick={reload} loading={loading}>
+          Refresh
+        </Button>
       )}
     >
-      <div className="dv-graded" style={gradeCssVars(standards.standard.colors)}>
+      <div className="dv-graded mh-page" style={gradeCssVars(standards.standard.colors)}>
         {(standards.note || standards.error) && (
           <p className="dv-standard-note" role="status">{standards.note || standards.error}</p>
         )}
 
-          {error && <ErrorBanner message={error} onRetry={reload} />}
+        {error && <ErrorBanner message={error} onRetry={reload} />}
 
         {!device ? (
           <Card>
@@ -191,119 +282,138 @@ export default function DeviceDetailPage() {
         ) : (
           <>
             <nav className="dm-crumbs" aria-label="Breadcrumb">
-              <Link to={mapHref()}>Map</Link>
+              <Link to={mapHref()}>Devices</Link>
               {device.location && (<><span aria-hidden="true">›</span><Link to={mapHref({ location: device.location })}>{device.location}</Link></>)}
-              {device.location && (<><span aria-hidden="true">›</span><Link to={mapHref({ location: device.location, department: labelOf(device.department) })}>{labelOf(device.department)}</Link></>)}
+              {device.location && device.department && (<><span aria-hidden="true">›</span><Link to={mapHref({ location: device.location, department: device.department })}>{device.department}</Link></>)}
               <span aria-hidden="true">›</span><span aria-current="page">{device.computerName}</span>
             </nav>
 
-            <Card className="dd-life">
-              <div className="dd-life-head">
-                <span className={`dd-status dd-status-${statusOf(device).replace(' ', '-').toLowerCase()}`}>{statusOf(device)}</span>
-                <span className="dd-life-who">
-                  {device.owner
-                    ? <>With <strong>{device.owner}</strong>{[device.location, device.department].filter(Boolean).map((v) => ` · ${v}`).join('')}</>
-                    : 'Nobody has it'}
-                  {device.serialNumber && <span className="dd-life-serial">Serial {device.serialNumber}</span>}
-                </span>
-                <LifecycleActions device={device} owners={owners} locations={locations} departments={departments} onAction={act} busy={acting} />
+            <Card className="mh-head">
+              <div className="mh-head-top">
+                <div className="mh-head-id">
+                  <div className="mh-head-line">
+                    <span className={`dd-status dd-status-${status.replace(' ', '-').toLowerCase()}`}>{status}</span>
+                    {kind && <span className="mh-kind">{kind}</span>}
+                  </div>
+                  <div className="mh-defs">
+                    <PlaceFill
+                      key={`${device.id}|${device.owner ?? ''}|${device.location ?? ''}|${device.department ?? ''}`}
+                      device={device} owners={owners} locations={locations} departments={departments}
+                      onSave={fillPlace} busy={placing} />
+                    {device.serialNumber && <SerialValue serial={device.serialNumber} />}
+                    {Number.isFinite(scanned) && (
+                      <div className="mh-def">
+                        <span className="mh-def-k">Scanned</span>
+                        <span className="mh-def-v">
+                          {relativeDays(scanned)}
+                          <span className="mh-muted"> · {formatMYT(scanned, 'datetime12')}</span>
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <LifecycleActions device={device} owners={owners} locations={locations} departments={departments}
+                  onAction={act} busy={acting} showTones={showTones} onToggleTones={toggleTones} />
               </div>
-              <PlaceFill key={`${device.id}|${device.owner ?? ''}|${device.location ?? ''}|${device.department ?? ''}`} device={device}
-                owners={owners} locations={locations} departments={departments}
-                onSave={fillPlace} busy={placing} />
               {actionNote && !actionError && <p className="dd-note" role="status">{actionNote}</p>}
               {actionError && <ErrorBanner message={actionError} busy={acting} onRetry={pending.length ? retry : undefined} />}
             </Card>
 
-            <div className="dd-histories">
-              <OwnerHistory device={device} stints={history.stints} loading={history.loading} />
-              <SpecHistory changes={history.changes} loading={history.loading} />
-            </div>
-            {history.error && <ErrorBanner message={history.error} onRetry={history.reload} />}
-
-            <div className="dd-summary">
-              <span className={`dd-risk rg-risk-${String(device.riskLevel).toLowerCase()}`}>
-                {device.riskLevel ?? 'Unknown'}
-                {typeof device.riskScore === 'number' && (
-                  <span className="dd-risk-score">{device.riskScore}</span>
-                )}
-              </span>
-              <span className="dd-scanned">
-                Scanned {formatMYT(device.scannedOn, 'datetime12')}
-                <span className="dd-scanned-zone"> Malaysia time</span>
-              </span>
-              <label className="dd-toggle">
-                <input
-                  type="checkbox"
-                  checked={showEmpty}
-                  onChange={(event) => setShowEmpty(event.target.checked)}
-                />
-                Show the fields the scan left blank
-              </label>
-              <label className="dd-toggle dd-toggle-tones">
-                <input
-                  type="checkbox"
-                  checked={showTones}
-                  onChange={(event) => setShowTones(event.target.checked)}
-                />
-                Colour the risks red and the healthy values green
-              </label>
-            </div>
-
             <PartTable device={device} />
 
-            <div className="dd-groups">
-              {groups.map((group) => (
-                <Card key={group.id} className="dd-group">
-                  <h2 className="dd-group-title">
-                    {group.title}
-                    {group.hint && <span className="dd-group-hint">{group.hint}</span>}
-                  </h2>
-                  <dl className="dd-fields">
-                    {group.fields.map((field) => (
-                      <div className="dd-field" key={field.key}>
-                        <dt>
-                          {field.label}
-                          {manual.has(field.key) && (
-                            <span className="dt-manual" title="Set by hand — imports leave this alone">
-                              edited
-                            </span>
-                          )}
-                        </dt>
-                        <dd>
-                          <ValueCell
-                            value={device[field.key]}
-                            fieldKey={field.key}
-                            kind={field.kind}
-                            tone={showTones ? toneForField(device, field.key) : null}
-                            entryTone={showTones && hasEntryTones(field.key)
-                              ? (text) => toneForEntry(field.key, text)
-                              : undefined}
-                          />
-                        </dd>
-                      </div>
-                    ))}
-                  </dl>
-                </Card>
+            <div role="tablist" aria-label="More about this machine" className="mh-tabs">
+              {TABS.map(([key, label]) => (
+                <button key={key} type="button" role="tab" id={`${tabBase}-${key}`}
+                  aria-selected={tab === key} aria-controls={`${tabBase}-panel`}
+                  tabIndex={tab === key ? 0 : -1}
+                  ref={(el) => { tabRefs.current[key] = el; }}
+                  className={`mh-tab${tab === key ? ' mh-tab-on' : ''}`}
+                  onClick={() => chooseTab(key)} onKeyDown={onTabKey}>
+                  {label}
+                </button>
               ))}
             </div>
 
-            {device[RAW_REPORT_KEY] && (
-              <Card className="dd-raw">
-                <button
-                  type="button"
-                  className="dd-raw-toggle"
-                  onClick={() => setShowRaw((open) => !open)}
-                  aria-expanded={showRaw}
-                >
-                  {showRaw ? 'Hide' : 'Show'} the scan report
-                  {device.sourceFileName && (
-                    <span className="dd-raw-file">{formatScalar(device.sourceFileName)}</span>
+            <div role="tabpanel" id={`${tabBase}-panel`} aria-labelledby={`${tabBase}-${tab}`} className="mh-panel">
+              {tab === 'details' && (
+                <>
+                  <div className="mh-details-bar">
+                    <input type="search" className="mh-find" value={query}
+                      onChange={(event) => setQuery(event.target.value)} aria-label="Find a field"
+                      placeholder="Find a field — e.g. IP, AnyDesk, Outlook" />
+                    <label className="mh-blanks">
+                      <input type="checkbox" checked={showEmpty} onChange={(event) => setShowEmpty(event.target.checked)} />
+                      Show blanks
+                    </label>
+                  </div>
+
+                  {shownGroups.length === 0 && (
+                    <p className="mh-none">
+                      {query.trim() ? `No field matches “${query.trim()}”.` : 'No fields to show.'}
+                    </p>
                   )}
-                </button>
-                {showRaw && <pre className="dd-raw-text">{device[RAW_REPORT_KEY]}</pre>}
-              </Card>
-            )}
+
+                  <div className="dd-groups">
+                    {shownGroups.map((group) => (
+                      <Card key={group.id} className="dd-group">
+                        <h2 className="dd-group-title">
+                          {group.title}
+                          {group.hint && <span className="dd-group-hint">{group.hint}</span>}
+                        </h2>
+                        <dl className="dd-fields">
+                          {group.fields.map((field) => (
+                            <div className="dd-field" key={field.key}>
+                              <dt>
+                                {field.label}
+                                {manual.has(field.key) && (
+                                  <span className="dt-manual" title="Set by hand — imports leave this alone">
+                                    edited
+                                  </span>
+                                )}
+                              </dt>
+                              <dd>
+                                <ValueCell
+                                  value={device[field.key]}
+                                  fieldKey={field.key}
+                                  kind={field.kind}
+                                  tone={showTones ? toneForField(device, field.key) : null}
+                                  entryTone={showTones && hasEntryTones(field.key)
+                                    ? (text) => toneForEntry(field.key, text)
+                                    : undefined}
+                                />
+                              </dd>
+                            </div>
+                          ))}
+                        </dl>
+                      </Card>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {tab === 'history' && (
+                <>
+                  <div className="dd-histories">
+                    <OwnerHistory device={device} stints={history.stints} loading={history.loading} />
+                    <SpecHistory changes={history.changes} loading={history.loading} />
+                  </div>
+                  {history.error && <ErrorBanner message={history.error} onRetry={history.reload} />}
+                </>
+              )}
+
+              {tab === 'report' && (
+                rawReport ? (
+                  <Card className="mh-report">
+                    <p className="mh-report-file">
+                      {device.sourceFileName ? formatScalar(device.sourceFileName) : 'Scan report'}
+                    </p>
+                    <pre className="dd-raw-text mh-raw">{rawReport}</pre>
+                  </Card>
+                ) : (
+                  <p className="mh-none">No scan report was stored for this machine.</p>
+                )
+              )}
+            </div>
           </>
         )}
       </div>

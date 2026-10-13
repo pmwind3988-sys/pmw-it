@@ -1,0 +1,499 @@
+/* devices-page — /devices redesign (Oct 2026). Loads after devices.css. */
+
+/* Screen-reader-only text (labels that are shown by the control, not as text). */
+.dvp-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.dvp-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+/* ---- Header actions and the settings menu ------------------------------- */
+
+.dvp-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dvp-menu {
+  position: relative;
+}
+
+.dvp-gear {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 10px;
+  border: 1px solid var(--it-line);
+  background: var(--it-panel);
+  color: var(--it-ink-soft);
+  cursor: pointer;
+  padding: 0;
+}
+
+.dvp-gear:hover,
+.dvp-gear[aria-expanded="true"] {
+  color: var(--it-ink);
+  border-color: var(--it-brand);
+}
+
+.dvp-gear:focus-visible {
+  outline: 2px solid var(--it-brand);
+  outline-offset: 2px;
+}
+
+/* A small amber dot: the standard has a note or an error to read. */
+.dvp-dot {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--it-accent);
+  box-shadow: 0 0 0 2px var(--it-panel);
+}
+
+.dvp-menu-pop {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 40;
+  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+  border-radius: 14px;
+  border: 1px solid var(--it-line);
+  background: var(--it-panel);
+  box-shadow: var(--it-card-shadow);
+}
+
+.dvp-menu-note {
+  margin: 0 0 6px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--it-accent-wash);
+  color: var(--it-ink);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.dvp-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--it-ink);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dvp-menu-item:hover:not(:disabled) {
+  background: var(--it-brand-wash);
+}
+
+.dvp-menu-item:disabled {
+  color: var(--it-ink-soft);
+  cursor: default;
+}
+
+/* ---- Find a machine ----------------------------------------------------- */
+
+.dvp-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: relative;
+  z-index: 20;
+}
+
+.dvp-finder {
+  position: relative;
+  width: 100%;
+  max-width: 640px;
+}
+
+.dvp-finder-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1px solid #c9d6e6;
+  border-color: var(--it-line);
+  background: var(--it-panel);
+  color: var(--it-ink-soft);
+  box-sizing: border-box;
+  cursor: text;
+}
+
+.dvp-finder-pill:focus-within {
+  border-color: var(--it-brand);
+  box-shadow: 0 0 0 3px var(--it-brand-wash);
+}
+
+.dvp-finder-pill input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--it-ink);
+  font: inherit;
+  /* Below 16px iOS zooms the page in on focus. */
+  font-size: 16px;
+}
+
+.dvp-finder-pill input::placeholder {
+  color: var(--it-ink-soft);
+}
+
+.dvp-finder-list {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 40;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  max-height: 360px;
+  overflow-y: auto;
+  border-radius: 14px;
+  border: 1px solid var(--it-line);
+  background: var(--it-panel);
+  box-shadow: var(--it-card-shadow);
+}
+
+.dvp-finder-opt {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  color: var(--it-ink);
+  font-size: 14px;
+}
+
+.dvp-finder-opt-active {
+  background: var(--it-brand-wash);
+}
+
+.dvp-finder-meta {
+  color: var(--it-ink-soft);
+  font-size: 13px;
+}
+
+.dvp-finder-none {
+  padding: 14px 16px;
+  margin: 0;
+  color: var(--it-ink-soft);
+  font-size: 14px;
+}
+
+/* ---- View switch -------------------------------------------------------- */
+
+.dvp-switch {
+  display: inline-flex;
+  align-self: flex-start;
+  max-width: 100%;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--it-thead);
+}
+
+.dvp-switch-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--it-ink-soft);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.dvp-switch-btn:hover {
+  color: var(--it-ink);
+}
+
+.dvp-switch-btn:focus-visible {
+  outline: 2px solid var(--it-brand);
+  outline-offset: 2px;
+}
+
+.dvp-switch-on {
+  background: var(--it-panel);
+  color: var(--it-ink);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
+.dvp-count {
+  min-width: 22px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--it-ink);
+  color: var(--it-panel);
+  font-size: 12px;
+  line-height: 18px;
+  text-align: center;
+}
+
+/* ---- Department scope (To do) ------------------------------------------- */
+
+.dvp-scope {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  max-width: 100%;
+}
+
+.dvp-scope select {
+  min-height: 44px;
+  padding: 0 40px 0 16px;
+  border-radius: 999px;
+  border: 1px solid var(--it-line);
+  background: var(--it-panel);
+  color: var(--it-ink);
+  font: inherit;
+  font-size: 16px;
+  cursor: pointer;
+  max-width: 100%;
+}
+
+/* ---- Back links --------------------------------------------------------- */
+
+.dvp-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0 10px 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--it-brand);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dvp-back:hover {
+  color: var(--it-brand-deep);
+}
+
+/* ---- Import ------------------------------------------------------------- */
+
+.dvp-import {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+.dvp-import-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dvp-import-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.dvp-title {
+  margin: 0;
+  font-size: 24px;
+  letter-spacing: -0.02em;
+  color: var(--it-ink);
+}
+
+.dvp-steps {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+  color: var(--it-ink-soft);
+}
+
+.dvp-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* The rule between two steps: green once the step before it is done. */
+.dvp-step + .dvp-step::before {
+  content: "";
+  width: 48px;
+  height: 2px;
+  margin: 0 10px;
+  border-radius: 2px;
+  background: var(--it-line);
+}
+
+.dvp-step-done + .dvp-step::before {
+  background: var(--it-good);
+}
+
+.dvp-step-done {
+  color: var(--it-ink-soft);
+}
+
+.dvp-step-current {
+  color: var(--it-ink);
+  font-weight: 600;
+}
+
+.dvp-step-dot {
+  width: 32px;
+  height: 32px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  box-sizing: border-box;
+  font-weight: 700;
+  font-size: 14px;
+  border: 2px solid var(--it-line);
+  color: var(--it-ink-soft);
+  background: transparent;
+}
+
+.dvp-step-done .dvp-step-dot {
+  background: var(--it-good);
+  border-color: var(--it-good);
+  color: #fff;
+}
+
+.dvp-step-current .dvp-step-dot {
+  background: var(--it-brand);
+  border-color: var(--it-brand);
+  color: var(--it-on-brand);
+  box-shadow: 0 0 0 5px var(--it-brand-wash);
+}
+
+/* The review's top bar: figures on the left, the save action on the right. */
+.dvp-review-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--it-line);
+  margin-bottom: 14px;
+}
+
+.dvp-figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 26px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+  color: var(--it-ink-soft);
+}
+
+.dvp-figures strong {
+  display: block;
+  font-size: 24px;
+  line-height: 1.1;
+  color: var(--it-ink);
+}
+
+.dvp-fig-warn strong {
+  color: var(--it-danger);
+}
+
+.dvp-fig-amber strong {
+  color: #b45309;
+}
+
+.dvp-save {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.dvp-save-note {
+  margin: 0;
+  font-size: 14px;
+  color: #b45309;
+}
+
+/* ---- Phone ------------------------------------------------------------- */
+
+@media (max-width: 640px) {
+  .dvp-switch-btn {
+    flex: 1 1 auto;
+    justify-content: center;
+    padding: 0 12px;
+  }
+
+  .dvp-finder-pill {
+    padding: 0 14px;
+  }
+
+  .dvp-steps {
+    flex-wrap: nowrap;
+  }
+
+  .dvp-step + .dvp-step::before {
+    width: 24px;
+    margin: 0 6px;
+  }
+
+  .dvp-save {
+    justify-content: stretch;
+    width: 100%;
+  }
+
+  .dvp-save .ui-btn {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+}

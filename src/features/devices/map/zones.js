@@ -2,6 +2,7 @@ import { inFleet, statusOf, SPARE, RETIRED } from '../lifecycle/status.js';
 import { labelOf, UNASSIGNED } from '../deviceFilters.js';
 import { cleanLocation } from './locations.js';
 import { GRADES, UNKNOWN, PARTS } from '../standards/defaultStandard.js';
+import { worstGradeOf, needsWork } from '../health.js';
 
 /**
  * Every number a tile on the map shows, at every level -- location,
@@ -19,12 +20,17 @@ export function summarise(name, devices) {
   let other = 0;
   let criticalMachines = 0;
   let attentionMachines = 0;
+  // Each machine counted once, at its worst part: the rings on the map are drawn from this.
+  const worst = Object.fromEntries(ALL_GRADES.map((g) => [g, 0]));
+  let workMachines = 0;
 
   for (const device of devices) {
     for (const { key } of PARTS) {
       const grade = device.parts?.[key]?.grade;
       parts[key][ALL_GRADES.includes(grade) ? grade : UNKNOWN] += 1;
     }
+    worst[worstGradeOf(device)] += 1;
+    if (needsWork(device)) workMachines += 1;
     if (device.criticalParts?.length) criticalMachines += 1;
     else if (device.attentionParts?.length) attentionMachines += 1;
     if (device.deviceType === 'Laptop') laptops += 1;
@@ -42,6 +48,8 @@ export function summarise(name, devices) {
     parts,
     criticalMachines,
     attentionMachines,
+    worst,
+    workMachines,
     partBars: PARTS.map(({ key, label }) => ({
       key,
       label,

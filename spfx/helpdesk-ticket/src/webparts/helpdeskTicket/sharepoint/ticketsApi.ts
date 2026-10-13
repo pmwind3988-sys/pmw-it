@@ -53,7 +53,7 @@ export class TicketsApi {
     }
   }
 
-  /** Directory people matching what was typed, for "Copy someone in". */
+  /** Directory people matching what was typed, for the CC field. */
   async searchPeople(query: string): Promise<Person[]> {
     if (query.trim().length < 2) return [];
     const res = await this.ok(

@@ -1,4 +1,4 @@
-// "Copy someone in": a debounced directory search with chips for the picked people.
+// "CC": the Tickets list's Cc column (people emailed about the ticket), a debounced directory search with chips for the picked people.
 import * as React from 'react';
 import { TicketsApi } from '../sharepoint/ticketsApi';
 import { Person } from '../tickets/draft';
@@ -90,8 +90,11 @@ export function CcPicker(props: CcPickerProps): React.ReactElement {
   return (
     <div className={styles.field}>
       <label htmlFor={inputId} className={styles.label}>
-        Copy someone in
+        CC <span className={styles.optional}>(optional)</span>
       </label>
+      <span id={`${inputId}-help`} className={styles.hint}>
+        People who should also get emails about this ticket, e.g. your manager.
+      </span>
       <div className={styles.ccBox} onClick={() => inputRef.current?.focus()}>
         {people.map((p) => {
           const label = p.name || p.email;
@@ -118,7 +121,8 @@ export function CcPicker(props: CcPickerProps): React.ReactElement {
           type="text"
           role="combobox"
           className={styles.ccInput}
-          placeholder={people.length ? '' : 'Type a name'}
+          placeholder={people.length ? '' : 'Type a name to add someone'}
+          aria-describedby={`${inputId}-help`}
           autoComplete="off"
           aria-autocomplete="list"
           aria-expanded={listShown}

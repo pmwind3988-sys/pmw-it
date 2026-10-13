@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   phoneCurve,
-  phoneLayout,
+  flowLayout,
+  fitsCircle,
   mindMapLayout, curve, nearestInDirection, donutGradient, ringSizeFor,
   BOARD, PHONE_BOARD, RING_PX, EXTRA_SLOTS, EXTRA_PX,
 } from './mindMap.js';
@@ -107,32 +108,62 @@ describe('donutGradient', () => {
   });
 });
 
-describe('phoneLayout', () => {
+describe('flowLayout', () => {
   const nodes = (rings, extras = []) => [
-    ...Array.from({ length: rings }, (_, i) => ({ key: `r${i}`, kind: 'location' })),
+    ...Array.from({ length: rings }, (_, i) => ({ key: `r${i}`, kind: 'dept' })),
     ...extras.map((kind) => ({ key: kind, kind })),
   ];
+  const px = (a, b, width) => Math.hypot(((a.x - b.x) * width) / 100, a.y - b.y);
 
-  it('zig-zags the rings down the board and puts the extras in a row at the end', () => {
-    const layout = phoneLayout(nodes(3, ['stash', 'noLocation', 'retired']));
-    expect(layout.at.r0.x).toBe(27);
-    expect(layout.at.r1.x).toBe(73);
-    expect(layout.at.r1.y).toBeGreaterThan(layout.at.r0.y);
+  it.each([
+    [12, 900, 140, false], [12, 700, 140, false], [8, 343, 104, true], [3, 343, 104, true], [20, 1200, 140, false],
+  ])('keeps %i rings and their captions apart on a %ipx board', (count, width, ringPx, phone) => {
+    const layout = flowLayout(nodes(count, ['stash', 'retired']), { width, ringPx, phone });
+    const points = Object.values(layout.at);
+    for (let i = 0; i < points.length; i += 1) {
+      for (let j = i + 1; j < points.length; j += 1) {
+        const sameRow = points[i].y === points[j].y;
+        // Side by side: a ring each plus a gap. One above the other: a ring plus its caption.
+        const need = sameRow ? ringPx + 8 : ringPx + 90;
+        expect(px(points[i], points[j], width)).toBeGreaterThanOrEqual(need);
+      }
+    }
+    for (const point of points) {
+      expect(point.x).toBeGreaterThan(0);
+      expect(point.x).toBeLessThan(100);
+      expect(point.y).toBeLessThan(layout.height);
+    }
+  });
+
+  it('puts the hub above every ring and grows the board with the count', () => {
+    const few = flowLayout(nodes(3), { width: 700 });
+    const many = flowLayout(nodes(15), { width: 700 });
+    expect(many.height).toBeGreaterThan(few.height);
+    expect(Math.min(...Object.values(few.at).map((p) => p.y)) - few.hub.y).toBeGreaterThan(120);
+  });
+
+  it('hangs the first row off the hub and every later node off the row above', () => {
+    const layout = flowLayout(nodes(7, ['stash']), { width: 700 });
+    const firstRowY = layout.at.r0.y;
+    for (const [key, point] of Object.entries(layout.at)) {
+      const up = layout.parent[key];
+      if (point.y === firstRowY) expect(up).toBeNull();
+      else expect(layout.at[up].y).toBeLessThan(point.y);
+    }
+  });
+
+  it('puts the extras in their own row after the rings', () => {
+    const layout = flowLayout(nodes(5, ['stash', 'noLocation', 'retired']), { width: 900 });
     expect(layout.at.stash.y).toBe(layout.at.retired.y);
-    expect(layout.at.stash.y).toBeGreaterThan(layout.at.r2.y);
-    expect([layout.at.stash.x, layout.at.noLocation.x, layout.at.retired.x]).toEqual([18, 50, 82]);
+    expect(layout.at.stash.y).toBeGreaterThan(layout.at.r4.y);
   });
+});
 
-  it('grows the board with the number of rings rather than overlapping them', () => {
-    expect(phoneLayout(nodes(10)).height).toBeGreaterThan(phoneLayout(nodes(3)).height);
-    const ten = phoneLayout(nodes(10));
-    // Two rings on the same side are two steps apart: room for a ring and its caption.
-    expect(ten.at.r2.y - ten.at.r0.y).toBeGreaterThanOrEqual(220);
-  });
-
-  it('keeps every ring below the hub', () => {
-    const layout = phoneLayout(nodes(1));
-    expect(layout.at.r0.y - layout.hub.y).toBeGreaterThan(120);
+describe('fitsCircle', () => {
+  it('keeps the circle only for a few rings on a wide board', () => {
+    expect(fitsCircle(3, 1000)).toBe(true);
+    expect(fitsCircle(5, 1000)).toBe(false);
+    expect(fitsCircle(3, 600)).toBe(false);
   });
 });
 

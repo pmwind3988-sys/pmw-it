@@ -142,35 +142,72 @@ export function donutGradient(worst, total) {
   return `conic-gradient(${stops.join(', ')})`;
 }
 
-/** Phone geometry, in px down the board: the hub on top, rings zig-zagging below it, the extras in a row at the end. */
-export const PHONE = { hubY: 64, firstRingY: 204, ringStep: 118, extrasGap: 150, bottomPad: 110 };
-const PHONE_EXTRA_ORDER = ['stash', 'noLocation', 'retired'];
-const PHONE_EXTRA_X = { 1: [50], 2: [28, 72], 3: [18, 50, 82] };
+/** Below this width, or above four rings, the circle has no room: the board becomes a tree. */
+export const RING_MODE_MIN_WIDTH = 760;
+export const RING_MODE_MAX_RINGS = 4;
+
+/** Is the circle layout safe for this many rings on a board this wide? */
+export const fitsCircle = (rings, width) => rings <= RING_MODE_MAX_RINGS && width >= RING_MODE_MIN_WIDTH;
+
+const FLOW_EXTRA_ORDER = ['stash', 'noLocation', 'retired'];
 
 /**
- * Where everything goes on a phone, where the wide board's ellipse leaves no
- * room between a ring's caption and its neighbour. x is a percent of the board
- * width, y is px from its top, and the board is as tall as `height` -- so a
- * level with ten departments simply grows downward instead of overlapping.
+ * The tree layout: the hub on top, the rings in centred rows below it, the
+ * extras in a row at the end. x is a percent of the board width and y is px
+ * from its top; the board is as tall as `height`, so twelve departments make
+ * a taller board rather than rings sitting on each other's captions. Each row
+ * leaves a ring's diameter plus room for a three-line caption.
  * `nodes` are `{ key, kind }`; extras are recognised by kind.
  */
-export function phoneLayout(nodes) {
-  const rings = nodes.filter((node) => !PHONE_EXTRA_ORDER.includes(node.kind));
-  const extras = PHONE_EXTRA_ORDER
-    .map((kind) => nodes.find((node) => node.kind === kind))
-    .filter(Boolean);
+export function flowLayout(nodes, { width = 1000, ringPx = 140, phone = false } = {}) {
+  const rings = nodes.filter((node) => !FLOW_EXTRA_ORDER.includes(node.kind));
+  const extras = FLOW_EXTRA_ORDER.map((kind) => nodes.find((node) => node.kind === kind)).filter(Boolean);
+
+  const colW = phone ? 150 : ringPx + 100;
+  const cols = Math.max(phone ? 2 : 1, Math.floor((width - 16) / colW));
+  const rowH = ringPx + (phone ? 150 : 140);
+  const hubY = phone ? 64 : 90;
+  const hubR = phone ? 48 : 75;
+  const firstY = hubY + hubR + 56 + ringPx / 2;
+  const step = (colW / Math.max(width, 1)) * 100;
 
   const at = {};
   rings.forEach((node, i) => {
-    at[node.key] = { x: i % 2 ? 73 : 27, y: PHONE.firstRingY + i * PHONE.ringStep };
+    const row = Math.floor(i / cols);
+    const inRow = Math.min(cols, rings.length - row * cols);
+    const col = i % cols;
+    at[node.key] = { x: round(50 + (col - (inRow - 1) / 2) * step), y: firstY + row * rowH };
   });
-  const lastRing = rings.length ? PHONE.firstRingY + (rings.length - 1) * PHONE.ringStep : PHONE.hubY;
-  const extrasY = lastRing + PHONE.extrasGap;
-  const xs = PHONE_EXTRA_X[extras.length] ?? [];
-  extras.forEach((node, i) => { at[node.key] = { x: xs[i], y: extrasY }; });
 
-  const height = (extras.length ? extrasY : lastRing) + PHONE.bottomPad;
-  return { hub: { x: 50, y: PHONE.hubY }, at, height };
+  const ringRows = Math.ceil(rings.length / cols);
+  const lastRingY = rings.length ? firstY + (ringRows - 1) * rowH : hubY;
+  const extrasY = rings.length ? lastRingY + rowH : firstY;
+  const spread = phone ? { 1: [50], 2: [28, 72], 3: [18, 50, 82] } : { 1: [50], 2: [35, 65], 3: [25, 50, 75] };
+  extras.forEach((node, i) => { at[node.key] = { x: spread[extras.length][i], y: extrasY }; });
+
+  // A tree, not a starburst: the first row hangs off the hub and every later
+  // node off the nearest node in the row above it, so one branch crosses each
+  // gap instead of every branch running the whole height of the board.
+  const rows = [];
+  for (const node of [...rings, ...extras]) {
+    const { y } = at[node.key];
+    if (!rows.length || rows[rows.length - 1].y !== y) rows.push({ y, keys: [] });
+    rows[rows.length - 1].keys.push(node.key);
+  }
+  const parent = {};
+  rows.forEach((row, r) => {
+    for (const key of row.keys) {
+      if (r === 0) { parent[key] = null; continue; }
+      const above = rows[r - 1].keys;
+      parent[key] = above.reduce((best, k) => (
+        Math.abs(at[k].x - at[key].x) < Math.abs(at[best].x - at[key].x) ? k : best), above[0]);
+    }
+  });
+
+  const bottom = extras.length ? extrasY + 60 : lastRingY + ringPx / 2;
+  // A last row of rings still has its captions below it; extras' captions are shorter.
+  const pad = extras.length ? (phone ? 90 : 110) : (phone ? 170 : 150);
+  return { hub: { x: 50, y: hubY }, at, parent, height: Math.round(bottom + pad) };
 }
 
 /**

@@ -18,7 +18,6 @@
   background: radial-gradient(circle at 50% 48%, var(--it-panel) 0, var(--it-panel) 30%, var(--it-canvas) 100%);
 }
 .mm-branches { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
-.mm-branches-phone { display: none; }
 .mm-branches path { fill: none; stroke-width: 2.5; stroke-linecap: round; vector-effect: non-scaling-stroke; }
 .mm-branch-solid { stroke: var(--it-brand-line); opacity: .7; }
 .mm-branch-dashed { stroke: var(--it-ink-soft); stroke-width: 2 !important; stroke-dasharray: 6 6; opacity: .45; }
@@ -27,7 +26,6 @@
 /* Every node is positioned by its centre, so the branches meet the shape, not its label. */
 .mm-node {
   position: absolute; z-index: 1; display: block; transform: translate(-50%, -50%);
-  left: var(--x); top: var(--y);
   text-decoration: none; color: var(--it-ink); transition: transform 140ms cubic-bezier(.2, 0, .2, 1);
 }
 a.mm-node:hover { transform: translate(-50%, -50%) scale(1.03); }
@@ -123,33 +121,23 @@ a.mm-node:hover { transform: translate(-50%, -50%) scale(1.03); }
 .mc-status-repair { background: var(--it-accent-wash); color: var(--it-ink); }
 .mc-fine { font-size: 13px; font-weight: 600; color: var(--it-good); }
 
-/* ---- phone ---- */
-@media (max-width: 640px) {
-  /* Phone: the board is as tall as its layout, and every node moves to its phone position. */
-  .mm-board { height: var(--phone-h, 560px); }
-  .mm-node { left: var(--px); top: var(--py); }
-  .mm-branches-wide { display: none; }
-  .mm-branches-phone { display: block; }
-  .mm-diamond .mm-caption, .mm-tomb .mm-caption {
-    top: calc(100% + 8px); left: 50%; transform: translateX(-50%); align-items: center; text-align: center;
-  }
-  .mm-lg, .mm-md { width: 104px; height: 104px; }
-  .mm-sm { width: 96px; height: 96px; }
-  .mm-lg .mm-name, .mm-md .mm-name, .mm-sm .mm-name { font-size: 16px; }
-  .mm-lg .mm-sub, .mm-md .mm-sub, .mm-sm .mm-sub { font-size: 11px; }
-  .mm-hole { padding: 4px; }
-  .mm-hub { width: 96px; height: 96px; }
-  .mm-hub-count { font-size: 26px; }
-  .mm-hub-eyebrow, .mm-hub-sub { font-size: 11px; }
-  .mm-hex { width: 84px; height: 74px; }
-  .mm-diamond { width: 64px; height: 64px; }
-  .mm-tomb { width: 48px; height: 56px; }
-  .mm-big { font-size: 20px; }
-  .mm-shape-name { font-size: 11px; }
-  .mm-caption { font-size: 11px; }
-  .mm-caption-title { font-size: 12px; }
-  .mm-pill { font-size: 12px; padding: 3px 9px; }
-}
+/* ---- compact: a narrow BOARD (not a narrow screen), chosen by MindMap, which also lays the rows out at these sizes ---- */
+.mm-board-compact .mm-lg, .mm-board-compact .mm-md { width: 104px; height: 104px; }
+.mm-board-compact .mm-sm { width: 96px; height: 96px; }
+.mm-board-compact .mm-lg .mm-name, .mm-board-compact .mm-md .mm-name, .mm-board-compact .mm-sm .mm-name { font-size: 16px; }
+.mm-board-compact .mm-lg .mm-sub, .mm-board-compact .mm-md .mm-sub, .mm-board-compact .mm-sm .mm-sub { font-size: 11px; }
+.mm-board-compact .mm-hole { padding: 4px; }
+.mm-board-compact .mm-hub { width: 96px; height: 96px; }
+.mm-board-compact .mm-hub-count { font-size: 26px; }
+.mm-board-compact .mm-hub-eyebrow, .mm-board-compact .mm-hub-sub { font-size: 11px; }
+.mm-board-compact .mm-hex { width: 84px; height: 74px; }
+.mm-board-compact .mm-diamond { width: 64px; height: 64px; }
+.mm-board-compact .mm-tomb { width: 48px; height: 56px; }
+.mm-board-compact .mm-big { font-size: 20px; }
+.mm-board-compact .mm-shape-name { font-size: 11px; }
+.mm-board-compact .mm-caption { font-size: 11px; }
+.mm-board-compact .mm-caption-title { font-size: 12px; }
+.mm-board-compact .mm-pill { font-size: 12px; padding: 3px 9px; }
 
 @media (prefers-reduced-motion: reduce) {
   .mm-node, a.mm-node:hover { transition: none; transform: translate(-50%, -50%); }
@@ -157,7 +145,25 @@ a.mm-node:hover { transform: translate(-50%, -50%) scale(1.03); }
 
 /* A department name longer than a site code wraps onto two lines at a smaller size, rather than losing its end. */
 .mm-name.mm-name-long {
-  white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: break-word;
-  font-size: 13px; line-height: 1.15; letter-spacing: 0;
+  white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: normal; word-break: keep-all;
+  font-size: 12px; line-height: 1.15; letter-spacing: 0;
 }
 .mm-sm .mm-name.mm-name-long { font-size: 11px; }
+
+/* The tree layout: the board is as tall as its rows (set inline), and every caption sits under its shape,
+   because in a row a side caption would run into the next node. */
+.mm-board-tree .mm-diamond .mm-caption, .mm-board-tree .mm-tomb .mm-caption {
+  top: calc(100% + 8px); left: 50%; transform: translateX(-50%); align-items: center; text-align: center;
+}
+.mm-board-compact .mm-name.mm-name-long { font-size: 10px; letter-spacing: -0.01em; }
+/* Two rings share a phone row, so a caption may only be as wide as its column; long profile names wrap. */
+.mm-board-compact .mm-caption { white-space: normal; width: 136px; }
+.mm-board-compact .mm-line { line-height: 1.3; }
+/* In the tree a branch runs down from a ring past its own caption: the caption gets a backing so the line passes behind it. */
+.mm-board-tree .mm-caption { background: var(--it-panel); border-radius: 12px; padding: 6px 8px; }
+.mm-board-tree .mm-line { background: transparent; }
+/* Stash, No location and Retired share one phone row of three: each caption gets a third of it. */
+.mm-board-compact .mm-hex .mm-caption, .mm-board-compact .mm-diamond .mm-caption, .mm-board-compact .mm-tomb .mm-caption {
+  width: 104px; box-sizing: border-box; padding: 4px 6px;
+}
+.mm-board-compact .mm-caption { box-sizing: border-box; }

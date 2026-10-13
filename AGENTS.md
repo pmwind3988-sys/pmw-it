@@ -300,10 +300,13 @@ unchanged, and `?risk=` takes a band or a stored level, so old links still work.
 
 **The map is a mind map, on purpose.** The user asked to keep it, with fewer
 rectangles: a hub circle, donut rings for places, a hexagon for the IT Stash, a
-diamond for No location, a tombstone for Retired. Every node carries two
-positions as CSS variables -- the wide board's and the phone's (`phoneLayout`,
-which grows the board downward instead of overlapping) -- so the same links
-serve both widths.
+diamond for No location, a tombstone for Retired. The board measures its own
+width and picks one of two layouts (`fitsCircle`): the circle when four rings or
+fewer fit, otherwise a TREE (`flowLayout`) -- the hub on top, rings in centred
+rows, each row hanging off the ring above, the board growing downward. A site
+with twelve departments, or any phone, gets the tree; nothing ever overlaps.
+Ring sizes shrink with the BOARD (`.mm-board-compact`), not the screen, so the
+sizes and the layout cannot disagree when the nav column narrows the board.
 
 **Several filter changes go out as ONE update.** `setParam` on the devices page
 takes an object for that reason: react-router's updater reads the address as

@@ -1,7 +1,7 @@
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  HUB, curve, phoneCurve, nearestInDirection, phoneLayout,
+  HUB, RING_PX, curve, phoneCurve, nearestInDirection, flowLayout, fitsCircle,
 } from '../map/mindMap';
 import { GRADE_SLUG } from '../standards/gradeColors';
 
@@ -26,22 +26,45 @@ const BRANCH = {
  * Arrow keys move between the nodes by position; the handler sits on each link,
  * never on window, so it cannot fight a text box.
  *
- * Every node carries two positions as CSS variables: the wide board's (percent
- * of both sides) and the phone's (phoneLayout: percent across, px down, on a
- * board that grows with the count). The stylesheet picks one by width, so the
- * same links serve both and nothing is rendered twice.
+ * Two layouts, chosen by the board's measured width: the circle (the hub in
+ * the middle, rings round it) when a few rings fit, and the tree (the hub on
+ * top, rings in rows) when they would not -- a place with twelve departments,
+ * or any phone. The tree's board grows downward, so nothing ever overlaps.
  */
 export default function MindMap({ label, hub, nodes }) {
   const refs = useRef([]);
-  const points = nodes.map((node) => node.at);
-  const phone = phoneLayout(nodes);
-  const place = (wide, narrow) => ({
-    '--x': `${wide.x}%`, '--y': `${wide.y}%`, '--px': `${narrow.x}%`, '--py': `${narrow.y}px`,
-  });
+  const board = useRef(null);
+  const [width, setWidth] = useState(() => (typeof window === 'undefined' ? 1000 : Math.max(320, window.innerWidth - 48)));
+
+  useEffect(() => {
+    const element = board.current;
+    if (!element || typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(([entry]) => setWidth(Math.round(entry.contentRect.width)));
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  const rings = nodes.filter((node) => node.shape === 'ring');
+  const circle = fitsCircle(rings.length, width);
+  const phone = width < 600;
+  const ringPx = phone ? 104 : RING_PX[rings[0]?.size ?? 'md'];
+  const flow = circle ? null : flowLayout(nodes, { width, ringPx, phone });
+
+  // Circle: both axes in percent of a fixed board. Tree: x in percent, y in px of a board as tall as the layout.
+  const hubAt = circle ? HUB : flow.hub;
+  const atOf = (node) => (circle ? node.at : flow.at[node.key]);
+  const place = (at) => ({ left: `${at.x}%`, top: circle ? `${at.y}%` : `${at.y}px` });
+  const branch = (node) => {
+    if (circle) return curve(HUB, node.at);
+    const up = flow.parent[node.key];
+    return phoneCurve(up ? flow.at[up] : flow.hub, flow.at[node.key]);
+  };
+  const points = nodes.map(atOf);
+  const keyBoard = circle ? undefined : { width, height: 100 };
 
   const onKeyDown = (index) => (event) => {
     if (!event.key.startsWith('Arrow')) return;
-    const next = nearestInDirection(points, index, event.key);
+    const next = nearestInDirection(points, index, event.key, keyBoard);
     if (next !== index && refs.current[next]) {
       event.preventDefault();
       refs.current[next].focus();
@@ -50,20 +73,20 @@ export default function MindMap({ label, hub, nodes }) {
 
   return (
     <div className="mm">
-      <div className="mm-board" role="group" aria-label={label} style={{ '--phone-h': `${phone.height}px` }}>
-        <svg className="mm-branches mm-branches-wide" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+      <div
+        ref={board}
+        className={`mm-board${circle ? '' : ' mm-board-tree'}${phone ? ' mm-board-compact' : ''}`}
+        role="group"
+        aria-label={label}
+        style={circle ? undefined : { height: `${flow.height}px` }}
+      >
+        <svg className="mm-branches" viewBox={circle ? '0 0 100 100' : `0 0 100 ${flow.height}`} preserveAspectRatio="none" aria-hidden="true">
           {nodes.map((node) => (
-            <path key={node.key} d={curve(HUB, node.at)} className={BRANCH[node.kind] ?? 'mm-branch-solid'} />
-          ))}
-        </svg>
-        {/* The phone's branches live in a box exactly as tall as its board: x in percent, y in px. */}
-        <svg className="mm-branches mm-branches-phone" viewBox={`0 0 100 ${phone.height}`} preserveAspectRatio="none" aria-hidden="true">
-          {nodes.map((node) => (
-            <path key={node.key} d={phoneCurve(phone.hub, phone.at[node.key])} className={BRANCH[node.kind] ?? 'mm-branch-solid'} />
+            <path key={node.key} d={branch(node)} className={BRANCH[node.kind] ?? 'mm-branch-solid'} />
           ))}
         </svg>
 
-        <div className="mm-node mm-hub" style={place(HUB, phone.hub)}>
+        <div className="mm-node mm-hub" style={place(hubAt)}>
           <span className="mm-hole">{hub}</span>
         </div>
 
@@ -75,7 +98,7 @@ export default function MindMap({ label, hub, nodes }) {
             ref={(el) => { refs.current[index] = el; }}
             onKeyDown={onKeyDown(index)}
             className={`mm-node mm-${node.shape} mm-${node.kind}${node.size ? ` mm-${node.size}` : ''}${node.donut ? ' mm-graded' : ''}`}
-            style={{ ...place(node.at, phone.at[node.key]), ...(node.donut ? { background: node.donut } : null) }}
+            style={{ ...place(atOf(node)), ...(node.donut ? { background: node.donut } : null) }}
           >
             {node.shape === 'ring'
               ? <span className="mm-hole">{node.center}</span>

@@ -8,7 +8,8 @@ export default defineConfig([
   // `public/models` and `public/ort` are third-party build artefacts that
   // scripts/fetch-model.mjs puts there. They are not ours to lint, and
   // the ONNX runtime's minified .mjs files fail every rule at once.
-  globalIgnores(['dist', 'public/ort', 'public/models']),
+  // spfx/ is a separate SharePoint web part project with its own lint and build.
+  globalIgnores(['dist', 'public/ort', 'public/models', 'spfx']),
   {
     files: ['**/*.{js,jsx}'],
     extends: [

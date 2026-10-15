@@ -20,6 +20,7 @@ import StandardsPage from '../features/devices/ui/StandardsPage';
 import { importFiles, mergeImports } from '../features/devices/importFiles';
 import { issuesFor, sortForReview } from '../features/devices/reviewIssues';
 import { useDevices } from '../features/devices/useDevices';
+import { useDeviceAdmin } from '../features/devices/useDeviceAdmin';
 import { labelOf, IN_FLEET } from '../features/devices/deviceFilters';
 import { todoItems } from '../features/devices/stats/todoItems';
 import { syncDevices } from '../features/devices/sharepoint/syncDevices';
@@ -64,6 +65,8 @@ export default function DevicesPage() {
   const getToken = useSharePointToken();
   const [params, setParams] = useSearchParams();
   const { devices: saved, loading, error, reload, standards } = useDevices();
+  // Removing a machine is for admins (owners of the IT helpdesk site) only.
+  const isAdmin = useDeviceAdmin();
 
   const view = params.get('view') ?? 'map';
   const [menuOpen, setMenuOpen] = useState(false);
@@ -563,8 +566,8 @@ export default function DevicesPage() {
               filters={filters}
               onFilterChange={setParam}
               onSave={handleRowSave}
-              onDelete={handleRowDelete}
-              onDeleteMany={handleRowDeleteMany}
+              onDelete={isAdmin ? handleRowDelete : undefined}
+              onDeleteMany={isAdmin ? handleRowDeleteMany : undefined}
               busy={rowBusy}
               locationOptions={locationOptions}
             />

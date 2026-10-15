@@ -173,6 +173,7 @@ pmw-it/
 | Device SharePoint list views | `src/features/devices/sharepoint/deviceViews.js` |
 | Editing or removing one device row | `src/features/devices/sharepoint/updateDevice.js` |
 | Removing several device rows at once | `deleteDevices` in `src/features/devices/sharepoint/updateDevice.js` |
+| Who may remove a device (admin = IT helpdesk site owner, Full Control) | `src/features/devices/sharepoint/deviceAdmin.js`, `useDeviceAdmin.js` |
 | What the register has ticked | `src/features/devices/selection.js` |
 | Device fleet statistics | `src/features/devices/stats/deviceStats.js` |
 | A machine's status, and what counts in the fleet | `src/features/devices/lifecycle/status.js` |

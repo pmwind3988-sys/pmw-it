@@ -1,10 +1,11 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import AppShell from '../components/AppShell';
 import { gradeCssVars } from '../features/devices/standards/gradeColors';
 import { Card, EmptyState, ErrorBanner } from '../components/ui/Surfaces';
 import Button from '../components/ui/Button';
-import { RefreshCw } from '../components/ui/Icons';
+import { RefreshCw, Trash2 } from '../components/ui/Icons';
+import { useConfirm } from '../components/ui/useConfirm';
 import { useDevices } from '../features/devices/useDevices';
 import { groupsFor, RAW_REPORT_KEY } from '../features/devices/fieldGroups';
 import { formatScalar } from '../features/devices/formatValue';
@@ -23,7 +24,8 @@ import { locationsIn } from '../features/devices/map/locations';
 import { mapHref } from '../features/devices/map/mapLinks';
 import PartTable from '../features/devices/ui/PartTable';
 import PlaceFill from '../features/devices/ui/PlaceFill';
-import { updateDevice } from '../features/devices/sharepoint/updateDevice';
+import { updateDevice, deleteDevice } from '../features/devices/sharepoint/updateDevice';
+import { useDeviceAdmin } from '../features/devices/useDeviceAdmin';
 import { matchingGroups } from '../features/devices/fieldSearch';
 
 /** Remembered per browser: somebody who turns the colouring off is not asked
@@ -114,6 +116,10 @@ export default function DeviceDetailPage() {
   const [actionNote, setActionNote] = useState('');
   const [pending, setPending] = useState([]);
   const [placing, setPlacing] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const isAdmin = useDeviceAdmin();
+  const { ask, dialog } = useConfirm();
+  const navigate = useNavigate();
 
   const requestedTab = params.get('tab');
   const tab = TABS.some(([key]) => key === requestedTab) ? requestedTab : 'details';
@@ -239,6 +245,31 @@ export default function DeviceDetailPage() {
     }
   };
 
+  // Admin only. The change log keeps a "Removed" line; the owner history rows
+  // stay in their own list, tied to an id nothing will use again.
+  const remove = async () => {
+    if (!await ask({
+      title: `Remove ${device.computerName} from the register?`,
+      body: 'It disappears from the map, the List and every figure. The change log keeps a '
+        + 'line saying it was removed. If the machine still exists, Retire keeps its history instead.',
+      confirmLabel: 'Remove it',
+      cancelLabel: 'Keep it',
+    })) return;
+    setRemoving(true);
+    setActionError('');
+    try {
+      const tokenRes = await getToken();
+      await deleteDevice({
+        siteUrl: SHAREPOINT_SITE_URL, token: tokenRes.accessToken, device,
+        changedBy: tokenRes.account?.username ?? '',
+      });
+      navigate('/devices?view=register');
+    } catch (failure) {
+      setActionError(failure.message);
+      setRemoving(false);
+    }
+  };
+
   const toggleTones = () => setShowTones((on) => !on);
 
   const status = device ? statusOf(device) : '';
@@ -253,9 +284,16 @@ export default function DeviceDetailPage() {
         ? [device.owner, device.department].filter(Boolean).join(' · ') || 'No owner recorded'
         : 'Looking this machine up in the register'}
       actions={(
-        <Button variant="secondary" size="sm" icon={RefreshCw} onClick={reload} loading={loading}>
-          Refresh
-        </Button>
+        <>
+          <Button variant="secondary" size="sm" icon={RefreshCw} onClick={reload} loading={loading}>
+            Refresh
+          </Button>
+          {isAdmin && device && (
+            <Button variant="danger" size="sm" icon={Trash2} onClick={remove} loading={removing}>
+              Remove
+            </Button>
+          )}
+        </>
       )}
     >
       <div className="dv-graded mh-page" style={gradeCssVars(standards.standard.colors)}>
@@ -417,6 +455,7 @@ export default function DeviceDetailPage() {
           </>
         )}
       </div>
+      {dialog}
     </AppShell>
   );
 }

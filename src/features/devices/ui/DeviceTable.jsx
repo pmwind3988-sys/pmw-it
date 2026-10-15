@@ -123,6 +123,9 @@ export default function DeviceTable({
   devices, filters, onFilterChange, onSave, onDelete, onDeleteMany, busy,
   locationOptions = NO_LOCATIONS,
 }) {
+  // Removing is admin-only: without the handlers there are no ticks, no
+  // Remove in the row menu and no bulk bar, rather than controls that fail.
+  const canRemove = Boolean(onDelete && onDeleteMany);
   const [sort, setSort] = useState(DEFAULT_SORT);
   const [columnSet, setColumnSet] = useState(readColumnSet);
   const [editingId, setEditingId] = useState(null);
@@ -463,7 +466,7 @@ export default function DeviceTable({
         </Button>
       </div>
 
-      {chosen.length > 0 && <div className="dt-bulk">{selectionBar}</div>}
+      {canRemove && chosen.length > 0 && <div className="dt-bulk">{selectionBar}</div>}
 
       {rows.length === 0 ? (
         <EmptyState>No devices match these filters.</EmptyState>
@@ -473,6 +476,7 @@ export default function DeviceTable({
             <thead>
               <tr>
                 <th className="dt-identity">
+                  {canRemove && (
                   <input
                     type="checkbox"
                     className="dt-tick"
@@ -486,6 +490,7 @@ export default function DeviceTable({
                     onChange={() => updateSelection((current) => toggleAll(current, paged.rows))}
                     aria-label="Select every device on this page"
                   />
+                  )}
                   <button
                     type="button"
                     className="dt-sort"
@@ -531,6 +536,7 @@ export default function DeviceTable({
                     <tr className={rowClass || undefined}>
                       <td className="dt-identity">
                         <div className="dt-name">
+                          {canRemove && (
                           <input
                             type="checkbox"
                             className="dt-tick"
@@ -541,6 +547,7 @@ export default function DeviceTable({
                             onChange={() => updateSelection((current) => toggleId(current, device.id))}
                             aria-label={`Select ${device.computerName}`}
                           />
+                          )}
                           {device.id != null ? (
                             <Link className="dt-link" to={`/devices/${device.id}`}>{name}</Link>
                           ) : (
@@ -581,14 +588,16 @@ export default function DeviceTable({
                                   <Pencil size={14} />
                                   Edit details
                                 </button>
-                                <button
-                                  type="button"
-                                  role="menuitem"
-                                  className="dt-menu-item dt-menu-bad"
-                                  onClick={() => { setMenuFor(null); setConfirming(rowKey); }}
-                                >
-                                  Remove…
-                                </button>
+                                {canRemove && (
+                                  <button
+                                    type="button"
+                                    role="menuitem"
+                                    className="dt-menu-item dt-menu-bad"
+                                    onClick={() => { setMenuFor(null); setConfirming(rowKey); }}
+                                  >
+                                    Remove…
+                                  </button>
+                                )}
                               </div>
                             )}
                           </div>
@@ -680,7 +689,7 @@ export default function DeviceTable({
                       })}
                     </tr>
 
-                    {confirming === rowKey && (
+                    {canRemove && confirming === rowKey && (
                       <tr className="dt-confirm-row">
                         <td colSpan={columns.length + 1}>
                           <div className="dt-confirm">

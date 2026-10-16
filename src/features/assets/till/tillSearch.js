@@ -1,5 +1,5 @@
 import { matchesQuery } from '../assetFilters.js';
-import { available, isOpen, nameOfItem } from '../handover/availability.js';
+import { available, isOpen, nameOfItem, titleOfHeld } from '../handover/availability.js';
 import { TRACKED, BULK } from '../assetKinds.js';
 import { unitsOf } from '../units.js';
 
@@ -68,7 +68,7 @@ function searchHolders(needle, assets, handovers) {
       return {
         id: `handover:${row.id}`,
         kind: 'handover',
-        name: [row.itemTitle || asset?.title || 'Item', which].filter(Boolean).join(' · '),
+        name: [titleOfHeld(row, asset) || 'Item', which].filter(Boolean).join(' · '),
         sub: `With ${row.personName || row.personEmail}`,
         handover: row,
       };

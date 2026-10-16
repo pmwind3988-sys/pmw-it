@@ -16,7 +16,7 @@ import SignatureShot from '../features/assets/ui/SignatureShot';
 import PersonEditor from '../features/assets/ui/PersonEditor';
 import { returnEverything } from '../features/assets/handover/planReturn';
 import {
-  heldBy, outstanding, isOverdue, isOpen, nameOfItem, HANDOVER_KIND,
+  heldBy, outstanding, isOverdue, isOpen, nameOfItem, titleOfHeld, HANDOVER_KIND,
 } from '../features/assets/handover/availability';
 import { CONDITIONS } from '../features/assets/assetKinds';
 import { unitsOf } from '../features/assets/units';
@@ -36,7 +36,8 @@ export default function AssetPersonPage() {
   const { instance } = useMsal();
   const getToken = useSharePointToken();
   const { handovers, loading, error, reload } = useHandovers();
-  // Only so a handover pointing at item 4 of a line can say which one that is.
+  // So a handover pointing at item 4 of a line can say which one that is, and
+  // so every row reads the item's name as the register has it NOW.
   const { assets } = useAssets();
 
   const [condition, setCondition] = useState(CONDITIONS[1] ?? 'Good');
@@ -71,10 +72,18 @@ export default function AssetPersonPage() {
    * can carry to a desk. Falls back to the number while the read is in flight,
    * and for a line whose items nobody has written on yet.
    */
-  const nameHeld = useMemo(() => {
-    const byId = new Map(assets.map((asset) => [asset.id, asset]));
-    return (row) => nameOfItem(row, unitsOf(byId.get(row.assetId) ?? {}));
-  }, [assets]);
+  const byId = useMemo(() => new Map(assets.map((asset) => [asset.id, asset])), [assets]);
+  const titleHeld = (row) => titleOfHeld(row, byId.get(row.assetId));
+  const nameHeld = (row) => {
+    const asset = byId.get(row.assetId);
+    const which = nameOfItem(row, unitsOf(asset ?? {}));
+    if (which) return which;
+    // A tracked laptop handed out before handovers carried serials had its
+    // serial only in the copied title. Now the title comes from the register,
+    // the serial has to come from there too, or renaming it loses the serial.
+    const serial = asset?.serialNumber;
+    return serial && !titleHeld(row).includes(serial) ? serial : '';
+  };
   const past = useMemo(
     () => handovers
       .filter((row) => String(row.personEmail ?? '').toLowerCase() === address.toLowerCase())
@@ -299,7 +308,7 @@ export default function AssetPersonPage() {
               {held.map((row) => (
                 <tr key={row.id} className={isOverdue(row) ? 'as-row-overdue' : undefined}>
                   <td>
-                    <Link to={`/assets/${row.assetId}`} className="as-link">{row.itemTitle}</Link>
+                    <Link to={`/assets/${row.assetId}`} className="as-link">{titleHeld(row)}</Link>
                     <span className="as-sub">
                       {row.category}
                       {/* WHICH one of the line. A serial when the handover
@@ -352,7 +361,7 @@ export default function AssetPersonPage() {
           <ul>
             {past.map((row) => (
               <li key={row.id}>
-                <Link to={`/assets/${row.assetId}`} className="as-link">{row.itemTitle}</Link>
+                <Link to={`/assets/${row.assetId}`} className="as-link">{titleHeld(row)}</Link>
                 <span className="as-sub">
                   {row.quantity} back {row.returnedOnMYT || ''}
                   {row.returnCondition ? ` — ${row.returnCondition}` : ''}

@@ -74,6 +74,19 @@ export function holdersOf(handovers, assetKey) {
 }
 
 /**
+ * What a handover's item is CALLED, as the register calls it now.
+ *
+ * `itemTitle` is copied onto the handover when it is written, so correcting an
+ * item's name on its own page left every handover still reading the old one.
+ * The register row is the name to believe; the copy is only a fallback for a
+ * row that has since been removed, or while the register is still loading.
+ * Which ONE of a line was handed over is `nameOfItem`'s job, not the title's.
+ */
+export function titleOfHeld(handover, asset) {
+  return asset?.title || handover?.itemTitle || '';
+}
+
+/**
  * The open handovers on one item, gathered per PERSON.
  *
  * Somebody who took five cables on Monday and one more on Wednesday is two

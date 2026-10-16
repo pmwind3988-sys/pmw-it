@@ -33,7 +33,7 @@ import { createLink, draftLink, linkUrl } from '../features/forms/sharepoint/che
 import { saveBatchToSharePoint, remainingDrafts } from '../features/assets/sharepoint/saveBatch';
 import { commitHandover, commitReturn } from '../features/assets/sharepoint/writeHandover';
 import { newBasket, removeLine, setQuantity, isUnitLine } from '../features/assets/handover/basket';
-import { isOverdue, isOpen } from '../features/assets/handover/availability';
+import { isOverdue, isOpen, titleOfHeld } from '../features/assets/handover/availability';
 import { categoriesIn } from '../features/assets/categories';
 import { assetTitle } from '../features/assets/identity';
 import { parseUnits } from '../features/assets/units';
@@ -404,6 +404,7 @@ export default function AssetTillPage() {
     .filter((row) => isOpen(row))
     .sort((a, b) => Number(isOverdue(b)) - Number(isOverdue(a)))
     .slice(0, 8), [handovers]);
+  const assetById = useMemo(() => new Map(assets.map((asset) => [asset.id, asset])), [assets]);
 
   const pressKey = (asset) => {
     if (mode === 'in') pick({ kind: 'model', asset, name: asset.title || asset.model });
@@ -1135,7 +1136,7 @@ export default function AssetTillPage() {
                     <li key={row.id}>
                       <span>
                         <strong>{row.personName || row.personEmail}</strong>
-                        <span>{row.itemTitle}{isOverdue(row) ? ' · overdue' : ''}</span>
+                        <span>{titleOfHeld(row, assetById.get(row.assetId))}{isOverdue(row) ? ' · overdue' : ''}</span>
                       </span>
                       <button type="button" className="till-chip" onClick={() => pick({ kind: 'handover', handover: row })}>Take back</button>
                     </li>

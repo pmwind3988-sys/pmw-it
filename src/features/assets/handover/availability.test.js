@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  nameOfItem,
+  nameOfItem, titleOfHeld,
   owned, out, available, isOut, outstanding, isOpen, isOverdue, statusFor,
   holdersOf, heldBy, peopleWithItems, groupHolders, HANDOVER_KIND, HANDOVER_STATUS,
 } from './availability.js';
@@ -222,5 +222,17 @@ describe('nameOfItem', () => {
     expect(nameOfItem({ unitIndex: 0 })).toBe('item 1');
     expect(nameOfItem({ unitIndex: null })).toBe('');
     expect(nameOfItem({})).toBe('');
+  });
+});
+
+describe('titleOfHeld', () => {
+  it('reads the register name, so a corrected name reaches the handovers', () => {
+    expect(titleOfHeld({ itemTitle: 'DELL Latitude 3550' }, { title: 'Dell Latitude 3540' })).toBe('Dell Latitude 3540');
+  });
+
+  it('falls back to the copy when the row is gone or not loaded yet', () => {
+    expect(titleOfHeld({ itemTitle: 'DELL Latitude 3550' }, undefined)).toBe('DELL Latitude 3550');
+    expect(titleOfHeld({ itemTitle: 'DELL Latitude 3550' }, { title: '' })).toBe('DELL Latitude 3550');
+    expect(titleOfHeld({}, undefined)).toBe('');
   });
 });

@@ -1,5 +1,5 @@
 import { findScanTarget } from '../handover/scanMatch.js';
-import { isOpen, outstanding, nameOfItem } from '../handover/availability.js';
+import { isOpen, outstanding, nameOfItem, titleOfHeld } from '../handover/availability.js';
 import { newId } from '../draft/draftAsset.js';
 import { normaliseCode } from '../identity.js';
 import { unitsOf } from '../units.js';
@@ -27,7 +27,7 @@ export const BACK_RESULT = {
 };
 
 function itemName(handover, asset) {
-  const title = handover.itemTitle || asset?.title || 'Item';
+  const title = titleOfHeld(handover, asset) || 'Item';
   const which = nameOfItem(handover, asset ? unitsOf(asset) : []);
   return which ? `${title} · ${which}` : title;
 }

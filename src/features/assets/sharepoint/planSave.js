@@ -2,7 +2,9 @@ import { assetKey, assetTitle, normaliseCode, indexByKey, indexByTag } from '../
 import { draftIssues, isBlocked } from '../draft/draftAsset.js';
 import { TRACKED_FIELDS } from './assetSchema.js';
 import { BULK } from '../assetKinds.js';
-import { withUnitsSplitOut, appendUnit, mergeUnits, PER_UNIT_CODES } from '../units.js';
+import {
+  withUnitsSplitOut, appendUnit, mergeUnits, parseUnits, serialiseUnits, PER_UNIT_CODES,
+} from '../units.js';
 
 /**
  * What a save is going to do, decided before a single request is sent.
@@ -112,6 +114,16 @@ export function coalesce(drafts) {
   return [...byKey.values()];
 }
 
+const PURCHASE_FIELDS = ['supplier', 'poNumber', 'doNumber', 'arrivedOn'];
+
+const isBlank = (value) => value === null || value === undefined || String(value).trim() === '';
+
+/** A bulk row's unit records that its count still shows. */
+function visibleUnits(row) {
+  const count = Math.max(0, Math.trunc(Number(row.quantity) || 0));
+  return serialiseUnits(parseUnits(row.units).filter((unit) => unit.index < count));
+}
+
 /**
  * `drafts` are already resolved against their batch (§4.6), so the purchase
  * details are on them. `register` is every row currently in SharePoint.
@@ -171,8 +183,12 @@ export function planSave(drafts, register, { addedOn = Date.now(), addedBy = '' 
     // On a bulk line the box being scanned is a NEW physical item, so it takes
     // the next position rather than the first — the row already describes
     // however many arrived before it.
+    //
+    // Items beyond the row's count are leftovers a lowered quantity hid, and
+    // this save is the one that writes over them: kept, they would push the
+    // new items into positions past the new count, where nobody can see them.
     const units = draft.trackingMode === BULK
-      ? mergeUnits(existing.units, draft.units, existing.quantity ?? 0)
+      ? mergeUnits(visibleUnits(existing), draft.units, existing.quantity ?? 0)
       : (draft.units ?? existing.units ?? '');
 
     const resolved = withUnitsSplitOut({
@@ -186,6 +202,15 @@ export function planSave(drafts, register, { addedOn = Date.now(), addedBy = '' 
       // like a typed model name threw the delivery away and still said "Saved".
       quantity,
       units,
+      // Owned by the handover list; a delivery knows nothing about who holds
+      // what, and must not log "2 out → blank" every time it lands.
+      quantityOut: existing.quantityOut,
+      assignedTo: existing.assignedTo,
+      assignedToEmail: existing.assignedToEmail,
+      // A delivery with no paperwork yet does not erase the line's.
+      ...Object.fromEntries(PURCHASE_FIELDS.map((field) => [
+        field, isBlank(draft[field]) ? existing[field] : draft[field],
+      ])),
       // Added to, never replaced: these are the barcodes the line is
       // recognised by, and a delivery that did not happen to scan one must
       // not make the register forget it.

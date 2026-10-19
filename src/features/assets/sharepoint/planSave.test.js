@@ -326,6 +326,45 @@ describe('planSave — new stock of a model already counted', () => {
     expect(unitsOf(body).map((unit) => unit.serialNumber).slice(3)).toEqual(['NEW1', 'NEW2']);
   });
 
+  /**
+   * The real Lenovo Idea Tab row: three saves with the count held at 2 left
+   * the same two serials parked beyond it, hidden. A delivery writes over
+   * those leftovers rather than stepping past them into positions the new
+   * count does not reach.
+   */
+  it('puts new items where the count can see them, over hidden leftovers', () => {
+    const leftovers = {
+      ...existing,
+      quantity: 2,
+      units: JSON.stringify([
+        { index: 0, serialNumber: 'OLD0' }, { index: 1, serialNumber: 'OLD1' },
+        { index: 2, serialNumber: 'GHOST' }, { index: 3, serialNumber: 'GHOST' },
+      ]),
+    };
+    const draft = newDraft({
+      category: 'Mouse', trackingMode: BULK, manufacturer: 'Logitech', model: 'M90', quantity: 2,
+      units: JSON.stringify([{ index: 0, serialNumber: 'NEW1' }, { index: 1, serialNumber: 'NEW2' }]),
+    });
+    const body = planSave([draft], [leftovers]).updates[0].body;
+    expect(body.quantity).toBe(4);
+    expect(JSON.parse(body.units).map((unit) => unit.serialNumber)).toEqual(['OLD0', 'OLD1', 'NEW1', 'NEW2']);
+  });
+
+  it('keeps what is out, and a supplier the delivery left blank', () => {
+    const lent = {
+      ...existing, quantityOut: 2, supplier: 'Computer Express', poNumber: 'DO2608 / 076',
+    };
+    const draft = newDraft({
+      category: 'Mouse', trackingMode: BULK, manufacturer: 'Logitech', model: 'M90', quantity: 1,
+    });
+    const { updates, changeRows } = planSave([draft], [lent]);
+    expect(updates[0].body.quantityOut).toBe(2);
+    expect(updates[0].body.supplier).toBe('Computer Express');
+    expect(updates[0].body.poNumber).toBe('DO2608 / 076');
+    expect(changeRows.map((row) => row.fieldName)).not.toContain('quantityOut');
+    expect(changeRows.map((row) => row.fieldName)).not.toContain('supplier');
+  });
+
   it('keeps a serial run when two lines of the same model are combined in one save', () => {
     const a = newDraft({ category: 'Mouse', trackingMode: BULK, manufacturer: 'Logitech', model: 'M90', quantity: 2, units: JSON.stringify([{ index: 0, serialNumber: 'A1' }, { index: 1, serialNumber: 'A2' }]) });
     const b = newDraft({ category: 'Mouse', trackingMode: BULK, manufacturer: 'Logitech', model: 'M90', quantity: 1, units: JSON.stringify([{ index: 0, serialNumber: 'B1' }]) });

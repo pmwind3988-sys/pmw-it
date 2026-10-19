@@ -137,6 +137,72 @@ export async function updateDevice({
   return { changes };
 }
 
+const nameKey = (name) => asText(name).trim().toLowerCase();
+
+/**
+ * Pure: what renaming a machine writes, or why it may not.
+ *
+ * The old name is not lost: the change log keeps "Renamed old → new" under the
+ * machine's id, which is what the History tab reads. The new name joins the
+ * manual list so the next scan report, which may still carry the old Windows
+ * name, does not put it back. A name another row already uses is refused --
+ * imports without a serial match on the name, and two rows answering to it
+ * would let a report land on the wrong machine.
+ */
+export function planRename(existing, newName, devices = []) {
+  const before = asText(existing.computerName).trim();
+  const after = asText(newName).trim();
+
+  if (!after) return { error: 'Type the new name.' };
+  if (after === before) return { error: 'That is already its name.' };
+  const taken = devices.find((row) => row.id !== existing.id && nameKey(row.computerName) === nameKey(after));
+  if (taken) return { error: `${taken.computerName} is already another machine in the register.` };
+
+  const manual = new Set(existing.manualFields ?? []);
+  manual.add('computerName');
+
+  return {
+    name: after,
+    change: { fieldName: 'computerName', oldValue: before, newValue: after, changeType: 'Updated' },
+    manualFields: [...manual],
+  };
+}
+
+/** Admin only, by the page. Throws with planRename's reason when it refuses. */
+export async function renameDevice({
+  siteUrl, token, existing, newName, devices, changedBy,
+}) {
+  if (!existing?.id) throw new Error('That row has no id, so it cannot be renamed');
+
+  const plan = planRename(existing, newName, devices);
+  if (plan.error) throw new Error(plan.error);
+
+  const digest = await getFormDigest(siteUrl, token);
+  const response = await withRetry(() =>
+    spFetch(siteUrl, `${listPath(DEVICE_LIST_NAME)}/items(${existing.id})`, {
+      token,
+      digest,
+      method: 'POST',
+      accept: ITEM_ACCEPT,
+      body: { Title: plan.name, ManualFields: plan.manualFields.join('\n') },
+      headers: { 'X-HTTP-Method': 'MERGE', 'IF-MATCH': '*' },
+    }));
+
+  if (!response.ok) {
+    throw new Error(`Could not rename the machine (${response.status}): ${await response.text()}`);
+  }
+
+  // Logged under the OLD name as Title and the id, so both the id read and a
+  // name-only read of older rows still find it. The machine is renamed either
+  // way, so a failed log line is reported rather than thrown.
+  try {
+    await logChanges(siteUrl, token, digest, existing, [plan.change], changedBy);
+    return { name: plan.name, logFailed: false };
+  } catch {
+    return { name: plan.name, logFailed: true };
+  }
+}
+
 /**
  * One machine off the register: the delete, then the row recording it. Shared
  * by the single Remove button and by removing a selection, so the two cannot

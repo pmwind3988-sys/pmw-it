@@ -122,6 +122,17 @@
 .mh-report-file { margin: 0; font-size: 14px; color: var(--it-ink-soft); }
 .mh-raw { max-height: 70vh; }
 
+/* Rename: the confirm dialog's frame, but nothing about it is destructive. */
+.rn-box .ui-confirm-title { color: var(--it-ink); }
+.rn-field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: var(--it-ink-soft); }
+.rn-input {
+  min-height: 44px; padding: 0 12px; border-radius: 10px; font: inherit; font-size: 16px; font-weight: 600;
+  border: 1px solid var(--it-line-strong, var(--it-line));
+  background: var(--it-surface, #fff); color: var(--it-ink);
+}
+.rn-input[aria-invalid='true'] { border-color: var(--it-danger); }
+.rn-why { min-height: 18px; margin: 6px 0 12px; font-size: 13px; color: var(--it-danger); }
+
 /* Phone: five round badges, names and grades under, reasons listed below -- */
 @media (max-width: 640px) {
   .mh-health { padding: 16px; border-radius: 24px; }

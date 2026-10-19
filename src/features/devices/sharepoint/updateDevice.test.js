@@ -2,7 +2,7 @@ import {
   describe, it, expect, afterEach, vi,
 } from 'vitest';
 import {
-  planEdit, updateDevice, deleteDevice, deleteDevices, EDITABLE_FIELDS,
+  planEdit, updateDevice, deleteDevice, deleteDevices, EDITABLE_FIELDS, planRename, renameDevice,
 } from './updateDevice.js';
 import { provisionDeviceColumns } from './provisionLists.js';
 
@@ -371,5 +371,67 @@ describe('deleteDevices', () => {
 
     expect(seen).toHaveLength(3);
     expect(seen.at(-1)).toEqual([3, 3]);
+  });
+});
+
+describe('planRename', () => {
+  it('records the old name as a rename and holds the new one against imports', () => {
+    const plan = planRename(row({ manualFields: ['owner'] }), '  PMW-LT-042 ', []);
+    expect(plan.name).toBe('PMW-LT-042');
+    expect(plan.change).toEqual({
+      fieldName: 'computerName', oldValue: 'PC1', newValue: 'PMW-LT-042', changeType: 'Updated',
+    });
+    expect(plan.manualFields).toEqual(['owner', 'computerName']);
+  });
+
+  it('refuses a blank name and the name it already has', () => {
+    expect(planRename(row(), '   ').error).toMatch(/Type/);
+    expect(planRename(row(), 'PC1').error).toMatch(/already its name/);
+  });
+
+  it('refuses a name another machine answers to, whatever its case', () => {
+    const others = [row(), row({ id: 8, computerName: 'PC2' })];
+    expect(planRename(row(), 'pc2', others).error).toMatch(/PC2 is already another machine/);
+  });
+
+  it('does not count the machine itself as taking the name', () => {
+    expect(planRename(row(), 'pc1 ', [row()]).name).toBe('pc1');
+    expect(planRename(row(), 'Pc1-new', [row()]).error).toBeUndefined();
+  });
+});
+
+describe('renameDevice', () => {
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it('writes the new Title and manual list, then logs the rename under the machine id', async () => {
+    const sp = fakeSharePoint();
+    vi.stubGlobal('fetch', sp.fetch);
+
+    const result = await renameDevice({
+      siteUrl: SITE, token: 't', existing: row(), newName: 'PC9', devices: [row()], changedBy: 'me@pmw-group.com',
+    });
+
+    expect(result).toEqual({ name: 'PC9', logFailed: false });
+    const [merge, log] = writes(sp.calls);
+    expect(merge.url).toContain('items(7)');
+    expect(merge.body).toEqual({ Title: 'PC9', ManualFields: 'computerName' });
+    expect(log.body).toMatchObject({
+      Title: 'PC1', DeviceId: 7, FieldName: 'computerName', OldValue: 'PC1', NewValue: 'PC9',
+      ChangedBy: 'me@pmw-group.com',
+    });
+  });
+
+  it('writes nothing when the name is refused', async () => {
+    const sp = fakeSharePoint();
+    vi.stubGlobal('fetch', sp.fetch);
+    await expect(renameDevice({ siteUrl: SITE, token: 't', existing: row(), newName: '', devices: [] }))
+      .rejects.toThrow(/Type/);
+    expect(writes(sp.calls)).toEqual([]);
+  });
+
+  it('still reports the rename when only the history line fails', async () => {
+    vi.stubGlobal('fetch', fakeSharePoint({ failOn: 'Changes' }).fetch);
+    const result = await renameDevice({ siteUrl: SITE, token: 't', existing: row(), newName: 'PC9', devices: [] });
+    expect(result).toEqual({ name: 'PC9', logFailed: true });
   });
 });

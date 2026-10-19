@@ -4,7 +4,7 @@ import AppShell from '../components/AppShell';
 import { gradeCssVars } from '../features/devices/standards/gradeColors';
 import { Card, EmptyState, ErrorBanner } from '../components/ui/Surfaces';
 import Button from '../components/ui/Button';
-import { RefreshCw, Trash2 } from '../components/ui/Icons';
+import { Pencil, RefreshCw, Trash2 } from '../components/ui/Icons';
 import { useConfirm } from '../components/ui/useConfirm';
 import { useDevices } from '../features/devices/useDevices';
 import { groupsFor, RAW_REPORT_KEY } from '../features/devices/fieldGroups';
@@ -24,7 +24,8 @@ import { locationsIn } from '../features/devices/map/locations';
 import { mapHref } from '../features/devices/map/mapLinks';
 import PartTable from '../features/devices/ui/PartTable';
 import PlaceFill from '../features/devices/ui/PlaceFill';
-import { updateDevice, deleteDevice } from '../features/devices/sharepoint/updateDevice';
+import { updateDevice, deleteDevice, renameDevice } from '../features/devices/sharepoint/updateDevice';
+import RenameDialog from '../features/devices/ui/RenameDialog';
 import { useDeviceAdmin } from '../features/devices/useDeviceAdmin';
 import { matchingGroups } from '../features/devices/fieldSearch';
 
@@ -117,6 +118,9 @@ export default function DeviceDetailPage() {
   const [pending, setPending] = useState([]);
   const [placing, setPlacing] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [renameError, setRenameError] = useState('');
   const isAdmin = useDeviceAdmin();
   const { ask, dialog } = useConfirm();
   const navigate = useNavigate();
@@ -270,7 +274,29 @@ export default function DeviceDetailPage() {
     }
   };
 
-  const toggleTones = () => setShowTones((on) => !on);
+  // Admin only. The old name stays in the History tab as a "Renamed" line.
+  const rename = async (name) => {
+    setRenaming(true);
+    setRenameError('');
+    try {
+      const tokenRes = await getToken();
+      const { logFailed } = await renameDevice({
+        siteUrl: SHAREPOINT_SITE_URL, token: tokenRes.accessToken, existing: device, newName: name,
+        devices, changedBy: tokenRes.account?.username ?? '',
+      });
+      setRenameOpen(false);
+      setActionError('');
+      setActionNote(logFailed ? 'Renamed, but the old name could not be written to the history.' : '');
+      reload();
+      history.reload();
+    } catch (failure) {
+      setRenameError(failure.message);
+    } finally {
+      setRenaming(false);
+    }
+  };
+
+  const toggleTones =() => setShowTones((on) => !on);
 
   const status = device ? statusOf(device) : '';
   const kind = device ? [device.deviceType, device.computerModel].filter(Boolean).join(' · ') : '';
@@ -288,6 +314,12 @@ export default function DeviceDetailPage() {
           <Button variant="secondary" size="sm" icon={RefreshCw} onClick={reload} loading={loading}>
             Refresh
           </Button>
+          {isAdmin && device && (
+            <Button variant="secondary" size="sm" icon={Pencil}
+              onClick={() => { setRenameError(''); setRenameOpen(true); }}>
+              Rename
+            </Button>
+          )}
           {isAdmin && device && (
             <Button variant="danger" size="sm" icon={Trash2} onClick={remove} loading={removing}>
               Remove
@@ -456,6 +488,10 @@ export default function DeviceDetailPage() {
         )}
       </div>
       {dialog}
+      {renameOpen && device && (
+        <RenameDialog device={device} devices={devices} busy={renaming} error={renameError}
+          onSave={rename} onClose={() => setRenameOpen(false)} />
+      )}
     </AppShell>
   );
 }

@@ -259,3 +259,15 @@ describe('planImport — lifecycle', () => {
     expect(plan.skipped[0].computerName).toBe('PC2');
   });
 });
+
+describe('planImport after an admin rename', () => {
+  it('keeps the name the admin gave when the report still carries the old Windows name', () => {
+    const existing = {
+      ...device({ serialNumber: '5CG1234XYZ' }), id: 7, computerName: 'PMW-LT-042', manualFields: ['computerName'],
+    };
+    const plan = planImport([device({ serialNumber: '5CG1234XYZ', computerName: 'PC1' })], [existing]);
+    expect(plan.inserts).toHaveLength(0);
+    expect(plan.changeRows.filter((c) => c.fieldName === 'computerName')).toEqual([]);
+    for (const update of plan.updates) expect(update.body.Title).toBe('PMW-LT-042');
+  });
+});

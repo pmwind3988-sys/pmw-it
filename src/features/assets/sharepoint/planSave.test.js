@@ -301,6 +301,31 @@ describe('planSave — new stock of a model already counted', () => {
       .toEqual([[0, 'OLD0'], [10, 'NEW1'], [11, 'NEW2']]);
   });
 
+  /**
+   * A count corrected by hand, or set by combining rows, is the figure the
+   * delivery adds TO. Holding it back like a typed model name left the till
+   * saying "Saved" while the line read exactly what it read before.
+   */
+  it('adds to a quantity somebody set by hand, and keeps the new serials visible', () => {
+    const handSet = {
+      ...existing,
+      quantity: 3,
+      quantityOut: 3,
+      manualFields: ['quantity', 'trackingMode', 'model'],
+      model: 'M90',
+    };
+    const draft = newDraft({
+      category: 'Mouse', trackingMode: BULK, manufacturer: 'Logitech', model: 'M90', quantity: 2,
+      units: JSON.stringify([{ index: 0, serialNumber: 'NEW1' }, { index: 1, serialNumber: 'NEW2' }]),
+    });
+    const { updates } = planSave([draft], [handSet]);
+    expect(updates).toHaveLength(1);
+    const body = updates[0].body;
+    expect(body.quantity).toBe(5);
+    expect(body.manualFields).toEqual(['quantity', 'trackingMode', 'model']);
+    expect(unitsOf(body).map((unit) => unit.serialNumber).slice(3)).toEqual(['NEW1', 'NEW2']);
+  });
+
   it('keeps a serial run when two lines of the same model are combined in one save', () => {
     const a = newDraft({ category: 'Mouse', trackingMode: BULK, manufacturer: 'Logitech', model: 'M90', quantity: 2, units: JSON.stringify([{ index: 0, serialNumber: 'A1' }, { index: 1, serialNumber: 'A2' }]) });
     const b = newDraft({ category: 'Mouse', trackingMode: BULK, manufacturer: 'Logitech', model: 'M90', quantity: 1, units: JSON.stringify([{ index: 0, serialNumber: 'B1' }]) });

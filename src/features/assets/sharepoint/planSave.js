@@ -175,20 +175,22 @@ export function planSave(drafts, register, { addedOn = Date.now(), addedBy = '' 
       ? mergeUnits(existing.units, draft.units, existing.quantity ?? 0)
       : (draft.units ?? existing.units ?? '');
 
-    const resolved = withUnitsSplitOut(applyManualOverrides(
-      {
-        ...draft,
-        assetKey: key,
-        quantity,
-        status: draft.status ?? existing.status,
-        units,
-        // Added to, never replaced: these are the barcodes the line is
-        // recognised by, and a delivery that did not happen to scan one must
-        // not make the register forget it.
-        additionalCodes: [...new Set([...(existing.additionalCodes ?? []), ...(draft.additionalCodes ?? [])])],
-      },
-      existing,
-    ));
+    const resolved = withUnitsSplitOut({
+      ...applyManualOverrides(
+        { ...draft, assetKey: key, status: draft.status ?? existing.status },
+        existing,
+      ),
+      // Set AFTER the manual overrides, not inside them. A count somebody
+      // corrected by hand (or a combine set) is already in `existing.quantity`,
+      // and a delivery adds to it rather than overwriting it -- holding it back
+      // like a typed model name threw the delivery away and still said "Saved".
+      quantity,
+      units,
+      // Added to, never replaced: these are the barcodes the line is
+      // recognised by, and a delivery that did not happen to scan one must
+      // not make the register forget it.
+      additionalCodes: [...new Set([...(existing.additionalCodes ?? []), ...(draft.additionalCodes ?? [])])],
+    });
 
     const changes = diffAsset(existing, resolved);
     if (!changes.length) {

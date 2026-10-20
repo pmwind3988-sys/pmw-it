@@ -1,9 +1,10 @@
 import { Link } from 'react-router-dom';
-import { Tag, Boxes } from '../../../components/ui/Icons';
+import { Tag } from '../../../components/ui/Icons';
 import { formatMYT } from '../../../utils/malaysiaTime';
 import { isTracked } from '../assetKinds';
 import { available, out } from '../handover/availability';
 import { unitsOf, perItem, isBlankUnit } from '../units';
+import CategoryLogo from './CategoryLogo';
 
 /**
  * The register, as a list.
@@ -105,10 +106,12 @@ export default function AssetTable({
                 {asset.supplier && <span className="as-sub">from {asset.supplier}</span>}
               </td>
               <td>
-                <span className="as-chip">
-                  {isTracked(asset.trackingMode) ? null : <Boxes size={12} />}
-                  {asset.category || '—'}
-                </span>
+                {asset.category ? (
+                  <span className="as-cat">
+                    <CategoryLogo category={asset.category} bulk={!isTracked(asset.trackingMode)} />
+                    {asset.category}
+                  </span>
+                ) : '—'}
               </td>
               <td className="as-mono"><Codes asset={asset} /></td>
               <td className="as-qty">{isTracked(asset.trackingMode) ? '1' : `× ${asset.quantity ?? 1}`}</td>

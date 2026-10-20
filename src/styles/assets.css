@@ -2027,3 +2027,116 @@
   from { opacity: 0; transform: translateX(-50%) translateY(6px); }
   to { opacity: 1; transform: translateX(-50%); }
 }
+
+/* --- a category's logo (ui/CategoryLogo.jsx) ---------------------------
+   Five colour families, one drawing per category. Every drawing carries a
+   loop of motion that stays PAUSED on its first frame — which is the drawing
+   at rest — until its row is pointed at. Two hundred rows moving at once is
+   noise, not information. */
+.cat-logo {
+  --cat-c: #0067b8;
+  --cat-w: #e8f2fc;
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--cat-w);
+  color: var(--cat-c);
+  flex: none;
+}
+.cat-logo svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  overflow: visible;
+}
+/* A stacked edge behind the tile: counted by the bagful. */
+.cat-logo.cat-bulk {
+  box-shadow: 2.5px -2.5px 0 0 var(--surface),
+    4px -4px 0 0 color-mix(in srgb, currentColor 30%, var(--surface));
+}
+.cat-comp { --cat-c: #0067b8; --cat-w: #e8f2fc; }
+.cat-office { --cat-c: #0f766e; --cat-w: #e2f3f0; }
+.cat-input { --cat-c: #5146d8; --cat-w: #ecebfd; }
+.cat-parts { --cat-c: #b45309; --cat-w: #fdf0e1; }
+.cat-misc { --cat-c: #4b5a6e; --cat-w: #edf0f4; }
+[data-theme='dark'] .cat-comp { --cat-c: #5cb3f5; --cat-w: #12283c; }
+[data-theme='dark'] .cat-office { --cat-c: #4fd1c0; --cat-w: #0f2a28; }
+[data-theme='dark'] .cat-input { --cat-c: #a5a0ff; --cat-w: #1f1d3d; }
+[data-theme='dark'] .cat-parts { --cat-c: #f6ad55; --cat-w: #2e1f0c; }
+[data-theme='dark'] .cat-misc { --cat-c: #a7b3c4; --cat-w: #1e2633; }
+
+.cat-logo .solid { fill: color-mix(in srgb, currentColor 16%, var(--cat-w)); }
+.cat-logo .dot { fill: currentColor; stroke: none; }
+.cat-logo .soft { fill: currentColor; fill-opacity: 0.5; stroke: none; }
+.cat-logo .paper { fill: var(--surface); }
+.cat-logo .hot { stroke: #f59e0b; }
+.cat-logo .hotdot { fill: #f59e0b; stroke: var(--cat-w); stroke-width: 1.5; }
+.cat-logo svg * { transform-box: fill-box; transform-origin: center; }
+
+.as-cat { display: inline-flex; align-items: center; gap: 9px; white-space: nowrap; }
+
+.cat-logo .a-type { stroke-dasharray: 14 14; animation: cat-type 2.8s ease-in-out infinite; }
+.cat-logo .a-type.d2 { animation-delay: 0.25s; }
+.cat-logo .a-type.d3 { animation-delay: 0.5s; }
+@keyframes cat-type { 0%, 100% { stroke-dashoffset: 0; } 12% { stroke-dashoffset: 14; } 55% { stroke-dashoffset: 0; } }
+.cat-logo .a-spin { transform-box: view-box; transform-origin: 16px 19px; animation: cat-spin 1.6s linear infinite; }
+@keyframes cat-spin { to { transform: rotate(360deg); } }
+.cat-logo .a-blink { animation: cat-blink 1.4s ease-in-out infinite; }
+@keyframes cat-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
+.cat-logo .a-scan { opacity: 0; animation: cat-scan 2.6s ease-in-out infinite; }
+@keyframes cat-scan { 0% { opacity: 0; transform: translateY(0); } 15% { opacity: 0.55; } 80% { opacity: 0.55; transform: translateY(9px); } 100% { opacity: 0; transform: translateY(9px); } }
+.cat-logo .a-feed { animation: cat-feed 3s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+@keyframes cat-feed { 0% { transform: translateY(0); } 14% { transform: translateY(-7px); } 70%, 100% { transform: translateY(0); } }
+.cat-logo .a-plug { animation: cat-plug 2.8s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+@keyframes cat-plug { 0%, 100% { transform: translateY(0); } 25%, 45% { transform: translateY(-4px); } 62% { transform: translateY(0); } }
+.cat-logo .a-led { animation: cat-led 2.8s steps(1) infinite; }
+@keyframes cat-led { 0% { opacity: 1; } 22% { opacity: 0.2; } 64% { opacity: 1; } }
+.cat-logo .a-buzz { animation: cat-buzz 2.6s ease-in-out infinite; }
+@keyframes cat-buzz { 0%, 32%, 100% { transform: rotate(0); } 5% { transform: rotate(-7deg); } 10% { transform: rotate(7deg); } 15% { transform: rotate(-7deg); } 20% { transform: rotate(7deg); } 26% { transform: rotate(0); } }
+.cat-logo .a-wave { opacity: 0; animation: cat-wave 2.6s ease-in-out infinite; }
+@keyframes cat-wave { 0% { opacity: 0; } 5%, 22% { opacity: 1; } 32%, 100% { opacity: 0; } }
+.cat-logo .a-ping { animation: cat-ping 2.6s ease-out infinite; }
+@keyframes cat-ping { 0%, 26%, 100% { transform: scale(1); } 32% { transform: scale(1.45); } 40% { transform: scale(1); } }
+.cat-logo .a-swipe { animation: cat-swipe 3s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+@keyframes cat-swipe { 0%, 100% { transform: translateX(0); } 35%, 60% { transform: translateX(9px); } }
+.cat-logo .a-wifi { animation: cat-wifi 2.2s ease-in-out infinite; }
+.cat-logo .a-wifi.w2 { animation-delay: 0.2s; }
+.cat-logo .a-wifi.w3 { animation-delay: 0.4s; }
+@keyframes cat-wifi { 0%, 100% { opacity: 1; } 25% { opacity: 0.2; } 55% { opacity: 1; } }
+.cat-logo .a-core { fill: currentColor; fill-opacity: 0.2; animation: cat-core 2s ease-in-out infinite; }
+@keyframes cat-core { 0%, 100% { fill-opacity: 0.2; } 50% { fill-opacity: 0.85; } }
+.cat-logo .a-press { animation: cat-press 2.4s ease-out infinite; }
+.cat-logo .a-press.p2 { animation-delay: 0.18s; }
+.cat-logo .a-press.p3 { animation-delay: 0.36s; }
+.cat-logo .a-press.p4 { animation-delay: 0.54s; }
+.cat-logo .a-press.p5 { animation-delay: 0.72s; }
+.cat-logo .a-press.p6 { animation-delay: 1s; }
+@keyframes cat-press { 0%, 100% { transform: translateY(0); fill-opacity: 0.5; } 6% { transform: translateY(1px); fill-opacity: 1; } 14% { transform: translateY(0); fill-opacity: 0.5; } }
+.cat-logo .a-scroll { animation: cat-scroll 1.5s ease-in-out infinite; }
+@keyframes cat-scroll { 0% { transform: translateY(0); opacity: 1; } 55% { transform: translateY(3px); opacity: 0; } 56% { transform: translateY(-2px); opacity: 0; } 100% { transform: translateY(0); opacity: 1; } }
+.cat-logo .a-pulse { stroke-dasharray: 5 60; stroke-width: 3; animation: cat-pulse 1.8s linear infinite; }
+@keyframes cat-pulse { 0% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: -65; } }
+.cat-logo .a-bolt { animation: cat-bolt 2.4s steps(1) infinite; }
+@keyframes cat-bolt { 0% { opacity: 1; } 8% { opacity: 0.15; } 14% { opacity: 1; } 20% { opacity: 0.15; } 26%, 100% { opacity: 1; } }
+.cat-logo .a-swing { transform-box: view-box; transform-origin: 16px 5px; animation: cat-swing 2.8s ease-in-out infinite; }
+@keyframes cat-swing { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(7deg); } 75% { transform: rotate(-7deg); } }
+.cat-logo .a-lid { transform-box: view-box; transform-origin: 4px 13px; animation: cat-lid 3s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+@keyframes cat-lid { 0%, 100% { transform: rotate(0); } 22%, 48% { transform: rotate(-24deg); } 64% { transform: rotate(0); } }
+.cat-logo .a-spark { opacity: 0; animation: cat-spark 3s ease-out infinite; }
+@keyframes cat-spark { 0%, 18% { opacity: 0; transform: scale(0.3); } 30% { opacity: 1; transform: scale(1); } 50%, 100% { opacity: 0; transform: scale(1.2); } }
+
+/* Still until pointed at. This sits after the animations and outranks them,
+   because the `animation` shorthand above resets the play state to running. */
+.cat-logo svg [class*='a-'] { animation-play-state: paused; }
+.as-table tbody tr:hover .cat-logo svg [class*='a-'],
+.as-table tbody tr:focus-within .cat-logo svg [class*='a-'] { animation-play-state: running; }
+@media (prefers-reduced-motion: reduce) {
+  .cat-logo svg * { animation: none !important; }
+}

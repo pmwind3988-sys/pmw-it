@@ -2056,11 +2056,6 @@
   stroke-linejoin: round;
   overflow: visible;
 }
-/* A stacked edge behind the tile: counted by the bagful. */
-.cat-logo.cat-bulk {
-  box-shadow: 2.5px -2.5px 0 0 var(--surface),
-    4px -4px 0 0 color-mix(in srgb, currentColor 30%, var(--surface));
-}
 .cat-comp { --cat-c: #0067b8; --cat-w: #e8f2fc; }
 .cat-office { --cat-c: #0f766e; --cat-w: #e2f3f0; }
 .cat-input { --cat-c: #5146d8; --cat-w: #ecebfd; }

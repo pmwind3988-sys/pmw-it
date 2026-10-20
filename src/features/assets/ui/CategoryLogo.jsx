@@ -6,8 +6,7 @@ import { familyOf } from '../categoryFamilies';
  * Each drawing has one loop of motion in it (a laptop's screen types, a
  * printer feeds a page, a router's signal pulses), and `assets.css` keeps it
  * STILL until the row it sits on is pointed at — a register of two hundred
- * rows all moving at once would be noise. A bulk category gets a stacked edge
- * behind the tile, which is what the old box icon used to say.
+ * rows all moving at once would be noise.
  *
  * Drawn on a 32px grid in the same stroke style as `components/ui/Icons.jsx`.
  * A category somebody added that has no drawing of its own gets the open box.
@@ -149,10 +148,10 @@ const GLYPHS = {
   ),
 };
 
-export default function CategoryLogo({ category, bulk = false }) {
+export default function CategoryLogo({ category }) {
   const glyph = GLYPHS[category] ?? GLYPHS.Other;
   return (
-    <span className={`cat-logo cat-${familyOf(category)}${bulk ? ' cat-bulk' : ''}`}>
+    <span className={`cat-logo cat-${familyOf(category)}`}>
       <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">{glyph}</svg>
     </span>
   );

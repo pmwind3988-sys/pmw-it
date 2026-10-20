@@ -108,7 +108,7 @@ export default function AssetTable({
               <td>
                 {asset.category ? (
                   <span className="as-cat">
-                    <CategoryLogo category={asset.category} bulk={!isTracked(asset.trackingMode)} />
+                    <CategoryLogo category={asset.category} />
                     {asset.category}
                   </span>
                 ) : '—'}

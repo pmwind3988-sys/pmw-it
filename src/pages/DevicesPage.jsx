@@ -52,8 +52,8 @@ const FILTER_KEYS = [
 
 /** The three views a person switches between. The URL keys are the old tab keys. */
 const VIEWS = [
-  { key: 'map', label: 'Places' },
   { key: 'register', label: 'List' },
+  { key: 'map', label: 'Places' },
   { key: 'dashboard', label: 'To do' },
 ];
 
@@ -68,7 +68,7 @@ export default function DevicesPage() {
   // Removing a machine is for admins (owners of the IT helpdesk site) only.
   const isAdmin = useDeviceAdmin();
 
-  const view = params.get('view') ?? 'map';
+  const view = params.get('view') ?? 'register';
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
   const menuButtonRef = useRef(null);
@@ -577,7 +577,7 @@ export default function DevicesPage() {
         {view === 'import' && (
           <section className="dvp-import" aria-labelledby="dvp-import-title">
             <div className="dvp-import-head">
-              <button type="button" className="dvp-back" onClick={() => switchView('map')}>
+              <button type="button" className="dvp-back" onClick={() => switchView('register')}>
                 <ChevronLeft size={14} /> Back to devices
               </button>
               <div className="dvp-import-title-row">
@@ -668,7 +668,7 @@ export default function DevicesPage() {
 
         {view === 'standards' && (
           <>
-            <button type="button" className="dvp-back" onClick={() => switchView('map')}>
+            <button type="button" className="dvp-back" onClick={() => switchView('register')}>
               <ChevronLeft size={14} /> Back to devices
             </button>
             <StandardsPage devices={saved} standards={standards} />

@@ -344,7 +344,7 @@ export default function DeviceDetailPage() {
               {!loading && (
                 <>
                   {' '}
-                  <Link to="/devices">Back to the map</Link>
+                  <Link to="/devices">Back to the device list</Link>
                 </>
               )}
             </EmptyState>

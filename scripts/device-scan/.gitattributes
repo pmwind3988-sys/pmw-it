@@ -1,0 +1,6 @@
+# cmd misreads labels and goto targets in a batch file with LF endings, and
+# the .ps1 must stay a byte copy of the .bat, so both keep CRLF on every checkout.
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+*.txt text eol=crlf

@@ -154,3 +154,142 @@
   .mh-page .dd-histories { grid-template-columns: 1fr; }
 }
 
+/* Machine sections: licences, serial and part numbers, installed software ---- */
+.mh-section { display: flex; flex-direction: column; gap: 16px; padding: 22px 24px; }
+.mh-section-head { display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: space-between; align-items: baseline; }
+.mh-section-title { margin: 0; font-size: 18px; letter-spacing: -0.01em; }
+.mh-section-count { font-weight: 400; color: var(--it-ink-soft); }
+.mh-section-note { margin: 0; font-size: 13px; color: var(--it-ink-soft); line-height: 1.45; }
+
+/* Header badge: which scan the page is built from */
+.mh-scan { font-size: 13px; padding: 3px 10px; border-radius: 12px; background: var(--it-brand-wash); color: var(--it-brand-deep); white-space: nowrap; }
+.mh-scan-basic { background: color-mix(in srgb, var(--grade-attention) 22%, transparent); color: var(--it-ink); }
+.mh-scan-old { background: var(--it-thead); color: var(--it-ink-soft); }
+
+/* Tone pill: the words carry the meaning, the grade colour only backs them */
+.lp-tone, .sw-badge { display: inline-flex; align-self: flex-start; width: fit-content; font-size: 13px; font-weight: 600; padding: 2px 10px; border-radius: 999px; }
+.lp-tone-good { background: var(--grade-optimal); color: var(--grade-optimal-ink); }
+.lp-tone-warn { background: var(--grade-attention); color: var(--grade-attention-ink); }
+.lp-tone-bad { background: var(--grade-critical); color: var(--grade-critical-ink); }
+.lp-tone-unknown { background: var(--grade-unknown); color: var(--grade-unknown-ink); }
+
+/* Licences ---------------------------------------------------------------- */
+.lp-cards { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.lp-card {
+  display: flex; flex-direction: column; gap: 8px; min-width: 0; padding: 16px;
+  border: 1px solid var(--it-line); border-radius: 10px; background: var(--it-surface, #fff);
+}
+.lp-kicker { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--it-ink-soft); }
+.lp-big { font-size: 20px; font-weight: 700; overflow-wrap: anywhere; }
+.lp-lines { display: flex; flex-direction: column; gap: 6px; }
+.lp-lines p { margin: 0; font-size: 13px; line-height: 1.45; color: var(--it-ink-soft); overflow-wrap: anywhere; }
+.lp-lines .lp-say { color: var(--it-ink); }
+.lp-warning {
+  display: flex; gap: 12px; align-items: flex-start; margin: 0; padding: 14px 16px; border-radius: 10px;
+  background: color-mix(in srgb, var(--grade-attention) 14%, var(--it-surface, #fff));
+  font-size: 14px; line-height: 1.5; color: var(--it-ink);
+}
+.lp-warning svg { flex: none; margin-top: 1px; color: var(--grade-attention); }
+
+/* Serial and part numbers ------------------------------------------------- */
+.pp-ids { margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 24px; font-size: 14px; }
+.pp-id { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pp-id dt { font-size: 12px; color: var(--it-ink-soft); }
+.pp-id dd { margin: 0; overflow-wrap: anywhere; }
+.pp-table { border: 1px solid var(--it-line); border-radius: 10px; overflow: hidden; }
+.pp-row {
+  display: grid; grid-template-columns: 110px minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px; align-items: center; padding: 10px 14px; font-size: 13px; border-top: 1px solid var(--it-line);
+}
+.pp-head { background: var(--it-thead); font-size: 12px; font-weight: 600; border-top: 0; }
+.pp-part { color: var(--it-ink-soft); }
+.pp-what, .pp-where { min-width: 0; overflow-wrap: anywhere; }
+.pp-pn, .pp-sn { min-width: 0; overflow-wrap: anywhere; }
+
+/* Installed software ------------------------------------------------------ */
+.sw-tools { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; justify-content: space-between; }
+.sw-search { flex: 1 1 280px; min-width: 0; }
+.sw-search-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.sw-find {
+  width: 100%; min-height: 44px; padding: 0 14px; border-radius: 10px; font: inherit; font-size: 16px;
+  border: 1px solid var(--it-line-strong, var(--it-line)); background: var(--it-surface, #fff); color: var(--it-ink);
+}
+.sw-find:focus-visible, .sw-copy:focus-visible, .sw-switch input:focus-visible, .sw-link:focus-visible {
+  outline: 2px solid var(--it-brand); outline-offset: 2px;
+}
+.sw-tools-end { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+.sw-switch { display: inline-flex; gap: 8px; align-items: center; min-height: 44px; font-size: 14px; color: var(--it-ink-soft); cursor: pointer; }
+.sw-copy {
+  font: inherit; font-size: 14px; min-height: 44px; padding: 0 14px; border-radius: 10px; cursor: pointer;
+  display: inline-flex; gap: 6px; align-items: center;
+  border: 1px solid var(--it-line-strong, var(--it-line)); background: var(--it-surface, #fff); color: var(--it-ink);
+}
+.sw-copy:disabled { color: var(--it-ink-soft); cursor: default; }
+.sw-copied { padding: 6px 12px; border-radius: 8px; font-weight: 600; background: var(--grade-optimal); color: var(--grade-optimal-ink); }
+.sw-note { margin: 0; font-size: 13px; line-height: 1.45; color: var(--it-ink-soft); }
+.sw-old { padding: 20px; border-radius: 10px; background: var(--it-thead); font-size: 14px; line-height: 1.5; }
+.sw-empty { padding: 24px 0; text-align: center; font-size: 14px; line-height: 1.6; color: var(--it-ink-soft); }
+.sw-link {
+  font: inherit; font-size: 14px; min-height: 44px; padding: 0 4px; border: 0; background: none;
+  color: var(--it-brand); text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
+}
+.sw-table { border: 1px solid var(--it-line); border-radius: 10px; overflow: hidden; }
+.sw-row {
+  display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1.4fr) 120px;
+  gap: 12px; align-items: center; padding: 9px 14px; font-size: 13px; border-top: 1px solid var(--it-line);
+}
+.sw-head { background: var(--it-thead); font-size: 12px; font-weight: 600; border-top: 0; }
+.sw-name { min-width: 0; overflow-wrap: anywhere; }
+.sw-row-background .sw-name { color: var(--it-ink-soft); }
+.sw-tag {
+  margin-left: 6px; font-size: 11px; padding: 0 5px; border-radius: 4px; color: var(--it-ink-soft);
+  border: 1px solid var(--it-line-strong, var(--it-line));
+}
+.sw-meta, .sw-sep { display: none; }
+.sw-version-col, .sw-publisher-col { min-width: 0; overflow-wrap: anywhere; }
+.sw-installed { color: var(--it-ink-soft); }
+
+@media (max-width: 640px) {
+  .mh-section { padding: 16px; border-radius: 16px; }
+  .mh-section-title { font-size: 17px; }
+
+  /* Licences: each card a row, label left, value and tone right */
+  .lp-cards { grid-template-columns: 1fr; gap: 0; }
+  .lp-card {
+    display: grid; grid-template-columns: 96px minmax(0, 1fr); grid-template-areas: "kicker big" "kicker tone";
+    gap: 2px 12px; align-items: center; padding: 12px 0; border: 0; border-bottom: 1px solid var(--it-line);
+    border-radius: 0; background: none;
+  }
+  .lp-card:last-child { border-bottom: 0; }
+  .lp-kicker { grid-area: kicker; font-size: 14px; font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--it-ink); }
+  .lp-big { grid-area: big; justify-self: end; text-align: right; font-size: 15px; font-weight: 600; }
+  .lp-tone { grid-area: tone; justify-self: end; }
+  .lp-lines { display: none; }
+  .lp-warning { font-size: 13px; padding: 12px; }
+
+  /* Parts: each one a block, the part and where on a line, the numbers under */
+  .pp-ids { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; }
+  .pp-head { display: none; }
+  .pp-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "part where" "what what" "pn sn";
+    gap: 2px 12px; padding: 12px 14px;
+  }
+  .pp-part { grid-area: part; font-size: 12px; }
+  .pp-where { grid-area: where; justify-self: end; text-align: right; font-size: 12px; color: var(--it-ink-soft); }
+  .pp-what { grid-area: what; font-size: 14px; font-weight: 600; }
+  .pp-pn { grid-area: pn; font-size: 12px; }
+  .pp-sn { grid-area: sn; justify-self: end; font-size: 12px; }
+  .pp-pn::before { content: 'P/N '; color: var(--it-ink-soft); }
+  .pp-sn::before { content: 'S/N '; color: var(--it-ink-soft); }
+
+  /* Software: name, then version · publisher under it */
+  .sw-tools-end { width: 100%; justify-content: space-between; }
+  .sw-head { display: none; }
+  .sw-row { grid-template-columns: minmax(0, 1fr); gap: 2px; padding: 10px 0; border-top: 1px solid var(--it-line); }
+  .sw-row:first-child { border-top: 0; }
+  .sw-version-col, .sw-publisher-col, .sw-installed { display: none; }
+  .sw-meta { display: block; font-size: 12px; color: var(--it-ink-soft); overflow-wrap: anywhere; }
+  .sw-sep { display: inline; }
+  .sw-table { border: 0; border-radius: 0; overflow: visible; }
+}
+

@@ -34,6 +34,7 @@ import { inFleet, statusOf, SPARE } from '../features/devices/lifecycle/status';
 import { performLifecycle } from '../features/devices/sharepoint/writeLifecycle';
 import { ACTIONS } from '../features/devices/lifecycle/planLifecycle';
 import { formatMYT } from '../utils/malaysiaTime';
+import { olderScanNote, scanSummary, scanSummaryLine } from '../features/devices/scanReview';
 
 const SHAREPOINT_SITE_URL =
   import.meta.env.VITE_SHAREPOINT_SITE_URL || 'https://pmwgroupcom.sharepoint.com/sites/IThelpdesk';
@@ -48,6 +49,7 @@ const FILTER_KEYS = [
   'risk', 'attention', 'type', 'department', 'os', 'av',
   'storage', 'ram', 'cpu', 'windows', 'stale', 'q',
   'part', 'critical', 'persona', 'license', 'server', 'formfit', 'status', 'location', 'work',
+  'winlicence', 'winact', 'officelic', 'officewarn', 'joined', 'software', 'scan',
 ];
 
 /** The three views a person switches between. The URL keys are the old tab keys. */
@@ -109,8 +111,11 @@ export default function DevicesPage() {
   const matches = useMemo(() => matchIncoming(merged, saved), [merged, saved]);
   const prompts = useMemo(() => replacementsFor(matches, saved), [matches, saved]);
   const notices = useMemo(() => new Map(
-    matches.map((match) => [match.device.sourceFileName, noticeFor(match)]).filter(([, text]) => text),
+    matches
+      .map((match) => [match.device.sourceFileName, [noticeFor(match), olderScanNote(match)].filter(Boolean).join(' ')])
+      .filter(([, text]) => text),
   ), [matches]);
+  const scanLine = useMemo(() => scanSummaryLine(scanSummary(matches)), [matches]);
   const waiting = unanswered(prompts, answers, excluded);
 
   const filters = useMemo(
@@ -642,6 +647,7 @@ export default function DevicesPage() {
                 ) : (
                   <ReviewGrid
                     devices={merged}
+                    scanLine={scanLine}
                     excluded={excluded}
                     onChange={handleChange}
                     onToggleRow={handleToggleRow}

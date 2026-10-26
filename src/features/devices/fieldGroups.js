@@ -1,4 +1,4 @@
-import { DEVICE_COLUMNS } from './sharepoint/deviceSchema.js';
+import { DEVICE_COLUMNS, recordKey } from './sharepoint/deviceSchema.js';
 
 /**
  * How one device's fields are laid out on its own page: by what somebody is
@@ -93,27 +93,51 @@ const GROUPS = [
       'manualFields', 'extraFields',
     ],
   },
+  {
+    id: 'hardwareIds',
+    title: 'Maker and identity',
+    hint: 'The numbers the maker set, the BIOS and the parts that carry their own',
+    keys: [
+      'manufacturer', 'productNumber', 'modelFamily', 'motherboardSerial', 'deviceUuid',
+      'biosVersion', 'biosDate', 'chassis', 'assetTag', 'windowsBuild',
+      'memoryModulesRaw', 'driveSerialsRaw', 'monitorDetailsRaw',
+    ],
+  },
+  {
+    id: 'licences',
+    title: 'Licences',
+    hint: 'How Windows and Office were licensed, and whose account is signed in',
+    keys: [
+      'windowsLicenseType', 'windowsActivation', 'windowsKeyEnds', 'firmwareKey',
+      'officeLicenseType', 'officePersonal', 'officePersonalReason', 'officeSignedInLicences',
+      'officeAccountsRaw', 'officeLicensedTo', 'officeTenantId', 'officeLicenceValidUntil',
+      'officeSubscriptionsRaw', 'officeVersion', 'officeChannel', 'deviceJoin', 'tenantName',
+    ],
+  },
+  {
+    id: 'software',
+    title: 'Software',
+    hint: 'What is installed, and how the scan was run',
+    keys: ['installedSoftwareRaw', 'softwareCount', 'scanVersion', 'scanRunAsAdmin'],
+  },
 ];
 
 /** The whole report file. It has its own panel, not a row in a group. */
 export const RAW_REPORT_KEY = 'rawReport';
 
-/** camelCase record key for a StaticName: first letter lowered. */
-const keyFor = (staticName) => staticName.charAt(0).toLowerCase() + staticName.slice(1);
-
 const LABELS = new Map([
   ['computerName', 'Computer'],
-  ...DEVICE_COLUMNS.map((column) => [keyFor(column.StaticName), column.Title]),
+  ...DEVICE_COLUMNS.map((column) => [recordKey(column), column.Title]),
 ]);
 
-const KINDS = new Map(DEVICE_COLUMNS.map((column) => [keyFor(column.StaticName), column.kind]));
+const KINDS = new Map(DEVICE_COLUMNS.map((column) => [recordKey(column), column.kind]));
 
 export const labelFor = (key) => LABELS.get(key) ?? key;
 
 /** Every key the schema knows, minus the raw report. */
 export const ALL_KEYS = [
   'computerName',
-  ...DEVICE_COLUMNS.map((column) => keyFor(column.StaticName)),
+  ...DEVICE_COLUMNS.map((column) => recordKey(column)),
 ].filter((key) => key !== RAW_REPORT_KEY);
 
 const GROUPED = new Set(GROUPS.flatMap((group) => group.keys));

@@ -398,3 +398,29 @@
 .dcm-note { margin-left: auto; font-size: 12px; color: var(--it-ink-soft); }
 .dcm-none, .dcm-foot { margin: 0; padding: 0 8px; font-size: 12px; color: var(--it-ink-soft); }
 .dcm-trigger:focus-visible, .dcm-set:focus-visible, .dcm-search:focus-visible { outline: 2px solid var(--it-brand); outline-offset: 2px; }
+
+/* Find a machine: why each match matched, and the link to the List for a program. */
+.dvp-finder-why strong { color: var(--it-ink); font-weight: 700; }
+.dvp-finder-all { padding: 0; }
+.dvp-finder-all button {
+  width: 100%; padding: 10px 14px; border: 0; background: none; text-align: left;
+  color: var(--it-brand); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+}
+.dvp-finder-all button:hover { background: var(--it-brand-wash); }
+
+/* Filter menu: the installed-software box. */
+.dtf-software {
+  width: 100%; min-height: 36px; padding: 6px 10px; border: 1px solid var(--it-line); border-radius: 8px;
+  background: var(--it-panel); color: var(--it-ink); font: inherit; font-size: 16px; box-sizing: border-box;
+}
+.dtf-note { margin: 2px 0 0; font-size: 12px; color: var(--it-ink-soft); }
+
+/* Import review: the scan badge and the one summary line above the grid. */
+.rg-scan-line { margin: 0 0 10px; font-size: 14px; color: var(--it-ink); }
+.rg-scan {
+  display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600;
+  border: 1px solid var(--it-line); color: var(--it-ink-soft); white-space: nowrap;
+}
+.rg-scan-new { border-color: var(--it-brand); color: var(--it-brand); }
+.rg-scan-basic { color: var(--it-ink); }
+.rg-scan-old { border-style: dashed; }

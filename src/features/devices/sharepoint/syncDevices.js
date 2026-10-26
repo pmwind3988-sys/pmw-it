@@ -1,6 +1,8 @@
 import { spFetch, listPath, ITEM_ACCEPT } from '../../sharepoint/spClient.js';
 import { provisionLists } from './provisionLists.js';
-import { DEVICE_LIST_NAME, CHANGE_LIST_NAME, toListItem } from './deviceSchema.js';
+import {
+  DEVICE_LIST_NAME, CHANGE_LIST_NAME, V2_FIELDS, toListItem,
+} from './deviceSchema.js';
 import { readAllDevices } from './readDevices.js';
 import { readAssignments } from './readAssignments.js';
 import { diffDevice } from './diffDevice.js';
@@ -13,6 +15,7 @@ import { planLifecycle, ACTIONS } from '../lifecycle/planLifecycle.js';
 import { currentStint } from '../lifecycle/stints.js';
 import { inFleet, IN_USE } from '../lifecycle/status.js';
 import { cleanLocation } from '../map/locations.js';
+import { scanRank } from '../derive/deriveScanInfo.js';
 
 /**
  * A field somebody corrected by hand outranks what the scan file says about
@@ -31,6 +34,34 @@ export function applyManualOverrides(incoming, existing) {
     // A name left over from a field that no longer exists is skipped rather
     // than writing `undefined` over a real value.
     if (field in existing) merged[field] = existing[field];
+  }
+  return merged;
+}
+
+/**
+ * A report from an OLDER scan knows nothing of the version 2 blocks, so its
+ * licence, hardware and software fields are empty, not "removed". Writing them
+ * would blank what a v2 scan stored, and every machine scanned before its
+ * re-import would lose its Office and Windows licence detail. So a report
+ * ranked below the stored one keeps the stored version 2 fields, scan version
+ * included, which then still says what those fields came from.
+ *
+ * Only what the lower report left EMPTY is carried: a basic scan after a full
+ * one still brings its own licences and software list, and loses only the
+ * serials and drives that cmd cannot read.
+ *
+ * A report of the same or a higher rank writes as normal.
+ */
+const saidNothing = (value) => value == null || value === '' || value === 'Unknown'
+  || (Array.isArray(value) && value.length === 0);
+
+export function carryV2Fields(incoming, existing) {
+  if (!existing) return incoming;
+  if (scanRank(incoming.scanVersion) >= scanRank(existing.scanVersion)) return incoming;
+
+  const merged = { ...incoming, scanVersion: existing.scanVersion };
+  for (const key of V2_FIELDS) {
+    if (saidNothing(incoming[key])) merged[key] = existing[key] ?? null;
   }
   return merged;
 }
@@ -98,7 +129,7 @@ export function planImport(incoming, existing, {
       location: device.location ?? row.location ?? null,
       serialNumber: device.serialNumber ?? row.serialNumber ?? null,
     };
-    const resolved = applyManualOverrides(carried, row);
+    const resolved = applyManualOverrides(carryV2Fields(carried, row), row);
     const wasActive = inFleet(row);
     // A report scanned before the machine went to the stash or the graveyard
     // describes it as it was; it updates the specs but does not bring it back.

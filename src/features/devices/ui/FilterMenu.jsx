@@ -10,7 +10,7 @@ import { ChevronDown } from '../../../components/ui/Icons';
  * menu opens. Escape and a press outside close it and hand the focus back to
  * the button that opened it.
  */
-export default function FilterMenu({ open, onOpenChange, focusFilter, groups, onPick }) {
+export default function FilterMenu({ open, onOpenChange, focusFilter, groups, onPick, software = null }) {
   const wrap = useRef(null);
   const trigger = useRef(null);
   const menu = useRef(null);
@@ -86,6 +86,28 @@ export default function FilterMenu({ open, onOpenChange, focusFilter, groups, on
               </div>
             </section>
           ))}
+
+          {software && (
+            <section className="dtf-group" aria-label="Installed software">
+              <h3 className="dtf-title">Installed software</h3>
+              <div className="dtf-items">
+                <input
+                  type="search"
+                  className="dtf-software"
+                  data-filter="software"
+                  placeholder="A program name, e.g. AutoCAD"
+                  aria-label="Program name contains"
+                  value={software.value}
+                  onChange={(event) => software.onChange(event.target.value)}
+                />
+                <p className="dtf-note" role="status">
+                  {software.count === null
+                    ? 'Type part of a program name.'
+                    : `${software.count} ${software.count === 1 ? 'machine has' : 'machines have'} it.`}
+                </p>
+              </div>
+            </section>
+          )}
         </div>
       )}
     </div>

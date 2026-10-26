@@ -108,6 +108,13 @@ pmw-it/
 | Sign-in screen | `src/pages/LoginPage.jsx`, `src/styles/auth.css` |
 | SharePoint reads | `src/hooks/useRequests.js` |
 | Device report parsing | `src/features/devices/parse/` |
+| The scan itself (program, .bat, .ps1, README) | `scripts/device-scan/`; the program's source in `scripts/device-scan/exe/`, built by `exe/build.cmd` |
+| The scan's settings (reports folder, start/close by itself) | `exe/Settings.cs`; `PMW-Device-Scan.ini` beside the program on the drive |
+| Licences, Office account, joined-to, from a v2 report | `src/features/devices/derive/deriveLicensing.js`; cards in `licenceView.js`, `ui/LicencePanel.jsx` |
+| Serial and part numbers of the PC and its parts | `derive/deriveHardwareIds.js`; `partsView.js`, `ui/PartsPanel.jsx` |
+| Installed software, and what counts as a runtime or driver | `derive/deriveSoftware.js`; `softwareView.js`, `ui/SoftwarePanel.jsx` |
+| Which scan wrote a report (v1, v2, basic) and which wins | `derive/deriveScanInfo.js` (`scanRank`), `carryV2Fields` in `sharepoint/syncDevices.js` |
+| The fleet-wide facts the List, filters and To do read | `src/features/devices/fleetFacts.js`; import summary in `scanReview.js` |
 | Device derived fields and risk | `src/features/devices/derive/` |
 | Drives that belong to IT, not to the machine | `src/features/devices/derive/itMedia.js` |
 | What each department asks of a machine | `src/features/devices/derive/persona.js` |
@@ -439,6 +446,32 @@ of the first, which a table decides for itself. Every frozen cell also carries
 its own opaque background, and each row state repeats its colour on those cells
 -- a sticky cell is painted while the row slides underneath it, so a transparent
 one shows both at once and a highlight breaks at the frozen edge.
+
+**The scan has three routes and they write the SAME report.** `scripts/device-scan/`
+holds `PMW-Device-Scan.exe` (C# 5 WinForms, built with the .NET 4 compiler every
+Windows ships, so no Visual Studio), `PMW-Device-Scan.bat` (a batch file and a
+PowerShell script in one; its batch half also holds a cmd-and-registry-only
+"basic" scan for when PowerShell fails) and `PMW-Device-Scan.ps1` (a byte copy of
+the .bat -- copy it again after every change). None needs admin rights or installs
+anything. Every label the old scan wrote stays, in order; version 2 blocks follow
+it, and `Scan Info` says which route wrote it (`Version 2`, `Version 2 exe`,
+`Version 2 basic`). A new label goes into all three AND into `KNOWN_LABELS`, and
+the exe's report is diffed against the PowerShell one (`--report-to <folder>
+--place "<PLACE>"` runs it headless). The basic route writes `Unknown` where cmd
+cannot see; the readers turn that into blank, never a value.
+- A lower-ranked report (`scanRank`: full > basic > v1) never blanks what a higher
+  one stored: `carryV2Fields` keeps only the stored values the incoming report left
+  EMPTY, so a basic scan still brings its own licences and software.
+- Plugging the drive in cannot start the scan, and nothing here may try: Windows
+  has blocked USB autorun since Windows 7, and the only workaround is something
+  installed on every PC, which is what USB malware does. "Start scanning by itself"
+  (the program's Settings) is the closest: plug in, double-click, done.
+- Office's "Valid until" is the next ONLINE CHECK-IN of the licence on that PC, not
+  the end of the subscription, and the plan (Business Basic / Standard / Premium)
+  is not on the PC at all. The user decided against a Microsoft 365 lookup for it
+  and against code-signing the program (2026-10-26).
+- The `.bat` runs the `.ps1` beside it with `-File`; building a script from its own
+  text is kept only as a fallback, because antivirus heuristics dislike it.
 
 **`Total RAM` in a scan report is usable RAM, not installed RAM.** Windows subtracts
 the integrated GPU's reserved share, so a 16 GB laptop reports 15 GB and an 8 GB one

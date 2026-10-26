@@ -1,6 +1,7 @@
 import { GRADES, PARTS } from './standards/defaultStandard';
 import { IN_FLEET, labelOf, ramBucket, UNASSIGNED } from './deviceFilters';
 import { securityRiskOf } from './health';
+import { SCAN_LABELS } from './fleetFacts.js';
 
 /**
  * What the List view's "+ Filter" menu offers, and how an active filter reads
@@ -18,6 +19,7 @@ const FLAG_LABELS = {
   critical: 'Has a critical part',
   formfit: 'Form factor mismatch',
   stale: 'Not scanned in 6 months',
+  officewarn: 'Personal Office',
 };
 
 const FILTER_LABELS = {
@@ -26,6 +28,8 @@ const FILTER_LABELS = {
   license: 'Office licence', risk: 'Security risk', type: 'Type', ram: 'RAM',
   storage: 'Storage', cpu: 'CPU age', server: 'Server link', q: 'Search',
   attention: 'Needs attention', windows: 'Windows',
+  winlicence: 'Windows licence', winact: 'Windows activation', officelic: 'Office copy',
+  joined: 'Joined to', software: 'Has software', scan: 'Scan',
 };
 
 /** Flags carry no value worth reading, so their chip is the label alone. */
@@ -50,6 +54,7 @@ const pickOnce = (filter, value, label) => option(filter, value, label, null);
 export function chipLabel(key, value) {
   if (isFlagFilter(key)) return FLAG_LABELS[key];
   if (key === 'status') return STATUS_LABELS[value] ?? `Status: ${value}`;
+  if (key === 'scan') return SCAN_LABELS[value] ?? `Scan: ${value}`;
   if (key === 'risk') return `Security risk: ${RISK_BANDS.includes(value) ? value : securityRiskOf(value)}`;
   if (key === 'os' && value === 'Unsupported') return 'Windows unsupported';
   if (key === 'av' && value === 'Unprotected') return 'No antivirus';
@@ -112,6 +117,15 @@ export function buildFilterGroups(devices, locationOptions = []) {
         ...sortedUnique(devices.map((d) => labelOf(d.licenseStatus)))
           .map((l) => option('license', l)),
         ...riskBands.map((band) => option('risk', band)),
+        ...sortedUnique(devices.map((d) => labelOf(d.windowsLicenseType)))
+          .map((w) => option('winlicence', w)),
+        ...sortedUnique(devices.map((d) => labelOf(d.windowsActivation)))
+          .map((w) => option('winact', w)),
+        ...sortedUnique(devices.map((d) => labelOf(d.officeLicenseType)))
+          .map((o) => option('officelic', o)),
+        pickOnce('officewarn', 'yes', FLAG_LABELS.officewarn),
+        ...sortedUnique(devices.map((d) => labelOf(d.deviceJoin)))
+          .map((j) => option('joined', j)),
       ],
     },
     {
@@ -127,6 +141,9 @@ export function buildFilterGroups(devices, locationOptions = []) {
           .map((s) => option('storage', s)),
         ...sortedUnique(devices.map((d) => labelOf(d.cpuAgeBand)))
           .map((c) => option('cpu', c)),
+        option('scan', 'new', SCAN_LABELS.new),
+        option('scan', 'basic', SCAN_LABELS.basic),
+        option('scan', 'old', SCAN_LABELS.old),
       ],
     },
   ];

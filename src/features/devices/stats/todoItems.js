@@ -1,4 +1,5 @@
 import { applyFilters, isStale } from '../deviceFilters.js';
+import { inFleet } from '../lifecycle/status.js';
 
 /**
  * The To do list: every problem the fleet has, worst first. Each count is the
@@ -67,6 +68,35 @@ const ITEMS = [
     count: (devices, now) => devices.filter((device) => isStale(device, now)).length,
   },
 ];
+
+/**
+ * A row counted over machines IN FLEET only, and opened with the same single
+ * filter: the List's own status default is In fleet, so the count and the
+ * rows it opens are the same machines by construction.
+ */
+const fleetRow = (id, title, why, severity, key, value) => ({
+  id,
+  title,
+  why,
+  severity,
+  filter: { key, value },
+  count: (devices) => applyFilters(devices.filter(inFleet), { [key]: value }).length,
+});
+
+ITEMS.push(
+  fleetRow('windows-not-activated', 'Windows not activated',
+    'Windows will nag, lock personalisation and stop some updates.',
+    'urgent', 'winact', 'Not activated'),
+  fleetRow('personal-office', 'Personal Office on a work machine',
+    'A Home or Personal copy, or a personal Microsoft account signed in to Office.',
+    'warning', 'officewarn', 'yes'),
+  fleetRow('not-joined', 'Not joined to PMW Group',
+    'Not Azure AD or domain joined, so company sign-in and policies do not reach them.',
+    'warning', 'joined', 'Not joined'),
+  fleetRow('old-scan', 'Scanned with the old scan',
+    'No licences, part numbers or software for these yet. Scan them with PMW-Device-Scan.exe.',
+    'upkeep', 'scan', 'old'),
+);
 
 /**
  * The open items for a set of machines, worst first. Items with nothing to do

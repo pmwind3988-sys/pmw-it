@@ -10,6 +10,10 @@ import { deriveIdentity } from './deriveIdentity.js';
 import { deriveHealth } from './deriveHealth.js';
 import { riskScore } from './riskScore.js';
 import { enrichFit } from './enrichFit.js';
+import { deriveHardwareIds } from './deriveHardwareIds.js';
+import { deriveLicensing } from './deriveLicensing.js';
+import { deriveSoftware } from './deriveSoftware.js';
+import { deriveScanInfo } from './deriveScanInfo.js';
 
 const firstOrNull = (lines) => (lines?.length ? cleanValue(lines[0]) : null);
 const joinLines = (lines) => (lines?.length ? lines.join('\n') : null);
@@ -22,6 +26,10 @@ export function deriveDevice({ text, fileName, lastModified, knownLocations }) {
   const storage = deriveStorage(fields['Storage Drives'] ?? []);
   const cpu = deriveCpu(fields.Processor ?? [], ram.ramType);
   const health = deriveHealth(fields);
+  const hardware = deriveHardwareIds(fields);
+  const licensing = deriveLicensing(fields);
+  const software = deriveSoftware(fields);
+  const scanInfo = deriveScanInfo(fields);
 
   const [motherboard] = parsePairs(fields.Motherboard ?? []);
   const network = parseNetwork(fields['Network Information'] ?? []);
@@ -34,6 +42,10 @@ export function deriveDevice({ text, fileName, lastModified, knownLocations }) {
     ...storage,
     ...cpu,
     ...health,
+    ...hardware,
+    ...licensing,
+    ...software,
+    ...scanInfo,
 
     computerModel: firstOrNull(fields['Computer Model']),
     motherboardVendor: motherboard?.left ?? null,

@@ -2,6 +2,7 @@ import { Fragment } from 'react';
 import { formatMYT } from '../../../utils/malaysiaTime';
 import { issuesFor } from '../reviewIssues';
 import ReplacementPrompt from './ReplacementPrompt';
+import { SCAN_BADGES, scanKindOf } from '../fleetFacts.js';
 
 /**
  * `editable: true` marks a column whose value was DERIVED rather than read
@@ -11,6 +12,7 @@ import ReplacementPrompt from './ReplacementPrompt';
  */
 const COLUMNS = [
   { key: 'computerName', label: 'Computer' },
+  { key: 'scanVersion', label: 'Scan' },
   { key: 'owner', label: 'Owner', editable: true },
   { key: 'location', label: 'Location', editable: true },
   { key: 'department', label: 'Department', editable: true },
@@ -33,11 +35,13 @@ const COLUMNS = [
  */
 export default function ReviewGrid({
   devices, excluded, onChange, onToggleRow, prompts = [], answers = {}, onAnswer, notices = new Map(),
+  scanLine = null,
 }) {
   const rows = devices;
 
   return (
     <div className="rg-wrap">
+      {scanLine && <p className="rg-scan-line">{scanLine}</p>}
       <div className="rg-scroll">
         <table className="rg">
           <thead>
@@ -74,6 +78,17 @@ export default function ReviewGrid({
 
                     {COLUMNS.map((column) => {
                       const value = device[column.key];
+
+                      if (column.key === 'scanVersion') {
+                        const kind = scanKindOf(device.scanVersion);
+                        return (
+                          <td key={column.key}>
+                            <span className={`rg-scan rg-scan-${kind}`} title={`Scan version ${device.scanVersion ?? 'unknown'}`}>
+                              {SCAN_BADGES[kind]}
+                            </span>
+                          </td>
+                        );
+                      }
 
                       if (!column.editable) {
                         const riskClass = column.key === 'riskLevel'

@@ -1,6 +1,7 @@
 import { statusOf, inFleet } from './lifecycle/status.js';
 import { cleanLocation } from './map/locations.js';
 import { needsWork, securityRiskOf } from './health.js';
+import { hasSoftware, isOldScan, scanKindOf } from './fleetFacts.js';
 
 const STALE_MS = 180 * 86_400_000;
 
@@ -62,6 +63,15 @@ const MATCHERS = {
   stale: (device) => isStale(device),
   status: (device, value) => (value === IN_FLEET ? inFleet(device) : statusOf(device) === value),
   location: (device, value) => labelOf(cleanLocation(device.location)) === value,
+  // Licence facts. An old scan never said whether Windows is activated or the
+  // machine joined, so it matches neither "Not activated" nor "Not joined".
+  winlicence: (device, value) => labelOf(device.windowsLicenseType) === value,
+  winact: (device, value) => !isOldScan(device) && labelOf(device.windowsActivation) === value,
+  officelic: (device, value) => labelOf(device.officeLicenseType) === value,
+  officewarn: (device) => device.officePersonal === true,
+  joined: (device, value) => !isOldScan(device) && labelOf(device.deviceJoin) === value,
+  software: (device, value) => hasSoftware(device, value),
+  scan: (device, value) => scanKindOf(device.scanVersion) === value,
   q: (device, value) => {
     const needle = value.toLowerCase();
     return `${device.computerName ?? ''} ${device.owner ?? ''} ${device.serialNumber ?? ''} ${device.anydeskId ?? ''}`
@@ -87,6 +97,6 @@ const cell = (value) => {
 export function toCsv(devices, columns) {
   const header = columns.map((column) => cell(column.label)).join(',');
   const body = devices.map((device) =>
-    columns.map((column) => cell(device[column.key])).join(','));
+    columns.map((column) => cell(column.value ? column.value(device) : device[column.key])).join(','));
   return [header, ...body].join('\r\n');
 }

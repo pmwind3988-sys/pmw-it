@@ -1,14 +1,18 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { importFiles, mergeImports } from './importFiles.js';
+import { importFiles, mergeImports, decodeReport } from './importFiles.js';
+import { parseReport } from './parse/parseReport.js';
 
 const fixture = (name) =>
   readFileSync(fileURLToPath(new URL(`./__fixtures__/${name}`, import.meta.url)), 'utf8');
 
-/** Minimal stand-in for a browser File: name, lastModified, text(). */
+/** Minimal stand-in for a browser File: name, lastModified, and the bytes the importer reads. */
 const fakeFile = (name, lastModified, text = fixture(name)) => ({
-  name, lastModified, text: async () => text,
+  name,
+  lastModified,
+  text: async () => text,
+  arrayBuffer: async () => new TextEncoder().encode(text).buffer,
 });
 
 describe('importFiles', () => {
@@ -58,6 +62,7 @@ describe('importFiles', () => {
       name: 'broken.txt',
       lastModified: 0,
       text: async () => { throw new Error('disk gone'); },
+      arrayBuffer: async () => { throw new Error('disk gone'); },
     };
     const result = await importFiles([broken, fakeFile('PMWL034_.txt', 0)]);
 
@@ -93,5 +98,56 @@ describe('mergeImports', () => {
 
     const merged = mergeImports(first, second);
     expect(merged.rejected.map((r) => r.fileName)).toEqual(['report.pdf', 'other.pdf']);
+  });
+});
+
+describe('decodeReport', () => {
+  const bytesOf = (text) => new TextEncoder().encode(text);
+
+  /** UTF-16 code units of `text`, low byte first (little-endian) or high byte first. */
+  const utf16 = (text, littleEndian) => {
+    const out = [];
+    for (const char of text) {
+      const code = char.charCodeAt(0);
+      const high = code >> 8;
+      const low = code & 0xff;
+      out.push(...(littleEndian ? [low, high] : [high, low]));
+    }
+    return new Uint8Array(out);
+  };
+
+  it('reads plain UTF-8', () => {
+    expect(decodeReport(bytesOf('Computer Name:\nPC-1\n'))).toBe('Computer Name:\nPC-1\n');
+  });
+
+  it('drops a UTF-8 byte-order mark', () => {
+    const bytes = new Uint8Array([0xef, 0xbb, 0xbf, ...bytesOf('Name:\n')]);
+    expect(decodeReport(bytes)).toBe('Name:\n');
+  });
+
+  it('reads UTF-16 little-endian behind its byte-order mark, without the mark in the text', () => {
+    const text = 'Computer Name:\nAMIR-HP\n';
+    const bytes = new Uint8Array([0xff, 0xfe, ...utf16(text, true)]);
+    expect(decodeReport(bytes)).toBe(text);
+  });
+
+  it('reads UTF-16 big-endian behind its byte-order mark', () => {
+    const text = 'Name:\n';
+    const bytes = new Uint8Array([0xfe, 0xff, ...utf16(text, false)]);
+    expect(decodeReport(bytes)).toBe(text);
+  });
+
+  it('reads the UTF-16 fixture as a device report, through the importer', async () => {
+    const bytes = readFileSync(fileURLToPath(new URL('./__fixtures__/[ENGINEERING] AMIR-HP_.txt', import.meta.url)));
+    const text = decodeReport(new Uint8Array(bytes));
+    expect(parseReport(text).isReport).toBe(true);
+    expect(parseReport(text).fields['Computer Name']).toEqual(['AMIR-HP']);
+
+    const result = await importFiles([{
+      name: '[ENGINEERING] AMIR-HP_.txt',
+      lastModified: 0,
+      arrayBuffer: async () => new Uint8Array(bytes).buffer,
+    }]);
+    expect(result.devices.map((d) => d.computerName)).toEqual(['AMIR-HP']);
   });
 });

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { todoItems } from './todoItems.js';
+import { applyFilters, IN_FLEET } from '../deviceFilters.js';
 
 const NOW = Date.UTC(2026, 9, 13);
 const DAY = 86_400_000;
@@ -7,7 +8,7 @@ const DAY = 86_400_000;
 const base = {
   riskLevel: 'OK', osSupported: true, avProtected: true, licenseStatus: 'Authentic',
   serverDependent: false, formFactorMatches: true, criticalParts: [], scannedOn: NOW - DAY,
-  scanComplete: true,
+  scanComplete: true, scanVersion: '2',
 };
 
 const devices = [
@@ -65,5 +66,30 @@ describe('todoItems', () => {
   it('does not offer a card for a part that only needs attention', () => {
     const attention = [{ ...base, id: 10, parts: { cpu: { grade: 'Needs attention' } } }];
     expect(todoItems(attention, NOW)).toEqual([]);
+  });
+});
+
+describe('fleet rows: licence and scan', () => {
+  const fleet = [
+    { ...base, id: 1, windowsActivation: 'Not activated', deviceJoin: 'Not joined', officePersonal: true },
+    { ...base, id: 2, windowsActivation: 'Activated', deviceJoin: 'Azure AD', officePersonal: false },
+    // Old scan: unknown, not wrong. Never counted as not activated or not joined.
+    { ...base, id: 3, scanVersion: '1', windowsActivation: null, deviceJoin: null, officePersonal: null },
+    { ...base, id: 4, status: 'Retired', windowsActivation: 'Not activated', deviceJoin: 'Not joined' },
+  ];
+  const row = (id) => todoItems(fleet, NOW).find((item) => item.id === id);
+
+  it('counts only machines in the fleet, and an old scan is never "not activated" or "not joined"', () => {
+    expect(row('windows-not-activated').count).toBe(1);
+    expect(row('not-joined').count).toBe(1);
+    expect(row('personal-office').count).toBe(1);
+    expect(row('old-scan').count).toBe(1);
+  });
+
+  it('every new row counts the same machines as the List filter it opens', () => {
+    for (const item of todoItems(fleet, NOW)) {
+      const listed = applyFilters(fleet, { status: IN_FLEET, [item.filter.key]: item.filter.value });
+      expect(listed.length, item.id).toBe(item.count);
+    }
   });
 });

@@ -16,7 +16,7 @@ import ColumnMenu from './ColumnMenu';
 import { applyFilters, IN_FLEET, toCsv } from '../deviceFilters';
 import { buildFilterGroups, chipLabel } from '../filterOptions';
 import {
-  ALL_COLUMNS, DEFAULT_SET, columnsForKeys, keysForSet, parseColumnSet, toggleColumn,
+  ALL_COLUMNS, DEFAULT_SET, columnsForKeys, keysForSet, parseColumnSet, toggleColumn, valueOfColumn,
 } from '../columnSets';
 import { gradeRank, securityRiskOf, worstGradeOf } from '../health';
 import { EDITABLE_FIELDS } from '../sharepoint/updateDevice';
@@ -159,6 +159,12 @@ export default function DeviceTable({
     () => buildFilterGroups(devices, locationOptions),
     [devices, locationOptions],
   );
+
+  // How many machines the typed program name keeps, under the same status
+  // filter the rows use, so the figure in the menu is the List's own count.
+  const softwareCount = useMemo(() => (filters.software
+    ? applyFilters(devices, { status: effectiveFilters.status, software: filters.software }).length
+    : null), [devices, filters.software, effectiveFilters.status]);
 
   // A row's menu and its confirm are keyed by id, or by name for a row with none.
   const rowKeyOf = (device) => device.id ?? device.computerName;
@@ -423,6 +429,11 @@ export default function DeviceTable({
           open={menuOpen}
           onOpenChange={setMenuOpen}
           focusFilter={menuFocus}
+          software={{
+            value: filters.software ?? '',
+            count: softwareCount,
+            onChange: (value) => onFilterChange('software', value),
+          }}
           groups={groups}
           onPick={pick}
         />
@@ -668,7 +679,7 @@ export default function DeviceTable({
                         } else {
                           content = (
                             <ValueCell
-                              value={device[column.key]}
+                              value={valueOfColumn(column, device)}
                               fieldKey={column.key}
                               kind={column.kind}
                               limit={CELL_ENTRIES}

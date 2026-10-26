@@ -1,0 +1,199 @@
+Name:
+Anydesk:
+1292517904
+Antivirus status:
+Remarks:
+
+
+===============================
+COMPUTER INFORMATION
+===============================
+
+Computer Name:
+V2-SAMPLE
+
+Computer Model:
+HP Laptop 15-fd0xxx
+
+Motherboard:
+HP | 8BB6
+
+Windows Version:
+Microsoft Windows 11 Pro
+
+Processor:
+13th Gen Intel(R) Core(TM) i7-1355U
+
+GPU:
+Intel(R) Iris(R) Xe Graphics
+VirtualMonitorDriver Device
+
+Total RAM:
+8 GB
+
+RAM Slot Info:
+4 GB | DDR4 | 3200 MHz | Samsung | M471A5244CB0-CWE
+4 GB | DDR4 | 3200 MHz | Samsung | M471A5244CB0-CWE
+Total Slots: 2 | Used Slots: 2
+
+Storage Drives:
+KBG50ZNV512G KIOXIA | SSD | 477 GB
+
+Network Information:
+Wi-Fi | SSID: PMW_Group 7 | IP: 192.168.1.166 | Dynamic
+
+Antivirus:
+Norton 360 | Enabled
+Windows Defender | Disabled
+
+Monitor:
+Generic PnP Monitor
+Default Monitor
+
+PMW Server and credentials:
+server | ashraf
+
+Server folder:
+Y: | \\server\emdata$\device list 2026
+Z: | \\server\PMW\IT
+
+Microsoft Office:
+O365BusinessRetail,O365HomePremRetail
+
+Adobe:
+None
+
+Email data files found Active or Inactive account:
+user@example.com | C:\Users\User\AppData\Local\Microsoft\Outlook\user@example.com
+SharePoint Lists.pst | C:\Users\User\AppData\Local\Microsoft\Outlook\SharePoint Lists.pst
+user@example.com | C:\Users\User\Documents\Outlook Files\user@example.com
+
+Serial Number:
+5CD333KBWH
+
+Manufacturer:
+HP
+
+Product Number:
+7Z8D7PA#UUF
+
+Model Family:
+
+Motherboard Serial:
+PRSPC058JIG0O2
+
+Device UUID:
+33444335-3333-424B-5748-484233334435
+
+BIOS:
+AMI | F.10 | 2024-03-20
+
+Chassis:
+Notebook | Asset tag: None
+
+Memory Modules:
+Bottom - Slot 1 (left) | 4 GB | Samsung | P/N M471A5244CB0-CWE | S/N 3430987E
+Bottom - Slot 2 (right) | 4 GB | Samsung | P/N M471A5244CB0-CWE | S/N 34309813
+
+Drive Serials:
+KBG50ZNV512G KIOXIA | S/N 0000_0000_0000_0000_8CE3_8E04_044E_3F10 | NVMe | Firmware HP02AN00
+
+Monitor Details:
+AUO |  | S/N None | Made 2022 week 0
+
+Battery:
+Primary | SerialNumberHPPrimary | Charge 62%
+
+Windows Build:
+26H2 | Build 26300.9711 | 64-bit | Installed 2025-11-01
+
+Windows License:
+Volume:GVLK | Licensed | Key ends T83GX | Windows(R), Professional edition
+Firmware key | [4.0] CoreSingleLanguage OEM:DM
+
+Office License:
+O365BusinessRetail | Subscription (Microsoft 365) | Click-to-Run
+O365HomePremRetail | Subscription (Microsoft 365) | Click-to-Run
+Office 16, Office16O365BusinessR_Grace edition | Retail | Notification -- not activated | Key ends 3RQ6B
+Signed-in licence | o365businessretail
+Signed-in licence | o365homepremretail
+
+Office Version:
+16.0.20430.20182 | x64 | Current Channel
+
+Office Accounts:
+Work or school sign-in | 1 profile(s)
+
+Office Subscription:
+O365BusinessRetail | Subscription | user@example.com | Tenant 3042ec28-18ef-448b-a1fd-cf1f2446943c | Valid until 2027-01-21 | Provisioned
+
+Device Join:
+Azure AD joined | YES
+Domain joined | NO
+Workplace joined | YES
+Tenant | PMW Group
+
+Installed Software:
+4Team Safe PST Backup | 3.00.0682 | 4Team Corporation | 2025-10-31
+Angry IP Scanner | 3.9.3 | Angry IP Scanner |
+Antigravity (User) | 1.23.2 | Google | 2026-04-23
+Antigravity 2.0.11 | 2.0.11 | Google |
+Cursor (User) | 3.7.27 | Anysphere | 2026-06-11
+Display Driver Uninstaller | 18.1.5.3 | Wagnardsoft |
+Eclipse Temurin JDK with Hotspot 17.0.20+8 (x64) | 17.0.20.8 | Eclipse Adoptium | 2026-08-11
+FortiClient VPN | 7.2.5.1053 | Fortinet Technologies Inc | 2026-07-31
+Git | 2.52.0 | The Git Development Community | 2026-01-20
+GitHub CLI | 2.97.0 | GitHub, Inc. | 2026-08-17
+Google Chrome | 155.0.8059.85 | Google LLC | 2026-10-21
+ImageMagick 7.1.2-18 Q16-HDRI (64-bit) (2026-03-22) | 7.1.2.18 | ImageMagick Studio LLC | 2026-05-04
+Microsoft .NET Runtime - 8.0.32 (x64) | 8.0.32.36604 | Microsoft Corporation |
+Microsoft .NET SDK 10.0.113 (x64) | 10.1.1326.50504 | Microsoft Corporation | 2026-10-14
+Microsoft .NET SDK 9.0.319 (x64) | 9.3.1926.50507 | Microsoft Corporation |
+Microsoft 365 - en-us | 16.0.20430.20182 | Microsoft Corporation |
+Microsoft 365 Apps for business - en-us | 16.0.20430.20182 | Microsoft Corporation |
+Microsoft ASP.NET Core 8.0.32 - Shared Framework (x64) | 8.0.32.26505 | Microsoft Corporation |
+Microsoft Edge | 156.0.4314.42 | Microsoft Corporation | 2026-10-26
+Microsoft OneDrive | 26.189.0928.0009 | Microsoft Corporation |
+Microsoft Teams Meeting Add-in for Microsoft Office | 1.26.25904 | Microsoft | 2026-10-15
+Microsoft Visual C++ 2008 Redistributable - x86 9.0.30729.6161 | 9.0.30729.6161 | Microsoft Corporation | 2026-01-26
+Microsoft Visual C++ 2013 Redistributable (x64) - 12.0.30501 | 12.0.30501.0 | Microsoft Corporation |
+Microsoft Visual C++ v14 Redistributable (x64) - 14.50.35719 | 14.50.35719.0 | Microsoft Corporation |
+Microsoft Visual C++ v14 Redistributable (x86) - 14.50.35719 | 14.50.35719.0 | Microsoft Corporation |
+Microsoft Visual Studio Code (User) | 1.143.0 | Microsoft Corporation | 2026-10-21
+Microsoft Visual Studio Installer | 3.6.2122.36397 | Microsoft Corporation | 2026-01-21
+Microsoft Windows Application Compatibility Fix Database |  |  |
+Microsoft Windows Desktop Runtime - 8.0.32 (x64) | 8.0.32.36605 | Microsoft Corporation |
+Microsoft Windows Desktop Runtime - 8.0.32 (x86) | 8.0.32.36605 | Microsoft Corporation |
+Microsoft Windows Desktop Runtime 10.0.13 (x86) | 10.0.13.50000 | Microsoft Corporation | 2026-10-14
+Mozilla Firefox (x64 en-US) | 158.0.1 | Mozilla |
+Mozilla Maintenance Service | 127.0 | Mozilla |
+Node.js | 24.14.0 | Node.js Foundation | 2026-03-19
+Norton 360 | 26.10.11201.2729 | Gen Digital Inc. |
+NVM for Windows 1.1.12 | 1.1.12 | Ecor Ventures LLC | 2026-03-12
+OBS Studio | 32.1.2 | OBS Project |
+PDFgear 2.1.14 | 2.1.14 | PDFgear | 2026-03-17
+Power Automate for desktop | 2.71.00115.26224 | Microsoft Corporation | 2026-08-21
+PowerShell 7.6.6.0-x64 | 7.6.6.0 | Microsoft Corporation |
+Presenton | 0.7.3-beta | Presenton |
+Python 2.7.15 (64-bit) | 2.7.15150 | Python Software Foundation | 2026-01-21
+Python 2.7.18 | 2.7.18150 | Python Software Foundation | 2026-01-21
+Python 3.14.2 | 3.14-64 | Python Software Foundation | 2026-01-21
+SADP | 3.1.4.5 | Hangzhou Hikvision Digital Technology Co., Ltd. |
+TP-Link Archer T2U Nano Driver | 2.1.0 | TP-Link | 2026-01-15
+TP-Link Archer T3U Driver | 2.1.0 | TP-Link | 2026-04-15
+UltraViewer version 6.6.84 | 6.6.84 | DucFabulous | 2025-11-27
+Visual Studio Build Tools 2017 | 15.9.78 | Microsoft Corporation | 2026-01-21
+VLC media player | 3.0.23 | VideoLAN |
+WebODM version 3.2.7 | 3.2.7 | WebODM | 2026-07-24
+WifiAutoInstall version 2.0.0.8 | 2.0.0.8 | Realtek, Inc. | 2025-10-31
+Windows SDK AddOn | 10.1.0.0 | Microsoft Corporation | 2026-01-21
+Windows Software Development Kit - Windows 10.0.19041.5609 | 10.1.19041.5609 | Microsoft Corporation |
+WinPcap 4.1.3 | 4.1.0.2980 | Riverbed Technology, Inc. |
+WinRAR 6.11 (64-bit) | 6.11.0 | win.rar GmbH |
+
+Scan Info:
+Version 2 | 2026-10-26 11:28 | Run by V2-SAMPLE\User | Admin No
+
+===============================
+END OF REPORT
+===============================

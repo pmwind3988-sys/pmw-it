@@ -1,13 +1,30 @@
 import { useId, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search } from '../../../components/ui/Icons';
-import { findMachines } from '../finder';
+import { findMatches, machinesWithProgram } from '../finder';
 import { labelOf } from '../deviceFilters';
 import { statusOf } from '../lifecycle/status';
+
+/** A program search that matches more than this many machines gets a link to the List. */
+const PROGRAM_LINK_OVER = 3;
+
+/** The reason a match is shown with, the matched text in bold. */
+function Reason({ reason }) {
+  const { label, value, suffix, at, length } = reason;
+  const head = `${label} `;
+  if (at < 0 || length === 0) return <>{head}{value}{suffix}</>;
+  return (
+    <>
+      {head}{value.slice(0, at)}<strong>{value.slice(at, at + length)}</strong>{value.slice(at + length)}{suffix}
+    </>
+  );
+}
 
 /**
  * The "Find a machine" pill. A combobox over every saved machine: arrow keys
  * move through the matches, Enter opens the highlighted one, Escape clears.
+ * Each match says why it matched; a program search that finds many machines
+ * links to the List filtered to them.
  */
 export default function DeviceFinder({ devices }) {
   const navigate = useNavigate();
@@ -16,10 +33,23 @@ export default function DeviceFinder({ devices }) {
   const [active, setActive] = useState(0);
   const [focused, setFocused] = useState(false);
 
-  const results = useMemo(() => findMachines(devices, query), [devices, query]);
+  const matches = useMemo(() => findMatches(devices, query), [devices, query]);
+  const results = useMemo(() => matches.map((match) => match.device), [matches]);
+  const programCount = useMemo(
+    () => (query.trim().length >= 2 ? machinesWithProgram(devices, query.trim()) : 0),
+    [devices, query],
+  );
   const index = Math.min(active, Math.max(results.length - 1, 0));
   const open = focused && query.trim().length >= 2;
   const showEmpty = open && results.length === 0;
+
+  // Every machine with the program, Retired and Spare included, under "Everything" so the List shows the same figure.
+  const openProgramList = () => {
+    const text = query.trim();
+    setQuery('');
+    setFocused(false);
+    navigate(`/devices?${new URLSearchParams({ software: text, status: 'All' })}`);
+  };
 
   const openMachine = (device) => {
     if (device?.id === undefined || device?.id === null) return;
@@ -73,7 +103,7 @@ export default function DeviceFinder({ devices }) {
 
       {open && results.length > 0 && (
         <ul id={listId} role="listbox" aria-label="Matching machines" className="dvp-finder-list">
-          {results.map((device, position) => (
+          {matches.map(({ device, reason }, position) => (
             <li
               key={device.id ?? device.computerName}
               id={`${listId}-${position}`}
@@ -88,8 +118,22 @@ export default function DeviceFinder({ devices }) {
               <span className="dvp-finder-meta">
                 {labelOf(device.owner)} · {statusOf(device)}
               </span>
+              <span className="dvp-finder-meta dvp-finder-why">
+                <Reason reason={reason} />
+              </span>
             </li>
           ))}
+          {programCount > PROGRAM_LINK_OVER && (
+            <li role="none" className="dvp-finder-all">
+              <button
+                type="button"
+                // mousedown, as the rows: the input blurs first and would close the list.
+                onMouseDown={(event) => { event.preventDefault(); openProgramList(); }}
+              >
+                All {programCount} machines with {query.trim()} in the List ›
+              </button>
+            </li>
+          )}
         </ul>
       )}
 

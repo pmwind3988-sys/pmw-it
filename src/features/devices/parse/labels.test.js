@@ -41,14 +41,20 @@ describe('cleanValue', () => {
 });
 
 describe('KNOWN_LABELS', () => {
-  it('has the 22 labels the scan writes', () => {
-    expect(KNOWN_LABELS).toHaveLength(22);
+  it('has the 42 labels the scan writes (22 from v1, 20 added for v2)', () => {
+    expect(KNOWN_LABELS).toHaveLength(42);
     expect(KNOWN_LABELS[0]).toBe('Name');
     expect(KNOWN_LABELS).toContain('Email data files found Active or Inactive account');
   });
 
   it('knows the serial number line', () => {
     expect(KNOWN_LABELS).toContain('Serial Number');
+  });
+
+  it('knows every block scan version 2 writes', () => {
+    for (const label of ['Office License', 'Installed Software', 'Scan Info', 'Device Join', 'BIOS']) {
+      expect(KNOWN_LABELS).toContain(label);
+    }
   });
 });
 
@@ -77,6 +83,10 @@ describe('matchLabel', () => {
 
   it('does NOT match a mapped drive line', () => {
     expect(matchLabel('Y: | \\\\server\\PMW\\IT')).toBe(null);
+  });
+
+  it('matches a v2 block label, so its lines are not read as a new field', () => {
+    expect(matchLabel('Windows License:')).toEqual({ label: 'Windows License', inline: '' });
   });
 
   it('does NOT match a value line that happens to contain a colon', () => {

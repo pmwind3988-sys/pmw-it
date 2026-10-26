@@ -31,6 +31,31 @@ export const KNOWN_LABELS = [
   // Added 2026-10-05 so a machine keeps its history through a rename. The scan
   // script writes it as `Serial Number: $((Get-CimInstance Win32_BIOS).SerialNumber)`.
   'Serial Number',
+  // Added 2026-10-26 for scan version 2. Each is a block of value lines, one
+  // ` | `-separated record per line, and `None` / `None found` means the scan
+  // looked and found nothing. A v1 report simply has none of these.
+  'Manufacturer',
+  'Product Number',
+  'Model Family',
+  'Motherboard Serial',
+  'Device UUID',
+  'BIOS',
+  'Chassis',
+  'Memory Modules',
+  'Drive Serials',
+  'Monitor Details',
+  'Battery',
+  'Windows Build',
+  'Windows License',
+  'Office License',
+  'Office Version',
+  'Office Accounts',
+  // Added 2026-10-26: which account each Microsoft 365 licence belongs to, its
+  // tenant, and when the PC next checks it in. Not the plan (Basic/Standard/Premium).
+  'Office Subscription',
+  'Device Join',
+  'Installed Software',
+  'Scan Info',
 ];
 
 const normalise = (s) => s.replace(/\s+/g, ' ').trim().toLowerCase();

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ALL_COLUMNS, COLUMN_SETS, COLUMN_SET_IDS, DEFAULT_SET, columnsForKeys, columnsForSet,
-  keysForSet, parseColumnSet, setMatching, toggleColumn,
+  keysForSet, parseColumnSet, setMatching, toggleColumn, valueOfColumn,
 } from './columnSets';
 
 const allKeys = new Set(ALL_COLUMNS.map((column) => column.key));
@@ -71,5 +71,27 @@ describe('column sets', () => {
     expect(parseColumnSet('hardware')).toBe('hardware');
     expect(parseColumnSet('nonsense')).toBe(DEFAULT_SET);
     expect(parseColumnSet(null)).toBe(DEFAULT_SET);
+  });
+});
+
+describe('licence and serial sets', () => {
+  it('sit after Security and before Everything', () => {
+    expect(COLUMN_SET_IDS.slice(-3)).toEqual(['licences', 'serials', 'everything']);
+  });
+
+  it('draw the licence and serial columns, never the frozen name', () => {
+    const licences = keysForSet('licences');
+    expect(licences).toEqual(expect.arrayContaining(['windowsLicenseType', 'windowsActivation', 'officeLicenseType', 'officeWarning', 'deviceJoin', 'softwareCount']));
+    const serials = keysForSet('serials');
+    expect(serials).toEqual(expect.arrayContaining(['manufacturer', 'productNumber', 'serialNumber', 'memoryParts', 'driveSerialList']));
+    expect(licences).not.toContain('computerName');
+    expect(serials).not.toContain('computerName');
+  });
+
+  it('a calculated column reads the machine through its own reader', () => {
+    const column = ALL_COLUMNS.find((c) => c.key === 'officeWarning');
+    expect(valueOfColumn(column, { officePersonal: true, officePersonalReason: 'A personal Microsoft account (x) is signed in to Office on this machine' }))
+      .toBe('Personal account');
+    expect(valueOfColumn(column, { officePersonal: false })).toBeNull();
   });
 });

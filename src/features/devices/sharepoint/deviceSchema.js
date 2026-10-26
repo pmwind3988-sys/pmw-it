@@ -1,11 +1,17 @@
 import { formatMYT } from '../../../utils/malaysiaTime.js';
 import { STATUSES } from '../lifecycle/status.js';
+import { WINDOWS_LICENSE_TYPES, OFFICE_LICENSE_TYPES, DEVICE_JOIN_STATES } from '../derive/deriveLicensing.js';
 
 export const DEVICE_LIST_NAME = 'IT Device List';
 export const CHANGE_LIST_NAME = 'IT Device Changes';
 
 const text = (StaticName, Title) => ({ StaticName, Title, kind: 'text' });
-const note = (StaticName, Title) => ({ StaticName, Title, kind: 'note' });
+/**
+ * `key` names the record field when it is not the StaticName's camelCase. A
+ * raw text column whose parsed form is an array keeps the raw text under its
+ * own key, so the array and the text can both sit on a record.
+ */
+const note = (StaticName, Title, key) => ({ StaticName, Title, kind: 'note', ...(key ? { key } : {}) });
 const num = (StaticName, Title) => ({ StaticName, Title, kind: 'number' });
 const bool = (StaticName, Title) => ({ StaticName, Title, kind: 'boolean' });
 const date = (StaticName, Title) => ({ StaticName, Title, kind: 'datetime' });
@@ -88,6 +94,46 @@ export const DEVICE_COLUMNS = [
   num('ArchiveCount', 'Archives'),
   note('EmailDataFiles', 'Email Data Files'),
 
+  // Scan report version 2. A v1 report leaves all of these empty, and a
+  // re-import of a v1 report never clears them: see carryV2Fields in syncDevices.js.
+  text('Manufacturer', 'Manufacturer'),
+  text('ProductNumber', 'Product Number'),
+  text('ModelFamily', 'Model Family'),
+  text('MotherboardSerial', 'Motherboard Serial'),
+  text('DeviceUuid', 'Device UUID'),
+  text('BiosVersion', 'BIOS Version'),
+  text('BiosDate', 'BIOS Date'),
+  text('Chassis', 'Chassis'),
+  text('AssetTag', 'Asset Tag'),
+  note('MemoryModules', 'Memory Modules', 'memoryModulesRaw'),
+  note('DriveSerials', 'Drive Serials', 'driveSerialsRaw'),
+  note('MonitorDetails', 'Monitor Details', 'monitorDetailsRaw'),
+  text('WindowsBuild', 'Windows Build'),
+
+  choice('WindowsLicenseType', 'Windows Licence', WINDOWS_LICENSE_TYPES),
+  choice('WindowsActivation', 'Windows Activation', ['Activated', 'Not activated', 'Unknown']),
+  text('WindowsKeyEnds', 'Windows Key Ends'),
+  text('FirmwareKey', 'Firmware Key'),
+  choice('OfficeLicenseType', 'Office', OFFICE_LICENSE_TYPES),
+  bool('OfficePersonal', 'Office Personal'),
+  note('OfficePersonalReason', 'Office Personal Reason'),
+  note('OfficeSignedIn', 'Office Signed-in Licences', 'officeSignedInLicences'),
+  note('OfficeAccounts', 'Office Accounts', 'officeAccountsRaw'),
+  text('OfficeLicensedTo', 'Office Licensed To'),
+  text('OfficeTenantId', 'Office Tenant ID'),
+  text('OfficeLicenceValidUntil', 'Office Licence Check-in By'),
+  note('OfficeSubscriptions', 'Office Subscriptions', 'officeSubscriptionsRaw'),
+  text('OfficeVersion', 'Office Version'),
+  text('OfficeChannel', 'Office Channel'),
+  choice('DeviceJoin', 'Joined To', DEVICE_JOIN_STATES),
+  text('TenantName', 'Tenant'),
+
+  note('InstalledSoftware', 'Installed Software', 'installedSoftwareRaw'),
+  num('SoftwareCount', 'Programs Installed'),
+  // Text, not a choice: a scan version this code has not met yet must not be refused by SharePoint.
+  text('ScanVersion', 'Scan Version'),
+  bool('ScanRunAsAdmin', 'Scan Run As Admin'),
+
   num('RiskScore', 'Risk Score'),
   choice('RiskLevel', 'Risk Level', RISK_LEVELS),
   note('RiskReasons', 'Risk Reasons'),
@@ -127,10 +173,38 @@ export const TRACKED_FIELDS = [
   'installedRamGB', 'ramType', 'ramSlotsUsed',
   'storageTotalGB', 'storageType',
   'antivirusStatus', 'riskLevel',
+  // Version 2. Only the ones that say something about the machine's state.
+  // The memory and drive lines change only when a stick or drive is swapped
+  // (or, rarely, a drive's firmware is updated), which is exactly what the
+  // machine page promises Spec history will show. The Windows build number and
+  // the software list change with every update and would bury the log.
+  'productNumber', 'windowsLicenseType', 'windowsActivation',
+  'officeLicenseType', 'officePersonal', 'deviceJoin', 'softwareCount',
+  'memoryModulesRaw', 'driveSerialsRaw',
+];
+
+/** The columns a scan version 2 report fills, by StaticName. */
+const V2_STATIC_NAMES = [
+  'Manufacturer', 'ProductNumber', 'ModelFamily', 'MotherboardSerial', 'DeviceUuid',
+  'BiosVersion', 'BiosDate', 'Chassis', 'AssetTag', 'MemoryModules', 'DriveSerials',
+  'MonitorDetails', 'WindowsBuild', 'WindowsLicenseType', 'WindowsActivation',
+  'WindowsKeyEnds', 'FirmwareKey', 'OfficeLicenseType', 'OfficePersonal',
+  'OfficePersonalReason', 'OfficeSignedIn', 'OfficeAccounts', 'OfficeLicensedTo',
+  'OfficeTenantId', 'OfficeLicenceValidUntil', 'OfficeSubscriptions', 'OfficeVersion',
+  'OfficeChannel', 'DeviceJoin', 'TenantName', 'InstalledSoftware', 'SoftwareCount',
+  'ScanVersion', 'ScanRunAsAdmin',
 ];
 
 /** camelCase record key for a StaticName: first letter lowered. */
 const keyFor = (staticName) => staticName.charAt(0).toLowerCase() + staticName.slice(1);
+
+/** The record field a column reads and writes. */
+export const recordKey = (column) => column.key ?? keyFor(column.StaticName);
+
+/** Record fields that only a version 2 scan fills. Carried over on a v1 re-import. */
+export const V2_FIELDS = DEVICE_COLUMNS
+  .filter((column) => V2_STATIC_NAMES.includes(column.StaticName))
+  .map(recordKey);
 
 const serialise = (value) => {
   if (Array.isArray(value)) {
@@ -148,8 +222,7 @@ export function toListItem(device) {
   const item = { Title: device.computerName ?? '' };
 
   for (const column of DEVICE_COLUMNS) {
-    const key = keyFor(column.StaticName);
-    let value = device[key];
+    let value = device[recordKey(column)];
 
     if (column.StaticName === 'ScannedOnMYT') {
       value = device.scannedOn ? formatMYT(device.scannedOn, 'datetime12') : null;
@@ -189,13 +262,14 @@ export function toListItem(device) {
 
 const ARRAY_COLUMNS = new Set([
   'GpuList', 'RiskReasons', 'MicrosoftOffice', 'AdobeProducts', 'ManualFields',
+  'OfficeSignedIn',
 ]);
 
 export function fromListItem(row) {
   const record = { id: row.Id ?? row.ID ?? null, computerName: row.Title ?? null };
 
   for (const column of DEVICE_COLUMNS) {
-    const key = keyFor(column.StaticName);
+    const key = recordKey(column);
     const raw = row[column.StaticName];
 
     // An absent column reads as null for every kind — notably NOT as NaN for a

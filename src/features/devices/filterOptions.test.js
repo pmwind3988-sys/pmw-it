@@ -77,3 +77,24 @@ describe('chipLabel', () => {
     expect(chipLabel('status', 'All')).toBe('Everything');
   });
 });
+
+describe('licence, software and scan options', () => {
+  const devices = [
+    machine({ id: 1, scanVersion: '2', windowsActivation: 'Not activated', deviceJoin: 'Not joined', officeLicenseType: 'Microsoft 365' }),
+    machine({ id: 2, scanVersion: '1', windowsActivation: null, deviceJoin: null }),
+  ];
+  const groups = buildFilterGroups(devices, []);
+  const items = groups.flatMap((g) => g.items);
+
+  it('offers the three scan kinds and the personal Office flag', () => {
+    expect(items.filter((i) => i.filter === 'scan').map((i) => i.value)).toEqual(['new', 'basic', 'old']);
+    expect(items.some((i) => i.filter === 'officewarn' && i.value === 'yes')).toBe(true);
+  });
+
+  it('reads the new chips in plain words', () => {
+    expect(chipLabel('scan', 'old')).toBe('Old scan');
+    expect(chipLabel('officewarn', 'yes')).toBe('Personal Office');
+    expect(chipLabel('software', 'autocad')).toBe('Has software: autocad');
+    expect(chipLabel('winact', 'Not activated')).toBe('Windows activation: Not activated');
+  });
+});

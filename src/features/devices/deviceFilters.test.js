@@ -236,3 +236,42 @@ describe('work filter and wider search', () => {
     expect(applyFilters(rows, { q: '284' }).map((d) => d.computerName)).toEqual(['B']);
   });
 });
+
+describe('licence, software and scan filters', () => {
+  const fleet = [
+    { id: 1, scanVersion: '2', windowsActivation: 'Not activated', deviceJoin: 'Not joined', officePersonal: true,
+      officeLicenseType: 'Microsoft 365', windowsLicenseType: 'OEM',
+      installedSoftware: [{ name: 'AutoCAD 2024', version: '1', publisher: 'Autodesk', installedOn: null }] },
+    { id: 2, scanVersion: '2 basic', windowsActivation: 'Activated', deviceJoin: 'Azure AD', officePersonal: false,
+      windowsLicenseType: 'Retail' },
+    // Old scan: the fields were never read, so nothing can be said about them.
+    { id: 3, scanVersion: '1', windowsActivation: null, deviceJoin: null, officePersonal: null },
+    { id: 4, scanVersion: null },
+  ];
+  const ids = (params) => applyFilters(fleet, params).map((d) => d.id);
+
+  it('an old scan matches neither Not activated nor Not joined', () => {
+    expect(ids({ winact: 'Not activated' })).toEqual([1]);
+    expect(ids({ joined: 'Not joined' })).toEqual([1]);
+  });
+
+  it('flags a personal Office copy or account', () => {
+    expect(ids({ officewarn: 'yes' })).toEqual([1]);
+  });
+
+  it('matches a licence by its stored choice', () => {
+    expect(ids({ winlicence: 'OEM' })).toEqual([1]);
+    expect(ids({ officelic: 'Microsoft 365' })).toEqual([1]);
+  });
+
+  it('narrows by a program name, case-insensitively', () => {
+    expect(ids({ software: 'autocad' })).toEqual([1]);
+    expect(ids({ software: 'excel' })).toEqual([]);
+  });
+
+  it('sorts a scan into new, basic or old, with a missing version as old', () => {
+    expect(ids({ scan: 'new' })).toEqual([1]);
+    expect(ids({ scan: 'basic' })).toEqual([2]);
+    expect(ids({ scan: 'old' })).toEqual([3, 4]);
+  });
+});

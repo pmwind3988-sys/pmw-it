@@ -1,4 +1,5 @@
-import { DEVICE_COLUMNS } from './sharepoint/deviceSchema';
+import { DEVICE_COLUMNS, recordKey } from './sharepoint/deviceSchema';
+import { officeWarningOf, memoryPartsOf, driveSerialsOf } from './fleetFacts.js';
 
 /**
  * Which columns the device list shows, and the every-column list the CSV
@@ -29,6 +30,10 @@ const CALCULATED_COLUMNS = [
   { key: 'gpuClass', label: 'Graphics' },
   { key: 'networkRisk', label: 'Server Link' },
   { key: 'networkNote', label: 'Server Link Detail' },
+  // Worked out from the stored record, so each carries its own reader.
+  { key: 'officeWarning', label: 'Office warning', value: officeWarningOf },
+  { key: 'memoryParts', label: 'Memory part numbers', value: memoryPartsOf },
+  { key: 'driveSerialList', label: 'Drive serials', value: driveSerialsOf },
 ];
 
 /** `rawReport` is the whole report file, one cell of which is taller than the screen. */
@@ -45,9 +50,6 @@ const LEAD_KEYS = [
   'antivirusStatus', 'riskScore', 'riskLevel',
 ];
 
-/** camelCase record key for a StaticName: first letter lowered. */
-const keyFor = (staticName) => staticName.charAt(0).toLowerCase() + staticName.slice(1);
-
 const rank = (key) => {
   const lead = LEAD_KEYS.indexOf(key);
   return lead === -1 ? LEAD_KEYS.length : lead;
@@ -60,7 +62,7 @@ export const ALL_COLUMNS = [
   ...CALCULATED_COLUMNS,
   ...DEVICE_COLUMNS
     .map((column) => ({
-      key: keyFor(column.StaticName),
+      key: recordKey(column),
       label: column.Title,
       kind: column.kind,
       numeric: column.kind === 'number',
@@ -103,6 +105,21 @@ export const COLUMN_SETS = {
       'riskScore', 'networkRisk', 'scannedOn',
     ],
   },
+  licences: {
+    label: 'Licences',
+    keys: [
+      ...IDENTITY,
+      'windowsLicenseType', 'windowsActivation', 'officeLicenseType', 'officeWarning',
+      'deviceJoin', 'softwareCount',
+    ],
+  },
+  serials: {
+    label: 'Serials & parts',
+    keys: [
+      ...IDENTITY,
+      'manufacturer', 'productNumber', 'serialNumber', 'memoryParts', 'driveSerialList',
+    ],
+  },
   everything: {
     label: `Everything (${ALL_COLUMNS.length - 1})`,
     keys: ALL_COLUMNS.map((column) => column.key).filter((key) => key !== 'computerName'),
@@ -115,6 +132,10 @@ export const COLUMN_SET_IDS = Object.keys(COLUMN_SETS);
 export function keysForSet(setId) {
   return (COLUMN_SETS[setId] ?? COLUMN_SETS[DEFAULT_SET]).keys;
 }
+
+/** What a column shows for one machine: its calculated reader, or the stored field. */
+export const valueOfColumn = (column, device) =>
+  (column.value ? column.value(device) : device[column.key]);
 
 /** The column objects for a list of keys, in that order. Unknown keys are dropped rather than drawn blank. */
 export function columnsForKeys(keys, all = ALL_COLUMNS) {

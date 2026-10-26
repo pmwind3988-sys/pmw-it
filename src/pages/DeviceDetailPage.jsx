@@ -23,6 +23,10 @@ import { statusOf } from '../features/devices/lifecycle/status';
 import { locationsIn } from '../features/devices/map/locations';
 import { mapHref } from '../features/devices/map/mapLinks';
 import PartTable from '../features/devices/ui/PartTable';
+import LicencePanel from '../features/devices/ui/LicencePanel';
+import PartsPanel from '../features/devices/ui/PartsPanel';
+import SoftwarePanel from '../features/devices/ui/SoftwarePanel';
+import { scanBadgeOf } from '../features/devices/licenceView';
 import PlaceFill from '../features/devices/ui/PlaceFill';
 import { updateDevice, deleteDevice, renameDevice } from '../features/devices/sharepoint/updateDevice';
 import RenameDialog from '../features/devices/ui/RenameDialog';
@@ -301,6 +305,7 @@ export default function DeviceDetailPage() {
   const status = device ? statusOf(device) : '';
   const kind = device ? [device.deviceType, device.computerModel].filter(Boolean).join(' · ') : '';
   const scanned = device ? instantOf(device.scannedOn) : NaN;
+  const scan = device ? scanBadgeOf(device) : null;
   const rawReport = device?.[RAW_REPORT_KEY];
 
   return (
@@ -363,6 +368,7 @@ export default function DeviceDetailPage() {
                 <div className="mh-head-id">
                   <div className="mh-head-line">
                     <span className={`dd-status dd-status-${status.replace(' ', '-').toLowerCase()}`}>{status}</span>
+                    <span className={`mh-scan mh-scan-${scan.kind}`}>{scan.text}</span>
                     {kind && <span className="mh-kind">{kind}</span>}
                   </div>
                   <div className="mh-defs">
@@ -390,6 +396,10 @@ export default function DeviceDetailPage() {
             </Card>
 
             <PartTable device={device} />
+
+            <LicencePanel device={device} />
+            <PartsPanel device={device} />
+            <SoftwarePanel device={device} />
 
             <div role="tablist" aria-label="More about this machine" className="mh-tabs">
               {TABS.map(([key, label]) => (

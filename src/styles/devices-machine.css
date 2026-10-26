@@ -227,7 +227,6 @@
 .sw-copy:disabled { color: var(--it-ink-soft); cursor: default; }
 .sw-copied { padding: 6px 12px; border-radius: 8px; font-weight: 600; background: var(--grade-optimal); color: var(--grade-optimal-ink); }
 .sw-note { margin: 0; font-size: 13px; line-height: 1.45; color: var(--it-ink-soft); }
-.sw-old { padding: 20px; border-radius: 10px; background: var(--it-thead); font-size: 14px; line-height: 1.5; }
 .sw-empty { padding: 24px 0; text-align: center; font-size: 14px; line-height: 1.6; color: var(--it-ink-soft); }
 .sw-link {
   font: inherit; font-size: 14px; min-height: 44px; padding: 0 4px; border: 0; background: none;

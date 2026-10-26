@@ -12,10 +12,11 @@ import { formatMYT } from '../../../utils/malaysiaTime';
 import { formatScalar } from '../formatValue';
 import ValueCell from './ValueCell';
 import FilterMenu from './FilterMenu';
+import ColumnMenu from './ColumnMenu';
 import { applyFilters, IN_FLEET, toCsv } from '../deviceFilters';
 import { buildFilterGroups, chipLabel } from '../filterOptions';
 import {
-  ALL_COLUMNS, COLUMN_SETS, COLUMN_SET_IDS, DEFAULT_SET, columnsForSet, parseColumnSet,
+  ALL_COLUMNS, DEFAULT_SET, columnsForKeys, keysForSet, parseColumnSet, toggleColumn,
 } from '../columnSets';
 import { gradeRank, securityRiskOf, worstGradeOf } from '../health';
 import { EDITABLE_FIELDS } from '../sharepoint/updateDevice';
@@ -127,7 +128,7 @@ export default function DeviceTable({
   // Remove in the row menu and no bulk bar, rather than controls that fail.
   const canRemove = Boolean(onDelete && onDeleteMany);
   const [sort, setSort] = useState(DEFAULT_SORT);
-  const [columnSet, setColumnSet] = useState(readColumnSet);
+  const [columnKeys, setColumnKeys] = useState(() => keysForSet(readColumnSet()));
   const [editingId, setEditingId] = useState(null);
   const [draft, setDraft] = useState({});
   // The row key (id, or name for a row with none) whose remove is awaiting a yes.
@@ -144,7 +145,7 @@ export default function DeviceTable({
   const [pageSize, setPageSize] = useState(25);
   const [at, setAt] = useState({ of: '', page: 1 });
 
-  const columns = useMemo(() => columnsForSet(columnSet), [columnSet]);
+  const columns = useMemo(() => columnsForKeys(columnKeys), [columnKeys]);
 
   // The status filter has ONE default: In use or in repair. Everything else
   // the menu can ask for is an explicit choice, and 'All' lifts the status
@@ -300,9 +301,11 @@ export default function DeviceTable({
       ? <span aria-hidden="true">{sort.dir === 'asc' ? ' ▲' : ' ▼'}</span>
       : null);
 
+  // A set is remembered; ticking columns on top of it is not, so a refresh
+  // puts the list back on the last set chosen.
   const chooseColumnSet = (next) => {
     writeColumnSet(next);
-    setColumnSet(next);
+    setColumnKeys(keysForSet(next));
   };
 
   const chooseSortPreset = (id) => {
@@ -443,14 +446,11 @@ export default function DeviceTable({
           </select>
         </label>
 
-        <label className="dl-select">
-          Columns
-          <select value={columnSet} onChange={(event) => chooseColumnSet(event.target.value)}>
-            {COLUMN_SET_IDS.map((id) => (
-              <option key={id} value={id}>{COLUMN_SETS[id].label}</option>
-            ))}
-          </select>
-        </label>
+        <ColumnMenu
+          keys={columnKeys}
+          onChooseSet={chooseColumnSet}
+          onToggle={(key) => setColumnKeys((current) => toggleColumn(current, key))}
+        />
 
         <Button
           variant="secondary"

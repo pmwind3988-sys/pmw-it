@@ -111,11 +111,50 @@ export const COLUMN_SETS = {
 
 export const COLUMN_SET_IDS = Object.keys(COLUMN_SETS);
 
-/** The column objects a set draws, in its own order. Unknown keys are dropped rather than drawn blank. */
-export function columnsForSet(setId, all = ALL_COLUMNS) {
-  const set = COLUMN_SETS[setId] ?? COLUMN_SETS[DEFAULT_SET];
+/** The keys a set draws, or the default set's for an id this module does not know. */
+export function keysForSet(setId) {
+  return (COLUMN_SETS[setId] ?? COLUMN_SETS[DEFAULT_SET]).keys;
+}
+
+/** The column objects for a list of keys, in that order. Unknown keys are dropped rather than drawn blank. */
+export function columnsForKeys(keys, all = ALL_COLUMNS) {
   const byKey = new Map(all.map((column) => [column.key, column]));
-  return set.keys.map((key) => byKey.get(key)).filter(Boolean);
+  return keys.map((key) => byKey.get(key)).filter(Boolean);
+}
+
+/** The column objects a set draws, in its own order. */
+export function columnsForSet(setId, all = ALL_COLUMNS) {
+  return columnsForKeys(keysForSet(setId), all);
+}
+
+/**
+ * Show or hide one column. A column switched on lands after the nearest shown
+ * column that comes before it in the full order, so picking "Office Licence"
+ * puts it where Everything would have it rather than tacked on after Scanned.
+ * The frozen computer name is not a choice and is never added or removed.
+ */
+export function toggleColumn(keys, key, all = ALL_COLUMNS) {
+  if (key === 'computerName') return keys;
+  if (keys.includes(key)) return keys.filter((k) => k !== key);
+
+  const order = all.map((column) => column.key);
+  const at = order.indexOf(key);
+  if (at === -1) return keys;
+
+  let insertAt = 0;
+  keys.forEach((shown, index) => {
+    const shownAt = order.indexOf(shown);
+    if (shownAt !== -1 && shownAt < at) insertAt = index + 1;
+  });
+  return [...keys.slice(0, insertAt), key, ...keys.slice(insertAt)];
+}
+
+/** The set whose columns are exactly these, in this order, or null when they are somebody's own pick. */
+export function setMatching(keys) {
+  return COLUMN_SET_IDS.find((id) => {
+    const setKeys = COLUMN_SETS[id].keys;
+    return setKeys.length === keys.length && setKeys.every((key, index) => key === keys[index]);
+  }) ?? null;
 }
 
 /** Only a value this module knows is accepted back from storage. */

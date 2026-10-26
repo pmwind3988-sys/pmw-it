@@ -360,3 +360,41 @@
 }
 .dtf-sub:first-child { margin-top: 0; }
 .dt-menu.dt-menu-up { top: auto; bottom: calc(100% + 4px); }
+
+/* Columns: start from a set, then tick any column on or off. Sits at the right of the bar, so it opens leftward. */
+.dcm-trigger {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 6px 12px;
+  border: 1px solid var(--it-line); border-radius: 8px; background: var(--it-panel);
+  color: var(--it-ink); font: inherit; font-size: 14px; white-space: nowrap; cursor: pointer;
+}
+.dcm-trigger[aria-expanded='true'] { background: var(--it-brand-wash); }
+.dcm-menu {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 30;
+  width: min(340px, calc(100vw - 32px)); padding: 12px;
+  display: flex; flex-direction: column; gap: 10px;
+  border: 1px solid var(--it-line); border-radius: var(--it-radius);
+  background: var(--it-panel); box-shadow: var(--it-card-shadow);
+}
+.dcm-sets { display: flex; flex-wrap: wrap; gap: 6px; }
+.dcm-set {
+  padding: 6px 10px; border: 1px solid var(--it-line); border-radius: 999px;
+  background: none; color: var(--it-ink); font: inherit; font-size: 13px; cursor: pointer;
+}
+.dcm-set:hover { background: var(--it-brand-wash); }
+.dcm-set[aria-pressed='true'] { border-color: var(--it-brand); background: var(--it-brand-wash); color: var(--it-brand); font-weight: 600; }
+.dcm-search {
+  min-height: 36px; padding: 6px 10px; border: 1px solid var(--it-line); border-radius: 8px;
+  background: var(--it-panel); color: var(--it-ink); font: inherit; font-size: 16px;
+}
+.dcm-list { max-height: min(50vh, 380px); overflow-y: auto; display: flex; flex-direction: column; gap: 1px; }
+.dcm-item {
+  display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 8px;
+  font-size: 14px; color: var(--it-ink); cursor: pointer;
+}
+.dcm-item:hover { background: var(--it-brand-wash); }
+.dcm-item input { width: 16px; height: 16px; accent-color: var(--it-brand); flex: none; }
+.dcm-fixed { cursor: default; color: var(--it-ink-soft); }
+.dcm-fixed:hover { background: none; }
+.dcm-note { margin-left: auto; font-size: 12px; color: var(--it-ink-soft); }
+.dcm-none, .dcm-foot { margin: 0; padding: 0 8px; font-size: 12px; color: var(--it-ink-soft); }
+.dcm-trigger:focus-visible, .dcm-set:focus-visible, .dcm-search:focus-visible { outline: 2px solid var(--it-brand); outline-offset: 2px; }

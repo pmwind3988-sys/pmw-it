@@ -1,5 +1,5 @@
 import { deriveDevice } from './derive/deriveDevice.js';
-import { parseReport } from './parse/parseReport.js';
+import { parseReport, cutAtNul } from './parse/parseReport.js';
 
 /**
  * Some reports are saved as UTF-16 (the scan's own writer does this on some
@@ -10,13 +10,13 @@ export function decodeReport(bytes) {
   const view = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
 
   if (view[0] === 0xff && view[1] === 0xfe) {
-    return new TextDecoder('utf-16le').decode(view.subarray(2));
+    return cutAtNul(new TextDecoder('utf-16le').decode(view.subarray(2)));
   }
   if (view[0] === 0xfe && view[1] === 0xff) {
-    return new TextDecoder('utf-16be').decode(view.subarray(2));
+    return cutAtNul(new TextDecoder('utf-16be').decode(view.subarray(2)));
   }
   // The UTF-8 decoder drops a UTF-8 byte-order mark by itself.
-  return new TextDecoder('utf-8').decode(view);
+  return cutAtNul(new TextDecoder('utf-8').decode(view));
 }
 
 export async function readTextFile(file) {

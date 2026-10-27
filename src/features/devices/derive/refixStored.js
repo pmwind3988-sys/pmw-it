@@ -1,6 +1,11 @@
 import { deriveStorage } from './deriveStorage.js';
 import { riskScore } from './riskScore.js';
 import { enrichFit } from './enrichFit.js';
+import { parseReport } from '../parse/parseReport.js';
+import { deriveHardwareIds } from './deriveHardwareIds.js';
+import { deriveLicensing } from './deriveLicensing.js';
+import { deriveSoftware } from './deriveSoftware.js';
+import { deriveScanInfo, scanRank } from './deriveScanInfo.js';
 
 /**
  * A stored row, brought back in line with today's rules.
@@ -34,7 +39,64 @@ function storageChanged(record, storage) {
   return STORAGE_KEYS.some((key) => record[key] !== storage[key]);
 }
 
-export function refixStored(record) {
+/**
+ * A version 2 report imported by a build that did not yet know its labels is
+ * stored whole, but every new block landed in Extra Fields and the row still
+ * reads as an old scan, so its page hides the licences, part numbers and
+ * software it plainly holds. The report text is the evidence, so those fields
+ * are read back out of it here, the same way the storage summary is.
+ *
+ * The stored text can also be cut short (a NUL in a program name ended it in
+ * SharePoint, before decodeReport removed them), Scan Info and all. Extra
+ * Fields is JSON, so it kept each unknown block whole: a block found there
+ * wins over the same block in the text, which may be the cut one.
+ *
+ * Only for a row that says old scan: a row holding a new scan already has what
+ * its own import read, and a report that really is v1 has nothing to add.
+ */
+function extraText(record) {
+  let extras;
+  try {
+    extras = JSON.parse(record.extraFields ?? '[]');
+  } catch {
+    return '';
+  }
+  if (!Array.isArray(extras)) return '';
+  return extras
+    .filter((entry) => entry?.label)
+    .map((entry) => `${entry.label}:\n${entry.value ?? ''}\n\n`)
+    .join('');
+}
+
+function rereadNewScan(record) {
+  if (scanRank(record.scanVersion) > 1) return record;
+  const raw = String(record.rawReport ?? '');
+  const extras = extraText(record);
+  if (!/^Scan Info:/m.test(raw + extras)) return record;
+
+  const fromRaw = parseReport(raw);
+  const fromExtras = parseReport(extras);
+  const fields = { ...fromRaw.fields };
+  for (const [label, lines] of Object.entries(fromExtras.fields)) {
+    if (lines.length) fields[label] = lines;
+  }
+  const unknownLabels = [...fromRaw.unknownLabels, ...fromExtras.unknownLabels
+    .filter((entry) => !fromRaw.unknownLabels.some((seen) => seen.label === entry.label))];
+  const scanInfo = deriveScanInfo(fields);
+  if (scanRank(scanInfo.scanVersion) <= 1) return record;
+
+  return {
+    ...record,
+    ...deriveHardwareIds(fields),
+    ...deriveLicensing(fields),
+    ...deriveSoftware(fields),
+    ...scanInfo,
+    extraFields: unknownLabels.length ? JSON.stringify(unknownLabels) : null,
+  };
+}
+
+export function refixStored(stored) {
+  const record = stored ? rereadNewScan(stored) : stored;
   if (!record?.storageDrivesRaw) return enrichFit(record);
 
   const lines = String(record.storageDrivesRaw)

@@ -151,3 +151,19 @@ describe('decodeReport', () => {
     expect(result.devices.map((d) => d.computerName)).toEqual(['AMIR-HP']);
   });
 });
+
+describe('decodeReport — junk a program name drags in from the registry', () => {
+  // A real report (PMWL013): Seagate's Toolkit registers a name with a NUL and
+  // garbage after it. SharePoint ends a stored text at the NUL, so the rest of
+  // the report, Scan Info included, was lost.
+  const line = 'Toolkit\u0000垪㶪㘨耀\\??\\ | 2.49.0.2 | Seagate\u0000坸㷸䂑耀汒뿟氿 | \r\nUltraViewer | 6.6 | DucFabulous |';
+  const bytes = new TextEncoder().encode(line);
+
+  it('cuts each value at its NUL, as the program that wrote it meant', () => {
+    expect(decodeReport(bytes)).toBe('Toolkit | 2.49.0.2 | Seagate | \r\nUltraViewer | 6.6 | DucFabulous |');
+  });
+
+  it('leaves no NUL anywhere in the text', () => {
+    expect(decodeReport(bytes).includes('\u0000')).toBe(false);
+  });
+});

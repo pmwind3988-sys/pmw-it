@@ -15,8 +15,20 @@ const DRIVE_LETTER = /^[A-Za-z]:/;
 
 const INVISIBLE = /[\u00a0\u200b\u200c]/g;
 
+/**
+ * A program can register a name with a NUL and memory garbage after it
+ * (Seagate's Toolkit does), and the scan copies it out as found. A NUL ends a
+ * string for whatever wrote it, so the value is cut there, up to the next cell
+ * or line. Left in, SharePoint ends the stored report at the NUL and loses
+ * everything after it.
+ */
+export function cutAtNul(text) {
+  // eslint-disable-next-line no-control-regex -- the NUL is what is being removed
+  return String(text).replace(/\u0000[^|\r\n]*?(?=[ \t]*\||[\r\n]|$)/g, '');
+}
+
 function normaliseText(text) {
-  return text
+  return cutAtNul(text)
     .replace(/^\ufeff/, '')
     .replace(/\r\n?/g, '\n')
     .replace(INVISIBLE, ' ');

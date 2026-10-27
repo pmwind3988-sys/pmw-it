@@ -164,7 +164,10 @@ export function toUpdateItem(patch) {
     }
 
     if (column.kind === 'choice') {
+      // '' leaves the column alone; an explicit null clears it (undoing a
+      // return has to rub out the condition it came back in).
       if (value) item[column.StaticName] = String(value);
+      else if (value === null) item[column.StaticName] = null;
       continue;
     }
 

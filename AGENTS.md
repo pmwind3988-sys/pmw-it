@@ -165,6 +165,7 @@ pmw-it/
 | Owned vs out vs available | `src/features/assets/handover/availability.js` |
 | What a handover writes or refuses | `src/features/assets/handover/planHandover.js` |
 | What a return writes | `src/features/assets/handover/planReturn.js` |
+| Undoing a person's last return (rows sharing their latest `ReturnedOn`) | `handover/planUndoReturn.js`, `commitUndoReturn` in `sharepoint/writeHandover.js` |
 | What one scan does at the till, per mode | `src/features/assets/till/stockIn.js`, `handOut.js`, `takeBack.js` |
 | Type-to-find and the desk's quick keys | `src/features/assets/till/tillSearch.js` |
 | Handing out a spare machine from the IT Stash at the till | `src/features/assets/till/stashMachines.js` |

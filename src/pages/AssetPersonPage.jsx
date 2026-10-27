@@ -4,17 +4,19 @@ import { useMsal } from '@azure/msal-react';
 import AppShell from '../components/AppShell';
 import Button from '../components/ui/Button';
 import { Card, ErrorBanner, EmptyState } from '../components/ui/Surfaces';
+import { useConfirm } from '../components/ui/useConfirm';
 import {
-  ArrowLeft, Check, AlertTriangle, Clock, Package, Users, Pencil,
+  ArrowLeft, Check, AlertTriangle, Clock, Package, Users, Pencil, Undo2,
 } from '../components/ui/Icons';
 import { useHandovers } from '../features/assets/useHandovers';
 import { useAssets, SHAREPOINT_SITE_URL } from '../features/assets/useAssets';
 import { useSharePointToken } from '../hooks/useRequests';
-import { commitReturn, commitPersonEdit } from '../features/assets/sharepoint/writeHandover';
+import { commitReturn, commitPersonEdit, commitUndoReturn } from '../features/assets/sharepoint/writeHandover';
 import SignatureField from '../features/assets/ui/SignatureField';
 import SignatureShot from '../features/assets/ui/SignatureShot';
 import PersonEditor from '../features/assets/ui/PersonEditor';
 import { returnEverything } from '../features/assets/handover/planReturn';
+import { lastReturnOf } from '../features/assets/handover/planUndoReturn';
 import {
   heldBy, outstanding, isOverdue, isOpen, nameOfItem, titleOfHeld, HANDOVER_KIND,
 } from '../features/assets/handover/availability';
@@ -59,6 +61,9 @@ export default function AssetPersonPage() {
   const [params] = useSearchParams();
   const [editing, setEditing] = useState(params.get('edit') === '1');
   const [renamed, setRenamed] = useState(null);
+  const [undoing, setUndoing] = useState(false);
+  const [undone, setUndone] = useState(null);
+  const { ask, dialog } = useConfirm();
 
   const address = decodeURIComponent(email ?? '');
   const held = useMemo(() => heldBy(handovers, address), [handovers, address]);
@@ -92,6 +97,11 @@ export default function AssetPersonPage() {
     [handovers, address],
   );
 
+  // The rows the most recent Return press touched, so a "Return everything"
+  // pressed by mistake costs one click to put back.
+  const lastReturn = useMemo(() => lastReturnOf(handovers, address), [handovers, address]);
+  const lastReturnUnits = lastReturn.rows.reduce((sum, row) => sum + (row.returnedQuantity ?? 0), 0);
+
   const name = held[0]?.personName || past[0]?.personName || address;
   const overdue = held.filter((row) => isOverdue(row)).length;
   const units = held.reduce((sum, row) => sum + outstanding(row), 0);
@@ -120,6 +130,39 @@ export default function AssetPersonPage() {
     } catch (thrown) {
       setFailure(thrown.message || 'The return could not be recorded');
     } finally {
+      setBusy(false);
+    }
+  };
+
+  const doUndo = async () => {
+    const when = formatMYT(lastReturn.returnedOn, 'datetime12');
+    if (!await ask({
+      title: `Undo the return of ${lastReturnUnits} item${lastReturnUnits === 1 ? '' : 's'}?`,
+      body: `Everything ${name} handed back on ${when} goes back on their name, with the `
+        + 'dates it was first issued. The condition chosen for the return stays on the '
+        + 'items, and a line that had been partly returned before comes back in full.',
+      confirmLabel: 'Undo the return',
+      cancelLabel: 'Leave it returned',
+    })) return;
+
+    setUndoing(true);
+    setBusy(true);
+    setFailure('');
+    setReport(null);
+    setUndone(null);
+    try {
+      const tokenRes = await getToken();
+      const result = await commitUndoReturn({
+        siteUrl: SHAREPOINT_SITE_URL,
+        token: tokenRes.accessToken,
+        email: address,
+      });
+      setUndone(result);
+      reload();
+    } catch (thrown) {
+      setFailure(thrown.message || 'The return could not be undone');
+    } finally {
+      setUndoing(false);
       setBusy(false);
     }
   };
@@ -208,6 +251,21 @@ export default function AssetPersonPage() {
             {report.signatureFailed
               && ' The signature could not be saved, so this is recorded unsigned.'
                 + ' It is still on the screen below and will go up with the next return.'}
+          </span>
+        </Card>
+      )}
+
+      {undone && (
+        <Card className={`as-notice ${undone.blocked.length || undone.writeFailures ? 'as-notice-warn' : 'as-notice-ok'}`}>
+          {undone.blocked.length || undone.writeFailures ? <AlertTriangle size={16} /> : <Check size={16} />}
+          <span>
+            {undone.reopened} line{undone.reopened === 1 ? '' : 's'} back on {name}'s name.
+            {undone.blocked.length > 0
+              && ` ${undone.blocked.length} could not be: ${undone.blocked[0].reason}`}
+            {undone.writeFailures > 0
+              && ` ${undone.writeFailures} could not be written. Press Undo again.`}
+            {undone.staleRows.length > 0
+              && ' Some register rows still read In stock; the handovers themselves are correct.'}
           </span>
         </Card>
       )}
@@ -355,6 +413,27 @@ export default function AssetPersonPage() {
         </div>
       )}
 
+      {lastReturn.rows.length > 0 && (
+        <Card className="as-notice">
+          <Undo2 size={16} />
+          <span>
+            Last return: {lastReturnUnits} item{lastReturnUnits === 1 ? '' : 's'},{' '}
+            {formatMYT(lastReturn.returnedOn, 'datetime12')}
+            {lastReturn.rows[0].returnedBy ? ` by ${lastReturn.rows[0].returnedBy}` : ''}.
+          </span>
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={Undo2}
+            loading={undoing}
+            disabled={busy}
+            onClick={doUndo}
+          >
+            Undo this return
+          </Button>
+        </Card>
+      )}
+
       {past.length > 0 && (
         <details className="as-batchlist">
           <summary><Users size={13} /> Already returned ({past.length})</summary>
@@ -387,6 +466,7 @@ export default function AssetPersonPage() {
           </ul>
         </details>
       )}
+      {dialog}
     </AppShell>
   );
 }

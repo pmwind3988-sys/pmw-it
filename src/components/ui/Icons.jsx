@@ -243,6 +243,13 @@ export const Inbox = make('Inbox', (
 
 export const Check = make('Check', <polyline points="20 6 9 17 4 12" />);
 
+export const Undo2 = make('Undo2', (
+  <>
+    <path d="M9 14 4 9l5-5" />
+    <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
+  </>
+));
+
 export const MoreHorizontal = make('MoreHorizontal', (
   <>
     <circle cx="5" cy="12" r="1" />

@@ -10,6 +10,7 @@ import {
 import { uploadSignature } from './uploadSignature.js';
 import { planHandover } from '../handover/planHandover.js';
 import { planReturn } from '../handover/planReturn.js';
+import { lastReturnOf, planUndoReturn } from '../handover/planUndoReturn.js';
 import { planPersonEdit } from '../handover/planPersonEdit.js';
 
 const itemPath = (listName) => `${listPath(listName)}/items`;
@@ -196,6 +197,64 @@ export async function commitReturn({
     writeFailures: written.filter((result) => result.error).length,
     staleRows: updated
       .map((result, index) => (result.error ? plan.assetUpdates[index].assetKey : null))
+      .filter(Boolean),
+  };
+}
+
+/**
+ * Undoing a person's most recent return.
+ *
+ * Re-read like the others, and found again from the fresh rows rather than
+ * from the screen: if a later return happened elsewhere, that is the one
+ * undone, which is what "the last return" means. Handover rows first, then the
+ * register copies only for rows whose handover reopened (§4.2).
+ */
+export async function commitUndoReturn({
+  siteUrl, token, email, onProgress,
+}) {
+  const report = (phase, done = 0, total = 0) => onProgress?.({ phase, done, total });
+
+  report('reading');
+  const [register, handovers] = await Promise.all([
+    readAllAssets(siteUrl, token),
+    readAllHandovers(siteUrl, token),
+  ]);
+
+  const digest = await provisionAssets(siteUrl, token);
+
+  const { rows } = lastReturnOf(handovers, email);
+  const plan = planUndoReturn(rows, register);
+
+  report('writing', 0, plan.handoverUpdates.length);
+  const written = await runPool(plan.handoverUpdates, async (update) => {
+    const response = await merge(
+      siteUrl, token, digest, HANDOVER_LIST_NAME, update.id, handoverPatch(update.body),
+    );
+    if (!response.ok) throw new Error(`${response.status}: ${await response.text()}`);
+    return update.assetKey;
+  }, { concurrency: 4, onProgress: (done, total) => report('writing', done, total) });
+
+  const landed = new Set(
+    written.map((result, index) => (result.error ? null : plan.handoverUpdates[index].assetKey))
+      .filter(Boolean),
+  );
+  const updates = plan.assetUpdates.filter((update) => landed.has(update.assetKey));
+
+  report('updating', 0, updates.length);
+  const updated = await runPool(updates, async (update) => {
+    const response = await merge(
+      siteUrl, token, digest, ASSET_LIST_NAME, update.id, assetPatch(update.body),
+    );
+    if (!response.ok) throw new Error(`${response.status}: ${await response.text()}`);
+    return update.assetKey;
+  }, { concurrency: 4, onProgress: (done, total) => report('updating', done, total) });
+
+  return {
+    reopened: written.filter((result) => !result.error).length,
+    blocked: plan.blocked,
+    writeFailures: written.filter((result) => result.error).length,
+    staleRows: updated
+      .map((result, index) => (result.error ? updates[index].assetKey : null))
       .filter(Boolean),
   };
 }

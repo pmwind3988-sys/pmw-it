@@ -3,7 +3,7 @@
   "solution": {
     "name": "PMW IT helpdesk tickets",
     "id": "d55f0de8-ccbe-469e-b377-70ef93656bee",
-    "version": "1.0.2.0",
+    "version": "1.1.0.0",
     "includeClientSideAssets": true,
     "skipFeatureDeployment": true,
     "isDomainIsolated": false,
@@ -30,7 +30,7 @@
         "title": "PMW IT helpdesk tickets",
         "description": "The feature that activates elements of the helpdesk-ticket solution.",
         "id": "d37c133f-c457-4c80-a6ef-2bf23c036fca",
-        "version": "1.0.2.0"
+        "version": "1.1.0.0"
       }
     ]
   },

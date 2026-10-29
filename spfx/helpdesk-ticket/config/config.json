@@ -9,6 +9,14 @@
           "manifest": "./src/webparts/helpdeskTicket/HelpdeskTicketWebPart.manifest.json"
         }
       ]
+    },
+    "ticket-queue-web-part": {
+      "components": [
+        {
+          "entrypoint": "./lib/webparts/ticketQueue/TicketQueueWebPart.js",
+          "manifest": "./src/webparts/ticketQueue/TicketQueueWebPart.manifest.json"
+        }
+      ]
     }
   },
   "externals": {},

@@ -10,6 +10,14 @@
         }
       ]
     },
+    "ticket-dashboard-web-part": {
+      "components": [
+        {
+          "entrypoint": "./lib/webparts/ticketDashboard/TicketDashboardWebPart.js",
+          "manifest": "./src/webparts/ticketDashboard/TicketDashboardWebPart.manifest.json"
+        }
+      ]
+    },
     "ticket-queue-web-part": {
       "components": [
         {

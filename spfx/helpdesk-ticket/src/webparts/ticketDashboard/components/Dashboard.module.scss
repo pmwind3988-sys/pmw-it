@@ -1,0 +1,1023 @@
+// The IT helpdesk dashboard. The queue's palette and card look (white cards,
+// 1px #e1dfdd borders, 6px radius), with the chart colours from chartMath.ts.
+// Labels and numbers are always text colours; series colours only paint marks.
+// Inputs are 16px so iOS does not zoom on focus; touch targets are 40px or more.
+
+$text: #201f1e;
+$text-2: #484644;
+$text-3: #605e5c;
+$border: #e1dfdd;
+$border-soft: #edebe9;
+$input-border: #8a8886;
+$primary: #0b5cad;
+$primary-hover: #094c8f;
+$primary-soft: #e8f1fb;
+$critical: #a4262c;
+$soft-bg: #faf9f8;
+$danger-bg: #fde7e9;
+$empty-fill: #f3f2f1;
+$story: #1b2a6b;
+
+@mixin focus-ring {
+  outline: 2px solid $primary;
+  outline-offset: 2px;
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 1240px;
+  margin: 0 auto;
+  color: $text;
+  font-family: 'Segoe UI', 'Segoe UI Web', system-ui, sans-serif;
+  box-sizing: border-box;
+  min-width: 0;
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  :focus-visible {
+    @include focus-ring;
+  }
+}
+
+.card {
+  background: #ffffff;
+  border: 1px solid $border;
+  border-radius: 6px;
+  min-width: 0;
+}
+
+.note {
+  margin: 0;
+  padding: 12px 16px;
+  font-size: 14px;
+  color: $text-3;
+  background: $soft-bg;
+  border: 1px dashed $border;
+  border-radius: 6px;
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px;
+}
+
+.headText {
+  display: flex;
+  flex: 1 1 320px;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.muted {
+  margin: 0;
+  font-size: 14px;
+  color: $text-2;
+}
+
+.headActions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.spin {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid $border;
+  border-top-color: $primary;
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+  flex: 0 0 auto;
+}
+
+.primaryBtn,
+.secondaryBtn,
+.iconBtn {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.55;
+  }
+}
+
+.primaryBtn {
+  border: 1px solid $primary;
+  background: $primary;
+  color: #ffffff;
+
+  &:hover:not(:disabled) {
+    background: $primary-hover;
+    border-color: $primary-hover;
+  }
+}
+
+.secondaryBtn {
+  border: 1px solid $input-border;
+  background: #ffffff;
+  color: $text;
+
+  &:hover:not(:disabled) {
+    background: $soft-bg;
+  }
+}
+
+.iconBtn {
+  width: 40px;
+  padding: 0;
+  border: 1px solid $input-border;
+  background: #ffffff;
+  color: $text-2;
+
+  &:hover:not(:disabled) {
+    background: $soft-bg;
+  }
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+// Filters: the queue's filter bar sits inside this card; the result lines go under it.
+
+.resultBox {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 24px 16px;
+}
+
+.resultLine {
+  margin: 0;
+  font-size: 14px;
+  color: $text-2;
+  min-height: 20px;
+}
+
+.hint {
+  margin: 0;
+  font-size: 13px;
+  color: $text-3;
+}
+
+.stateBox {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 24px 24px;
+  font-size: 15px;
+  color: $text-2;
+}
+
+.errorBox {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 16px 0 0;
+  padding: 12px 16px;
+  border-radius: 4px;
+  background: $danger-bg;
+  color: $critical;
+  font-size: 14px;
+}
+
+.bodyCard {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.footNote {
+  margin: 0;
+  font-size: 13px;
+  color: $text-3;
+  text-align: center;
+}
+
+// Story strip
+
+.stories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.story {
+  flex: 1 1 300px;
+  min-width: 0;
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 20px;
+  border-radius: 8px;
+  background: $story;
+  color: #ffffff;
+}
+
+.storyBadge {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.14);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.storyText {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.storyKicker {
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #c7d3f0;
+}
+
+.storyBody {
+  font-size: 18px;
+  line-height: 1.35;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+// Key figures
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 16px;
+  background: #ffffff;
+  border: 1px solid $border;
+  border-radius: 6px;
+  color: $text;
+  text-decoration: none;
+}
+
+.kpiLink {
+  cursor: pointer;
+
+  &:hover {
+    border-color: $primary;
+  }
+}
+
+.kpiLabel {
+  font-size: 13px;
+  color: $text-2;
+}
+
+.kpiValue {
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1;
+  overflow-wrap: anywhere;
+}
+
+.kpiNote {
+  font-size: 13px;
+  color: $text-3;
+  overflow-wrap: anywhere;
+}
+
+// Layout rows: a wide card and a narrow one share a row; they stack on a phone.
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  min-width: 0;
+}
+
+.wide {
+  flex: 3 1 520px;
+}
+
+.narrow {
+  flex: 2 1 340px;
+}
+
+.trendWide {
+  flex: 2 1 520px;
+}
+
+.trendNarrow {
+  flex: 1 1 300px;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  padding: 20px 24px;
+}
+
+.cardHead {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px 16px;
+}
+
+.cardText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.cardSub {
+  margin: 0;
+  font-size: 13px;
+  color: $text-3;
+}
+
+.cardTools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 14px;
+  align-items: center;
+  font-size: 13px;
+  color: $text-2;
+}
+
+.toggle {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid $input-border;
+  border-radius: 4px;
+  background: #ffffff;
+  color: $text;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+
+  &[aria-pressed='true'] {
+    background: $primary-soft;
+    border-color: $primary;
+    color: $primary;
+    font-weight: 600;
+  }
+
+  &:hover {
+    background: $soft-bg;
+  }
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: $text-2;
+}
+
+.swatchLine {
+  width: 14px;
+  height: 3px;
+  border-radius: 2px;
+  flex: 0 0 auto;
+}
+
+.swatchSquare {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex: 0 0 auto;
+}
+
+.empty {
+  margin: 0;
+  padding: 12px 0;
+  font-size: 15px;
+  color: $text-2;
+}
+
+.quiet {
+  margin: 0;
+  font-size: 13px;
+  color: $text-2;
+}
+
+.alert {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 4px;
+  background: #fdf3f4;
+  color: $critical;
+  font-size: 13px;
+}
+
+.alert span {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.tableBox {
+  max-height: 360px;
+  overflow: auto;
+  border-top: 1px solid $border-soft;
+}
+
+.table {
+  width: 100%;
+  min-width: 340px;
+  border-collapse: collapse;
+  font-size: 14px;
+
+  th,
+  td {
+    padding: 8px 10px;
+    text-align: left;
+    border-bottom: 1px solid $border-soft;
+    white-space: nowrap;
+  }
+
+  th {
+    font-size: 13px;
+    font-weight: 600;
+    color: $text-2;
+  }
+
+  td {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+// Shared bar rows
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rowName {
+  min-width: 0;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rowNum {
+  font-size: 14px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.holderRow,
+.areaRow {
+  display: grid;
+  grid-template-columns: minmax(96px, 170px) minmax(0, 1fr) 36px;
+  align-items: center;
+  gap: 12px;
+}
+
+.track {
+  display: flex;
+  gap: 2px;
+  height: 22px;
+  min-width: 0;
+}
+
+.stack {
+  display: flex;
+  gap: 2px;
+  height: 18px;
+  min-width: 0;
+}
+
+.seg {
+  display: block;
+  flex-shrink: 1;
+  min-width: 0;
+  height: 100%;
+  border-radius: 4px;
+}
+
+.areaBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+// Leaderboard
+
+.boardWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.board {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.boardRow {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.medal {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  background: $empty-fill;
+  color: $text-2;
+}
+
+.boardMid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.thinTrack {
+  height: 6px;
+  background: $empty-fill;
+  border-radius: 3px;
+}
+
+.thinFill {
+  height: 6px;
+  border-radius: 3px;
+  background: #2a78d6;
+}
+
+.boardNum {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.callout {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 4px;
+  background: #f3f8fd;
+  font-size: 13px;
+  color: $text-2;
+}
+
+// Priority
+
+.priorityBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.priorityBar {
+  display: flex;
+  height: 36px;
+  gap: 2px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.priSeg {
+  display: block;
+  flex-basis: 0;
+  flex-shrink: 1;
+  min-width: 0;
+  height: 100%;
+}
+
+.priorityLegend {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.priItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  min-width: 0;
+}
+
+.priSwatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex: 0 0 auto;
+}
+
+.priPct {
+  margin-left: auto;
+}
+
+// Heat map
+
+.heatScroll {
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.heatGrid {
+  display: grid;
+  grid-template-columns: 44px repeat(12, minmax(34px, 1fr));
+  gap: 3px;
+  min-width: 480px;
+  font-size: 11px;
+  color: $text-3;
+}
+
+.heatHead {
+  text-align: center;
+}
+
+.heatDay {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  color: $text-2;
+}
+
+.heatCell {
+  height: 28px;
+  border-radius: 3px;
+}
+
+.heatLegend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: $text-3;
+}
+
+.heatKey {
+  width: 18px;
+  height: 12px;
+  border-radius: 2px;
+}
+
+.busiest {
+  margin-left: auto;
+  color: $text-2;
+}
+
+// Close-time bars
+
+.speedBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.speedBars {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  height: 170px;
+  border-bottom: 1px solid #c8c6c4;
+}
+
+.speedCol {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.speedCount {
+  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.speedBar {
+  width: 100%;
+  border-radius: 4px 4px 0 0;
+}
+
+.speedLabels {
+  display: flex;
+  gap: 10px;
+  font-size: 11px;
+  color: $text-3;
+  text-align: center;
+}
+
+.speedLabel {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+// Age bars
+
+.ageRow {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr) 36px;
+  align-items: center;
+  gap: 12px;
+}
+
+.ageTrack {
+  height: 18px;
+  background: $empty-fill;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.ageFill {
+  height: 100%;
+  border-radius: 3px;
+}
+
+// Record gaps
+
+.gapList {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.gap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gapHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.gapTrack {
+  height: 8px;
+  background: $empty-fill;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.gapFill {
+  height: 100%;
+  background: #2a78d6;
+  border-radius: 4px;
+}
+
+.gapNote {
+  font-size: 12px;
+  color: $text-3;
+}
+
+// Time charts: the plot is a stretched SVG; labels, dots and the tooltip sit over it in percent.
+
+.chartBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.plotWrap {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.yAxis {
+  position: relative;
+  flex: 0 0 36px;
+  height: 220px;
+}
+
+.yLabel {
+  position: absolute;
+  right: 6px;
+  transform: translateY(-50%);
+  font-size: 11px;
+  line-height: 1;
+  color: $text-3;
+}
+
+.plot {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 220px;
+  border-radius: 2px;
+  cursor: crosshair;
+  touch-action: pan-y;
+}
+
+.svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+
+.crosshair {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: $input-border;
+  pointer-events: none;
+}
+
+.dot {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.tag {
+  position: absolute;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+  color: $text;
+  pointer-events: none;
+}
+
+.tip {
+  position: absolute;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  background: #ffffff;
+  border: 1px solid $border;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  font-size: 12px;
+  color: $text-2;
+  white-space: nowrap;
+  pointer-events: none;
+
+  strong {
+    color: $text;
+  }
+}
+
+.xAxis {
+  position: relative;
+  height: 18px;
+  margin-left: 36px;
+  font-size: 11px;
+  color: $text-3;
+}
+
+.xLabel {
+  position: absolute;
+  top: 0;
+  white-space: nowrap;
+}
+
+// On a phone the plot is narrow: every second axis label steps aside so the rest never run together.
+@media (max-width: 600px) {
+  .xAxis .xLabel:nth-child(2n + 2) {
+    display: none;
+  }
+
+  .heatScroll,
+  .tableBox {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .holderRow,
+  .areaRow {
+    grid-template-columns: minmax(84px, 110px) minmax(0, 1fr) 32px;
+    gap: 8px;
+  }
+
+  .ageRow {
+    grid-template-columns: 96px minmax(0, 1fr) 32px;
+    gap: 8px;
+  }
+
+  .priorityLegend {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .story {
+    flex-basis: 100%;
+  }
+
+  .wide,
+  .narrow,
+  .trendWide,
+  .trendNarrow {
+    flex-basis: 100%;
+  }
+}

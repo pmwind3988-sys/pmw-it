@@ -1,7 +1,7 @@
 import { fromQueueItem, QueueTicket } from '../../ticketQueue/queue/ticket';
 import {
   ages, arrivals, byArea, byPriority, changeText, closedAt, daysToClose, gaps, grainFor, headline, holders,
-  leaderboard, median, percentile, slotText, speeds, splitCategory, stories, trend, trendWindow
+  leaderboard, median, percentile, periodOf, slotText, speeds, splitCategory, stories, trend, trendWindow
 } from './stats';
 
 // Thursday 29 October 2026, 10:00 local.
@@ -73,7 +73,7 @@ describe('headline', () => {
     t({ Created: at(2025, 10, 9), Priority: 'Critical' }),
     t({ Created: at(2026, 9, 1), Status: 'Completed', Completed_x0020_Date: at(2026, 9, 2) })
   ];
-  const h = headline(rows, rows, NOW);
+  const h = headline(rows, rows, periodOf({ preset: 'all' }, NOW), NOW);
 
   it('counts open, unassigned and the oldest open ticket from the present', () => {
     expect(h.openNow).toBe(2);
@@ -82,8 +82,8 @@ describe('headline', () => {
   });
 
   it('compares this calendar month with last', () => {
-    expect([h.raisedThisMonth, h.raisedLastMonth]).toEqual([1, 2]);
-    expect([h.closedThisMonth, h.closedLastMonth]).toEqual([1, 1]);
+    expect([h.raised, h.raisedBefore]).toEqual([1, 2]);
+    expect([h.closed, h.closedBefore]).toEqual([1, 1]);
     expect(h.criticalInView).toBe(1);
   });
 
@@ -92,6 +92,37 @@ describe('headline', () => {
     expect(changeText(30, 40)).toBe('↓ 25% on last month');
     expect(changeText(5, 0)).toBe('');
     expect(changeText(4, 4)).toBe('Same as last month');
+    expect(changeText(6, 4, 'last year')).toBe('↑ 50% on last year');
+    expect(changeText(6, undefined)).toBe('');
+  });
+
+  it('follows the Raised filter: open and oldest from the tickets it picks, raised and closed in its span', () => {
+    const year = periodOf({ preset: 'thisYear' }, NOW);
+    const inYear = rows.filter((r) => new Date(r.created).getFullYear() === 2026);
+    const y = headline(rows, inYear, year, NOW);
+    expect(y.openNow).toBe(1);
+    expect(y.oldestOpen?.days).toBe(26);
+    expect([y.raised, y.closed]).toEqual([3, 2]);
+    expect([y.raisedBefore, y.closedBefore]).toEqual([1, 0]);
+  });
+});
+
+describe('period', () => {
+  it('names the span the cards count', () => {
+    const all = periodOf({ preset: 'all' }, NOW);
+    expect([all.label, all.prevLabel, all.kicker]).toEqual(['this month', 'last month', 'October so far']);
+    const year = periodOf({ preset: 'thisYear' }, NOW);
+    expect([year.label, year.prevLabel, year.kicker]).toEqual(['this year', 'last year', '2026 so far']);
+    expect(year.prev?.from).toEqual(new Date(2025, 0, 1));
+    const sep = periodOf({ preset: 'month', month: '2026-09' }, NOW);
+    expect([sep.label, sep.prevLabel, sep.kicker]).toEqual(['in Sep 2026', 'Aug 2026', 'September 2026']);
+    const oct = periodOf({ preset: 'month', month: '2026-10' }, NOW);
+    expect(oct.kicker).toBe('October so far');
+    const week = periodOf({ preset: 'pastWeek' }, NOW);
+    expect(week.prev).toEqual({ from: new Date(2026, 9, 16), to: new Date(2026, 9, 23) });
+    const span = periodOf({ preset: 'range', start: '2026-10-01', end: '2026-10-10' }, NOW);
+    expect([span.label, span.prevLabel, span.kicker]).toEqual(['in these dates', 'the 10 days before', '1 Oct 2026 – 10 Oct 2026']);
+    expect(periodOf({ preset: 'range', end: '2026-10-10' }, NOW).prev).toBeUndefined();
   });
 });
 
@@ -176,7 +207,8 @@ describe('gaps and stories', () => {
 
   it('writes the three sentences', () => {
     const rows = [t({ Created: at(2026, 10, 29, 15), Status: 'Completed', Completed_x0020_Date: at(2026, 10, 29, 17) })];
-    const s = stories(headline(rows, rows, NOW), arrivals(rows), NOW);
+    const p = periodOf({ preset: 'thisMonth' }, NOW);
+    const s = stories(headline(rows, rows, p, NOW), arrivals(rows), p);
     expect(s[0].text).toBe('1 ticket in, 1 closed. The pile held steady.');
     expect(s[0].kicker).toBe('October so far');
     expect(s[1].text).toContain('Thursday, 3–4 PM');

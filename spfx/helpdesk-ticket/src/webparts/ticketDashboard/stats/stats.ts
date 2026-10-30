@@ -5,13 +5,15 @@
 //   - `inView`: the queue's filter as set, dates included. Distributions
 //     (what tickets are about, how urgent, how long they took, when they
 //     arrive) describe exactly the tickets the filters picked, and so does Export.
-//   - `scope`: the same filter WITHOUT its dates. "Open now", "this month vs
-//     last month", who holds what and how old the open tickets are describe the
-//     present, and a date filter of "March" must not make 41 open tickets read 3.
+//   - `scope`: the same filter WITHOUT its dates. Who holds what and how old the
+//     open tickets are describe the present, and a date filter of "March" must
+//     not make 41 open tickets read 3 there. The headline cards read it too, but
+//     cut to the chosen dates themselves (`periodOf`): "closed in March" counts
+//     a ticket raised in February, and the comparison needs the period before.
 // The trend charts read `scope` too, cut to the chosen dates (or the past 12
 // months when none are chosen), because a trend needs time on its x axis.
 
-import { Range } from '../../ticketQueue/queue/dateRange';
+import { DateChoice, describe as describeRange, inRange, Range, rangeOf } from '../../ticketQueue/queue/dateRange';
 import { QueueTicket } from '../../ticketQueue/queue/ticket';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -147,13 +149,97 @@ export function trend(scope: QueueTicket[], range: Range, now: Date): { grain: G
 
 // ---------------------------------------------------------------- headline figures
 
+/**
+ * The span the headline cards count, from the Raised filter. "Any time" has no
+ * span of its own, so it counts this calendar month, as the cards always did.
+ */
+export interface Period {
+  range: Range;
+  /** The same length just before, for "↑ 12% on last month"; none when the span has no start. */
+  prev?: Range;
+  /** "this month", "this year", "in Sep 2026": after "Raised" / "Closed". */
+  label: string;
+  /** "last month", "the 7 days before": after "on". */
+  prevLabel: string;
+  /** "October so far", "2026 so far", "September 2026": the story card's heading. */
+  kicker: string;
+}
+
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const monthStart = (now: Date, back: number): Date => new Date(now.getFullYear(), now.getMonth() - back, 1);
+const shiftDays = (d: Date, n: number): Date => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+
+function monthPeriod(from: Date, now: Date): Period {
+  const prevFrom = new Date(from.getFullYear(), from.getMonth() - 1, 1);
+  const range = { from, to: new Date(from.getFullYear(), from.getMonth() + 1, 1) };
+  const prev = { from: prevFrom, to: from };
+  if (from.getFullYear() === now.getFullYear() && from.getMonth() === now.getMonth()) {
+    return { range, prev, label: 'this month', prevLabel: 'last month', kicker: `${MONTH_NAMES[from.getMonth()]} so far` };
+  }
+  return {
+    range,
+    prev,
+    label: `in ${SHORT[from.getMonth()]} ${from.getFullYear()}`,
+    prevLabel: `${SHORT[prevFrom.getMonth()]} ${prevFrom.getFullYear()}`,
+    kicker: `${MONTH_NAMES[from.getMonth()]} ${from.getFullYear()}`
+  };
+}
+
+export function periodOf(choice: DateChoice, now: Date): Period {
+  const r = rangeOf(choice, now);
+  const days = (n: number, label: string, prevLabel: string, kicker: string): Period => ({
+    range: r,
+    prev: r.from ? { from: shiftDays(r.from, -n), to: r.from } : undefined,
+    label,
+    prevLabel,
+    kicker
+  });
+  switch (choice.preset) {
+    case 'today':
+      return days(1, 'today', 'yesterday', 'Today so far');
+    case 'thisWeek':
+      return days(7, 'this week', 'last week', 'This week so far');
+    case 'pastWeek':
+      return days(7, 'in the past 7 days', 'the 7 days before', 'Past 7 days');
+    case 'last30':
+      return days(30, 'in the past 30 days', 'the 30 days before', 'Past 30 days');
+    case 'thisMonth':
+      return monthPeriod(monthStart(now, 0), now);
+    case 'thisYear': {
+      const y = now.getFullYear();
+      return { range: r, prev: { from: new Date(y - 1, 0, 1), to: new Date(y, 0, 1) }, label: 'this year', prevLabel: 'last year', kicker: `${y} so far` };
+    }
+    case 'month':
+      if (r.from) return monthPeriod(r.from, now);
+      break;
+    case 'range':
+      if (r.from || r.to) {
+        const span = r.from && r.to ? Math.round((r.to.getTime() - r.from.getTime()) / DAY) : 0;
+        return {
+          range: r,
+          prev: span > 0 && r.from ? { from: shiftDays(r.from, -span), to: r.from } : undefined,
+          label: 'in these dates',
+          prevLabel: `the ${span} ${span === 1 ? 'day' : 'days'} before`,
+          kicker: describeRange(choice, now)
+        };
+      }
+      break;
+    default:
+      break;
+  }
+  return monthPeriod(monthStart(now, 0), now);
+}
+
 export interface Headline {
+  /** Open tickets among those the filters pick, dates included. */
   openNow: number;
   unassignedOpen: number;
-  raisedThisMonth: number;
-  raisedLastMonth: number;
-  closedThisMonth: number;
-  closedLastMonth: number;
+  /** Raised and closed in the period, and in the one before it when there is one. */
+  raised: number;
+  raisedBefore?: number;
+  closed: number;
+  closedBefore?: number;
   /** Median days to close, tickets in view. */
   medianDays?: number;
   /** 90th percentile days to close, tickets in view. */
@@ -163,28 +249,27 @@ export interface Headline {
   inView: number;
 }
 
-const monthStart = (now: Date, back: number): Date => new Date(now.getFullYear(), now.getMonth() - back, 1);
-
-export function headline(scope: QueueTicket[], inView: QueueTicket[], now: Date): Headline {
-  const thisM = monthStart(now, 0);
-  const nextM = monthStart(now, -1);
-  const lastM = monthStart(now, 1);
-  const between = (d: Date | undefined, a: Date, b: Date): boolean => !!d && d >= a && d < b;
-  const open = scope.filter(isOpen);
+export function headline(scope: QueueTicket[], inView: QueueTicket[], period: Period, now: Date): Headline {
+  const within = (d: Date | undefined, r: Range): boolean => !!d && inRange(d, r);
+  const open = inView.filter(isOpen);
   let oldest: { ticket: QueueTicket; days: number } | undefined;
   open.forEach((t) => {
     const days = Math.floor((now.getTime() - new Date(t.created).getTime()) / DAY);
     if (!isNaN(days) && (!oldest || days > oldest.days)) oldest = { ticket: t, days };
   });
+  // Closed counts every ticket closed in the period, whenever it was raised.
   const done = scope.filter((t) => t.status === 'Completed');
+  const raisedIn = (r: Range): number => scope.filter((t) => within(new Date(t.created), r)).length;
+  const closedIn = (r: Range): number => done.filter((t) => within(closedAt(t), r)).length;
   const speeds = inView.map(daysToClose).filter((d): d is number => d !== undefined);
+  const prev = period.prev;
   return {
     openNow: open.length,
     unassignedOpen: open.filter((t) => !t.assignedTo).length,
-    raisedThisMonth: scope.filter((t) => between(new Date(t.created), thisM, nextM)).length,
-    raisedLastMonth: scope.filter((t) => between(new Date(t.created), lastM, thisM)).length,
-    closedThisMonth: done.filter((t) => between(closedAt(t), thisM, nextM)).length,
-    closedLastMonth: done.filter((t) => between(closedAt(t), lastM, thisM)).length,
+    raised: raisedIn(period.range),
+    raisedBefore: prev ? raisedIn(prev) : undefined,
+    closed: closedIn(period.range),
+    closedBefore: prev ? closedIn(prev) : undefined,
     medianDays: median(speeds),
     p90Days: percentile(speeds, 0.9),
     oldestOpen: oldest,
@@ -193,12 +278,14 @@ export function headline(scope: QueueTicket[], inView: QueueTicket[], now: Date)
   };
 }
 
-/** "↑ 29% on last month", "↓ 12% on last month", "Same as last month", "" when last month had none. */
-export function changeText(now: number, before: number): string {
-  if (before === 0) return now === 0 ? 'Same as last month' : '';
+/** "↑ 29% on last month", "↓ 12% on last month", "Same as last month"; "" when there is nothing to compare with. */
+export function changeText(now: number, before: number | undefined, prevLabel = 'last month'): string {
+  if (before === undefined) return '';
+  const same = `Same as ${prevLabel}`;
+  if (before === 0) return now === 0 ? same : '';
   const pct = Math.round(((now - before) / before) * 100);
-  if (pct === 0) return 'Same as last month';
-  return `${pct > 0 ? '↑' : '↓'} ${Math.abs(pct)}% on last month`;
+  if (pct === 0) return same;
+  return `${pct > 0 ? '↑' : '↓'} ${Math.abs(pct)}% on ${prevLabel}`;
 }
 
 // ---------------------------------------------------------------- people
@@ -482,22 +569,20 @@ export interface Story {
   text: string;
 }
 
-const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-
 export function days1(n: number): string {
   if (n < 1) return `${Math.max(1, Math.round(n * 24))} hours`;
   const r = Math.round(n * 10) / 10;
   return `${r} ${r === 1 ? 'day' : 'days'}`;
 }
 
-export function stories(h: Headline, heat: Heat, now: Date): Story[] {
+export function stories(h: Headline, heat: Heat, period: Period): Story[] {
   const out: Story[] = [];
-  const diff = h.raisedThisMonth - h.closedThisMonth;
+  const diff = h.raised - h.closed;
   out.push({
     badge: diff > 0 ? `+${diff}` : diff < 0 ? `−${-diff}` : '=',
-    kicker: `${MONTH_NAMES[now.getMonth()]} so far`,
+    kicker: period.kicker,
     text:
-      `${h.raisedThisMonth} ${h.raisedThisMonth === 1 ? 'ticket' : 'tickets'} in, ${h.closedThisMonth} closed. ` +
+      `${h.raised} ${h.raised === 1 ? 'ticket' : 'tickets'} in, ${h.closed} closed. ` +
       (diff > 0 ? `The pile grew by ${diff}.` : diff < 0 ? `The pile shrank by ${-diff}.` : 'The pile held steady.')
   });
   if (heat.busiest) {

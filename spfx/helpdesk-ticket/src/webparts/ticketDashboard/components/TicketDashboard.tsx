@@ -32,6 +32,8 @@ import {
   headline,
   holders,
   leaderboard,
+  Period,
+  periodOf,
   speeds,
   stories,
   trend
@@ -151,6 +153,7 @@ function DashboardScreen(props: DashboardScreenProps): React.ReactElement {
   const scope = applyFilter(all, { ...filter, date: { preset: 'all' } }, now);
   const inView = applyFilter(all, filter, now);
   const range: Range = rangeOf(filter.date, now);
+  const period = periodOf(filter.date, now);
 
   const assigneeText = assigneeSummary(filter.assignees, me, nameOf);
   const dateText = describeRange(filter.date, now);
@@ -232,7 +235,7 @@ function DashboardScreen(props: DashboardScreenProps): React.ReactElement {
             {rows !== undefined && resultText}
           </p>
           <p className={styles.hint}>Every chart and figure below follows these filters, and so does Export.</p>
-          <p className={styles.hint}>Open now, this month and who holds what always show the present.</p>
+          <p className={styles.hint}>Who holds what and the month&apos;s leaderboard always show the present.</p>
         </div>
       </section>
 
@@ -268,7 +271,7 @@ function DashboardScreen(props: DashboardScreenProps): React.ReactElement {
         )}
 
         {rows !== undefined && rows.length > 0 && (
-          <DashboardBody api={api} scope={scope} inView={inView} range={range} now={now} />
+          <DashboardBody api={api} scope={scope} inView={inView} range={range} period={period} now={now} />
         )}
       </section>
 
@@ -286,6 +289,8 @@ interface DashboardBodyProps {
   /** Tickets the whole filter picks, dates included. */
   inView: QueueTicket[];
   range: Range;
+  /** What the headline cards count: the chosen dates, or this month for "Any time". */
+  period: Period;
   now: Date;
 }
 
@@ -298,11 +303,11 @@ const AlertIcon = (): React.ReactElement => (
 );
 
 function DashboardBody(props: DashboardBodyProps): React.ReactElement {
-  const { api, scope, inView, range, now } = props;
+  const { api, scope, inView, range, period, now } = props;
   const empty = inView.length === 0;
 
   const t = trend(scope, range, now);
-  const h = headline(scope, inView, now);
+  const h = headline(scope, inView, period, now);
   const heat = arrivals(inView);
   const team = holders(scope);
   const board = leaderboard(scope, now);
@@ -311,7 +316,7 @@ function DashboardBody(props: DashboardBodyProps): React.ReactElement {
   const sp = speeds(inView);
   const ag = ages(scope, now);
   const gp = gaps(inView);
-  const story = stories(h, heat, now);
+  const story = stories(h, heat, period);
   const monthName = MONTH_NAMES[now.getMonth()];
 
   const trendTitle =
@@ -334,15 +339,15 @@ function DashboardBody(props: DashboardBodyProps): React.ReactElement {
       noteColour: h.unassignedOpen > 0 ? PALETTE.critical : '#107c10'
     },
     {
-      label: 'Raised this month',
-      value: String(h.raisedThisMonth),
-      note: changeText(h.raisedThisMonth, h.raisedLastMonth)
+      label: `Raised ${period.label}`,
+      value: String(h.raised),
+      note: changeText(h.raised, h.raisedBefore, period.prevLabel)
     },
     {
-      label: 'Closed this month',
-      value: String(h.closedThisMonth),
-      note: changeText(h.closedThisMonth, h.closedLastMonth),
-      noteColour: h.closedThisMonth >= h.raisedThisMonth ? '#107c10' : undefined
+      label: `Closed ${period.label}`,
+      value: String(h.closed),
+      note: changeText(h.closed, h.closedBefore, period.prevLabel),
+      noteColour: h.closed >= h.raised ? '#107c10' : undefined
     },
     {
       label: 'Median time to close',

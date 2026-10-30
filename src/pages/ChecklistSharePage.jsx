@@ -20,6 +20,7 @@ import {
   createLink, draftLink, linkUrl, getLink, changeWaitingLink,
 } from '../features/forms/sharepoint/checklistLinks';
 import { linkState } from '../features/forms/links/linkRules';
+import { switchFormMode, modesForLink } from '../features/forms/links/linkChanges';
 
 const SHAREPOINT_SITE_URL =
   import.meta.env.VITE_SHAREPOINT_SITE_URL || 'https://pmwgroupcom.sharepoint.com/sites/IThelpdesk';
@@ -121,6 +122,8 @@ export default function ChecklistSharePage() {
   const [failure, setFailure] = useState('');
   const [created, setCreated] = useState(null);
   const [qr, setQr] = useState('');
+  // Item lines a switch to IN or OUT moved into Other remarks, to say so.
+  const [moved, setMoved] = useState([]);
 
   useEffect(() => {
     document.title = changingId ? 'PMW IT — Change a checklist link' : 'PMW IT — Share a checklist';
@@ -163,6 +166,14 @@ export default function ChecklistSharePage() {
   const update = (field) => (value) => setValues((current) => (field === 'entity'
     ? withEntity(current, value, options)
     : { ...current, [field]: value }));
+  // A waiting link picked as the wrong type: same link, its details carried over.
+  const changeType = (mode) => {
+    if (!mode || mode === values.formMode) return;
+    const next = switchFormMode(values, editable, mode);
+    setValues(next.values);
+    setEditable(next.editable);
+    setMoved(next.moved.length ? next.moved : []);
+  };
   const toggle = (field) => setEditable((current) => (current.includes(field)
     ? current.filter((entry) => entry !== field)
     : [...current, field]));
@@ -210,6 +221,7 @@ export default function ChecklistSharePage() {
         id: existing.id,
         values,
         editable,
+        formMode: values.formMode,
       });
       setCreated({ ...link, changed: true });
     } catch (thrown) {
@@ -284,22 +296,37 @@ export default function ChecklistSharePage() {
     <AppShell
       title={existing ? 'Change a checklist link' : 'Share a checklist'}
       subtitle={existing
-        ? 'Not signed yet. Change what it pre-fills and what the employee may edit — the link and QR stay the same'
+        ? 'Not signed yet. Change its type, what it pre-fills and what the employee may edit — the link and QR stay the same'
         : 'Fill in what you know, then copy a link for the employee to complete and sign'}
       actions={listButton}
     >
       {failure && <ErrorBanner message={failure} onRetry={existing ? saveChanges : (values.formMode ? create : undefined)} />}
 
       <Card className="ff-panel">
-        <Field label="Form Type" required help={existing ? 'Fixed once the link is made. For another type, share a new link.' : 'The employee cannot change this.'}>
+        <Field
+          label="Form Type"
+          required
+          help={existing
+            ? (existing.handovers?.kind
+              ? 'Made at the till, so only the types that match what the till recorded are offered. The link and QR stay the same.'
+              : 'Picked the wrong one? Switch it here. The link and QR stay the same.')
+            : 'The employee cannot change this.'}
+        >
           <RadioCards
             name="formMode"
             value={values.formMode}
-            onChange={existing ? () => {} : update('formMode')}
-            options={existing ? FORM_MODES.filter((mode) => mode.value === existing.formMode) : FORM_MODES}
+            onChange={existing ? changeType : update('formMode')}
+            options={existing ? FORM_MODES.filter((mode) => modesForLink(existing).includes(mode.value)) : FORM_MODES}
             icons={MODE_ICONS}
           />
         </Field>
+
+        {existing && values.formMode !== existing.formMode && (
+          <p className="ff-help cl-switch" role="status">
+            Saving changes this link from {modeLabel(existing.formMode)} to {modeLabel(values.formMode)}.
+            {moved.length > 0 && ` ${moved.join(', ')} ${moved.length === 1 ? 'has' : 'have'} no box on this form, so ${moved.length === 1 ? 'it is' : 'they are'} kept in Other remarks.`}
+          </p>
+        )}
 
         {values.formMode && (
           <>

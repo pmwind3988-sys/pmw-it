@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { IN, INDIVIDUAL } from '../checklistForm.js';
+import { IN, OUT, INDIVIDUAL } from '../checklistForm.js';
 import { LINK_STATUS, fromLinkItem, toLinkItem } from './linkSchema.js';
 import {
   linkActions, planEdit, reopenFields, expiryFields, editNote, isReopened, endOfDay, dayOf, planPresetChange,
+  switchFormMode, modesForLink,
 } from './linkChanges.js';
 
 const NOW = Date.parse('2026-10-05T04:00:00Z');
@@ -181,6 +182,50 @@ describe('the new link columns', () => {
     expect(back.editedBy).toBe('IT Desk');
     expect(back.editedOn).toBe('2026-10-05T04:00:00Z');
     expect(back.originalSubmitted).toEqual(signedValues);
+  });
+});
+
+describe('switching the form type of a waiting link', () => {
+  it('turns a request into IN, ticking what IN has a box for and keeping the rest in remarks', () => {
+    const { values, editable, moved } = switchFormMode({
+      formMode: INDIVIDUAL,
+      employeeName: 'Amir',
+      items: [{ item: 'Laptop', quantity: 1 }, { item: 'HDMI Cable', quantity: 2 }, { item: '', quantity: 1 }],
+      otherRemarks: 'Desk 4',
+    }, ['items', 'employeeName'], IN);
+    expect(values.formMode).toBe(IN);
+    expect(values.employeeName).toBe('Amir');
+    expect(values.checkedItems).toEqual(['Laptop']);
+    expect(values.otherRemarks).toBe('Desk 4\nHDMI Cable x2');
+    expect(moved).toEqual(['HDMI Cable x2']);
+    expect(editable).toEqual(['checkedItems', 'employeeName']);
+  });
+
+  it('turns IN into a request, one of each ticked item', () => {
+    const { values, editable } = switchFormMode({ formMode: IN, checkedItems: ['Laptop', 'Mouse'], items: [] }, ['checkedItems'], INDIVIDUAL);
+    expect(values.items).toEqual([{ item: 'Laptop', quantity: 1 }, { item: 'Mouse', quantity: 1 }]);
+    expect(values.checkedItems).toEqual([]);
+    expect(editable).toEqual(['items']);
+  });
+
+  it('leaves the items alone between IN and OUT', () => {
+    const { values, moved } = switchFormMode({ formMode: IN, checkedItems: ['Laptop'] }, [], OUT);
+    expect(values.checkedItems).toEqual(['Laptop']);
+    expect(moved).toEqual([]);
+  });
+
+  it('writes the new type onto the link, and refuses one a till link cannot take', () => {
+    const { fields, formMode } = planPresetChange(link({ formMode: INDIVIDUAL }), {
+      values: { checkedItems: ['Laptop'] }, editable: ['checkedItems'], formMode: IN,
+    }, NOW);
+    expect(formMode).toBe(IN);
+    expect(fields.FormMode).toBe(IN);
+    expect(JSON.parse(fields.Editable)).toEqual(['checkedItems']);
+
+    const handout = link({ handovers: { kind: 'handout', ids: [1] } });
+    expect(modesForLink(handout)).toEqual([IN, INDIVIDUAL]);
+    expect(modesForLink(link({ handovers: { kind: 'return', ids: [1] } }))).toEqual([OUT]);
+    expect(() => planPresetChange(handout, { values: {}, formMode: OUT }, NOW)).toThrow(/cannot become OUT/);
   });
 });
 

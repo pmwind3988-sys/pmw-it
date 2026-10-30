@@ -170,13 +170,15 @@ export function setLinkExpiry({ siteUrl, token, id, expiresAt }) {
  * is refused rather than overwritten.
  */
 export async function changeWaitingLink({
-  siteUrl, token, id, values, editable,
+  siteUrl, token, id, values, editable, formMode,
 }) {
   const link = await getLink({ siteUrl, token, id });
   if (!link) throw new Error('That link is no longer on the list');
-  const plan = planPresetChange(link, { values, editable });
+  const plan = planPresetChange(link, { values, editable, formMode });
   await updateLinkRow({ siteUrl, token, id, fields: plan.fields, what: 'save the changes to the link' });
-  return { ...link, preset: plan.preset, editable: JSON.parse(plan.fields.Editable) };
+  return {
+    ...link, formMode: plan.formMode, preset: plan.preset, editable: JSON.parse(plan.fields.Editable),
+  };
 }
 
 /** Back to waiting. A signed record and its signature stay until signed again. */

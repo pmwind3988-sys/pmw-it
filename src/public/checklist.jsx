@@ -14,11 +14,11 @@ import '../styles/public.css';
  * no portal page, so nothing on it leads anywhere else; every other address
  * still goes through the portal's sign-in.
  *
- * No theme toggle either — it follows the device, which is what somebody
- * opening a link on their phone expects.
+ * No theme toggle either, and always light, whatever the device is set to:
+ * it is a form somebody signs and prints, and it should look like the paper
+ * one on every phone.
  */
-const dark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
-document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+document.documentElement.setAttribute('data-theme', 'light');
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

@@ -128,7 +128,7 @@ pmw-it/
 | The shared-link list's columns | `src/features/forms/links/linkSchema.js` |
 | Creating / listing / cancelling links (portal side) | `src/features/forms/sharepoint/checklistLinks.js` |
 | Opening and submitting a link (server side) | `server/checklistLinkApi.js`, `server/graph.js`, `api/c/[code].js` |
-| The public page | `checklist.html`, `src/public/`, `src/styles/public.css` |
+| The public page (always light, whatever the device's theme) | `checklist.html`, `src/public/`, `src/styles/public.css` |
 | The checklist form body, shared by all three pages | `src/components/checklist/` |
 | What IT may do to a link, and what an edit / reopen writes | `src/features/forms/links/linkChanges.js` |
 | Entity / Department choices, live or carried by a link | `src/features/forms/formOptions.js`, `src/hooks/useOrgDirectory.js` |
@@ -879,7 +879,10 @@ change writes; `checklistLinks.js` carries it out as the signed-in user.
 - *Edit form* (waiting links only; beside Open, not in More) opens the share page at
   `?link=<id>` with the link's pre-filled values and "Employee can edit"
   switches, and saves them back onto the SAME link -- code, QR and dropdown
-  choices unchanged, form type fixed (`planPresetChange`,
+  choices unchanged. The form type CAN be switched there (`switchFormMode`
+  carries ticks to request lines and back, an item IN/OUT has no box for goes
+  to Other remarks; `modesForLink` keeps a till hand-out to IN/request and a
+  take-back to OUT), and the server reads the type off the link (`planPresetChange`,
   `changeWaitingLink`, which re-reads the link and refuses one signed,
   cancelled, expired or mid-signing since the page loaded).
 - *Expire now* is a new end date of now, so a link expired by mistake is one

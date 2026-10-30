@@ -633,6 +633,13 @@
 
 /* Builder: the hint above the fields, and the "link ready" card. */
 .cl-hint { margin: 18px 0 14px; }
+.cl-switch {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--it-brand-wash);
+  color: var(--it-ink);
+}
 
 .cl-ready { display: grid; gap: 18px; }
 .cl-ready-head { display: flex; gap: 12px; align-items: flex-start; color: var(--it-brand, var(--text-primary)); }

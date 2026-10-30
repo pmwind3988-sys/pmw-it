@@ -1,6 +1,8 @@
 import { LINK_STATUS } from './linkSchema.js';
 import { linkState, cleanPreset, editableFields, isBlankValue } from './linkRules.js';
-import { fieldsFor } from '../checklistForm.js';
+import {
+  fieldsFor, FORM_MODES, IN, OUT, INDIVIDUAL, CHECKLIST_ITEMS, isRequest, modeLabel,
+} from '../checklistForm.js';
 import { validateChecklist } from '../validate.js';
 import { toChecklistItem } from '../toChecklistItem.js';
 import { formatMYT } from '../../../utils/malaysiaTime.js';
@@ -125,23 +127,79 @@ export function planEdit(link, values, { by, at = Date.now() }) {
 }
 
 /**
+ * The form types a waiting link may be switched to. A link made at the till
+ * is tied to what the till did: a hand-out can be IN or a request, never OUT,
+ * and a take-back is only ever OUT -- its signature lands on the RETURN.
+ */
+export function modesForLink(link) {
+  const kind = link?.handovers?.kind;
+  if (kind === 'return') return [OUT];
+  if (kind) return [IN, INDIVIDUAL];
+  return FORM_MODES.map((mode) => mode.value);
+}
+
+const itemLine = (row) => `${row.item}${Number(row.quantity) > 1 ? ` x${row.quantity}` : ''}`;
+
+/**
+ * The pre-filled values carried from one form type to another. Everything
+ * but the items is shared. IN and OUT tick a list where a request names items
+ * and quantities, so ticks become one of each, and a requested item the
+ * checklist has no box for (a desktop, a cable) is kept as a line in Other
+ * remarks rather than dropped. "Employee can edit" on the items follows them.
+ */
+export function switchFormMode(values, editable, toMode) {
+  const fromRequest = isRequest(values.formMode);
+  const toRequest = isRequest(toMode);
+  const next = { ...values, formMode: toMode };
+  let open = [...editable];
+  const moved = [];
+
+  if (!fromRequest && toRequest) {
+    const ticked = values.checkedItems ?? [];
+    next.items = ticked.length ? ticked.map((item) => ({ item, quantity: 1 })) : values.items;
+    next.checkedItems = [];
+    open = open.map((field) => (field === 'checkedItems' ? 'items' : field));
+  } else if (fromRequest && !toRequest) {
+    const rows = (values.items ?? []).filter((row) => String(row?.item ?? '').trim());
+    next.checkedItems = [...new Set(rows.map((row) => row.item).filter((item) => CHECKLIST_ITEMS.includes(item)))];
+    const homeless = rows.filter((row) => !CHECKLIST_ITEMS.includes(row.item)).map(itemLine);
+    if (homeless.length) {
+      next.otherRemarks = [values.otherRemarks, ...homeless].filter((line) => String(line ?? '').trim()).join('\n');
+      moved.push(...homeless);
+    }
+    next.items = [];
+    open = open.map((field) => (field === 'items' ? 'checkedItems' : field));
+  }
+
+  return { values: next, editable: [...new Set(open)], moved };
+}
+
+/**
  * IT changing what a link pre-fills, and what the employee may change, before
  * anybody has signed it. Same link, same code, same QR: nothing to resend.
- * The form type stays: it decides which checklist the link makes.
+ * The form type may change too (`formMode`), within `modesForLink`: the
+ * server reads the type off the link when it is opened and signed, so a link
+ * switched before signing makes the right checklist.
  *
  * Only while it WAITS. Mid-signing, the employee's submission would land on a
  * link that no longer says what they saw; once signed, it is "Edit" instead,
  * which leaves a note on the record.
  */
-export function planPresetChange(link, { values, editable = [] }, now = Date.now()) {
+export function planPresetChange(link, { values, editable = [], formMode }, now = Date.now()) {
   if (linkState(link, now) !== 'open') {
     throw new Error('Only a link still waiting to be signed can be changed — reload to see it as it is now');
   }
+  const mode = formMode || link.formMode;
+  if (mode !== link.formMode && !modesForLink(link).includes(mode)) {
+    throw new Error(`This link cannot become ${modeLabel(mode)}: it was made at the till for a ${link.handovers?.kind === 'return' ? 'take-back' : 'hand-out'}`);
+  }
   const preset = cleanPreset(values, link.options ?? null);
-  const shown = new Set(fieldsFor(link.formMode));
+  const shown = new Set(fieldsFor(mode));
   return {
     preset,
+    formMode: mode,
     fields: {
+      ...(mode !== link.formMode ? { FormMode: mode } : {}),
       EmployeeName: String(preset.employeeName ?? '').trim(),
       Preset: JSON.stringify(preset),
       // A blank field is the employee's anyway; listing it would say nothing.

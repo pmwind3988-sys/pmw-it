@@ -382,6 +382,11 @@ describe('planRename', () => {
       fieldName: 'computerName', oldValue: 'PC1', newValue: 'PMW-LT-042', changeType: 'Updated',
     });
     expect(plan.manualFields).toEqual(['owner', 'computerName']);
+    expect(plan.previousNames).toEqual(['PC1']);
+  });
+
+  it('adds the outgoing name to the names it had before', () => {
+    expect(planRename(row({ previousNames: ['OLD-1'] }), 'PC9').previousNames).toEqual(['OLD-1', 'PC1']);
   });
 
   it('refuses a blank name and the name it already has', () => {
@@ -414,7 +419,7 @@ describe('renameDevice', () => {
     expect(result).toEqual({ name: 'PC9', logFailed: false });
     const [merge, log] = writes(sp.calls);
     expect(merge.url).toContain('items(7)');
-    expect(merge.body).toEqual({ Title: 'PC9', ManualFields: 'computerName' });
+    expect(merge.body).toEqual({ Title: 'PC9', ManualFields: 'computerName', PreviousNames: 'PC1' });
     expect(log.body).toMatchObject({
       Title: 'PC1', DeviceId: 7, FieldName: 'computerName', OldValue: 'PC1', NewValue: 'PC9',
       ChangedBy: 'me@pmw-group.com',

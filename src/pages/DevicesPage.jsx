@@ -24,7 +24,10 @@ import { useDeviceAdmin } from '../features/devices/useDeviceAdmin';
 import { labelOf, IN_FLEET } from '../features/devices/deviceFilters';
 import { todoItems } from '../features/devices/stats/todoItems';
 import { syncDevices } from '../features/devices/sharepoint/syncDevices';
-import { updateDevice, deleteDevice, deleteDevices } from '../features/devices/sharepoint/updateDevice';
+import {
+  updateDevice, deleteDevice, deleteDevices, renameDevice,
+} from '../features/devices/sharepoint/updateDevice';
+import RenameDialog from '../features/devices/ui/RenameDialog';
 import { provisionLists } from '../features/devices/sharepoint/provisionLists';
 import { matchIncoming, noticeFor } from '../features/devices/lifecycle/matchIncoming';
 import { replacementsFor, unanswered } from '../features/devices/lifecycle/replacements';
@@ -71,6 +74,10 @@ export default function DevicesPage() {
   const isAdmin = useDeviceAdmin();
 
   const view = params.get('view') ?? 'register';
+  // The machine whose Rename dialog is open from the List (admin only).
+  const [renameFor, setRenameFor] = useState(null);
+  const [renaming, setRenaming] = useState(false);
+  const [renameError, setRenameError] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
   const menuButtonRef = useRef(null);
@@ -421,6 +428,37 @@ export default function DevicesPage() {
       }
     });
 
+  const openRename = (device) => {
+    setRenameError('');
+    setRenameFor(device);
+  };
+
+  /**
+   * The machine page's Rename, from the List. The dialog stays open on a
+   * refusal so the reason shows beside the name that was typed. The old name
+   * goes to the machine's Previous names and to its History.
+   */
+  const handleRename = async (name) => {
+    setRenaming(true);
+    setRenameError('');
+    try {
+      const tokenRes = await getToken();
+      const { logFailed } = await renameDevice({
+        siteUrl: SHAREPOINT_SITE_URL, token: tokenRes.accessToken, existing: renameFor, newName: name,
+        devices: saved, changedBy: tokenRes.account?.username ?? '',
+      });
+      setRenameFor(null);
+      setRowError(logFailed
+        ? `Renamed to ${name}, but the History line could not be written. The old name is still under Previous names.`
+        : '');
+      reload();
+    } catch (failure) {
+      setRenameError(failure.message);
+    } finally {
+      setRenaming(false);
+    }
+  };
+
   const rejectedList = rejected.length > 0 && (
     <ul className="dz-rejected">
       {rejected.map((item) => (
@@ -573,9 +611,14 @@ export default function DevicesPage() {
               onSave={handleRowSave}
               onDelete={isAdmin ? handleRowDelete : undefined}
               onDeleteMany={isAdmin ? handleRowDeleteMany : undefined}
+              onRename={isAdmin ? openRename : undefined}
               busy={rowBusy}
               locationOptions={locationOptions}
             />
+            {renameFor && (
+              <RenameDialog device={renameFor} devices={saved} busy={renaming} error={renameError}
+                onSave={handleRename} onClose={() => setRenameFor(null)} />
+            )}
           </>
         )}
 

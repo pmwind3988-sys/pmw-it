@@ -14,6 +14,11 @@ describe('findMachines', () => {
     expect(findMachines(fleet, ' a ')).toEqual([]);
   });
 
+  it('finds a machine by a name it had before a rename', () => {
+    const renamed = [...fleet, { id: 5, computerName: 'PMW-LT-042', previousNames: ['AMIR-HP'] }];
+    expect(findMachines(renamed, 'amir-hp').map((d) => d.id)).toEqual([5]);
+  });
+
   it('puts an exact name or serial match first', () => {
     expect(findMachines(fleet, 'lab-pc')[0].id).toBe(3);
     expect(findMachines(fleet, 'sn123')[0].id).toBe(1);

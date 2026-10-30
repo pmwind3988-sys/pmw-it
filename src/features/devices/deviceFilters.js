@@ -74,7 +74,7 @@ const MATCHERS = {
   scan: (device, value) => scanKindOf(device.scanVersion) === value,
   q: (device, value) => {
     const needle = value.toLowerCase();
-    return `${device.computerName ?? ''} ${device.owner ?? ''} ${device.serialNumber ?? ''} ${device.anydeskId ?? ''}`
+    return `${device.computerName ?? ''} ${(device.previousNames ?? []).join(' ')} ${device.owner ?? ''} ${device.serialNumber ?? ''} ${device.anydeskId ?? ''}`
       .toLowerCase().includes(needle);
   },
 };

@@ -121,7 +121,7 @@ function download(name, text) {
 const GRADE_CLASS = (grade) => `pc-chip g-${GRADE_SLUG[grade] ?? 'unknown'}`;
 
 export default function DeviceTable({
-  devices, filters, onFilterChange, onSave, onDelete, onDeleteMany, busy,
+  devices, filters, onFilterChange, onSave, onDelete, onDeleteMany, onRename, busy,
   locationOptions = NO_LOCATIONS,
 }) {
   // Removing is admin-only: without the handlers there are no ticks, no
@@ -564,6 +564,11 @@ export default function DeviceTable({
                           ) : (
                             <span className="dt-link">{name}</span>
                           )}
+                          {device.previousNames?.length > 0 && (
+                            <span className="dt-was" title={`Previous names: ${device.previousNames.join(', ')}`}>
+                              was {device.previousNames.at(-1)}
+                            </span>
+                          )}
 
                           <div className="dt-rowmenu">
                             <button
@@ -599,6 +604,17 @@ export default function DeviceTable({
                                   <Pencil size={14} />
                                   Edit details
                                 </button>
+                                {/* Admin only, like Remove; a row with no id cannot be written to. */}
+                                {onRename && device.id != null && (
+                                  <button
+                                    type="button"
+                                    role="menuitem"
+                                    className="dt-menu-item"
+                                    onClick={() => { setMenuFor(null); onRename(device); }}
+                                  >
+                                    Rename…
+                                  </button>
+                                )}
                                 {canRemove && (
                                   <button
                                     type="button"

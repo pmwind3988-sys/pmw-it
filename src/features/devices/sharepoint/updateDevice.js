@@ -6,6 +6,7 @@ import { runPool, withRetry } from '../../sharepoint/writePool.js';
 import { formatMYT } from '../../../utils/malaysiaTime.js';
 import { cleanLocation } from '../map/locations.js';
 import { provisionDeviceColumns } from './provisionLists.js';
+import { withPreviousName } from '../previousNames.js';
 
 /**
  * The only fields the register lets somebody retype. They are exactly the ones
@@ -147,7 +148,8 @@ const nameKey = (name) => asText(name).trim().toLowerCase();
  * manual list so the next scan report, which may still carry the old Windows
  * name, does not put it back. A name another row already uses is refused --
  * imports without a serial match on the name, and two rows answering to it
- * would let a report land on the wrong machine.
+ * would let a report land on the wrong machine. The old name is also kept on
+ * the row itself, in `previousNames`, so the List and search can show it.
  */
 export function planRename(existing, newName, devices = []) {
   const before = asText(existing.computerName).trim();
@@ -165,6 +167,7 @@ export function planRename(existing, newName, devices = []) {
     name: after,
     change: { fieldName: 'computerName', oldValue: before, newValue: after, changeType: 'Updated' },
     manualFields: [...manual],
+    previousNames: withPreviousName(existing.previousNames, before, after),
   };
 }
 
@@ -177,16 +180,33 @@ export async function renameDevice({
   const plan = planRename(existing, newName, devices);
   if (plan.error) throw new Error(plan.error);
 
-  const digest = await getFormDigest(siteUrl, token);
-  const response = await withRetry(() =>
+  let digest = await getFormDigest(siteUrl, token);
+  const merge = () => withRetry(() =>
     spFetch(siteUrl, `${listPath(DEVICE_LIST_NAME)}/items(${existing.id})`, {
       token,
       digest,
       method: 'POST',
       accept: ITEM_ACCEPT,
-      body: { Title: plan.name, ManualFields: plan.manualFields.join('\n') },
+      body: {
+        Title: plan.name,
+        ManualFields: plan.manualFields.join('\n'),
+        PreviousNames: plan.previousNames.join('\n'),
+      },
       headers: { 'X-HTTP-Method': 'MERGE', 'IF-MATCH': '*' },
     }));
+
+  let response = await merge();
+
+  // A list made before PreviousNames existed refuses the write by naming the
+  // column; add the columns and try once more, as updateDevice does.
+  if (response.status === 400) {
+    const reason = await response.text();
+    if (!/does not exist on type/i.test(reason)) {
+      throw new Error(`Could not rename the machine (400): ${reason}`);
+    }
+    digest = await provisionDeviceColumns(siteUrl, token);
+    response = await merge();
+  }
 
   if (!response.ok) {
     throw new Error(`Could not rename the machine (${response.status}): ${await response.text()}`);

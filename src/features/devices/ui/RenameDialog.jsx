@@ -42,8 +42,8 @@ export default function RenameDialog({
           <Pencil size={16} /> Rename {device.computerName}
         </h2>
         <p className="ui-confirm-body">
-          The old name stays in this machine&apos;s History as “Renamed”. The next scan report
-          will not change it back.
+          The old name is kept under Previous names and in this machine&apos;s History as
+          “Renamed”, and still finds it in search. The next scan report will not change it back.
           {!device.serialNumber && ' This machine has no serial on record, so a report that still '
             + 'carries the old name will arrive as a new machine.'}
         </p>

@@ -16,6 +16,7 @@ import { currentStint } from '../lifecycle/stints.js';
 import { inFleet, IN_USE } from '../lifecycle/status.js';
 import { cleanLocation } from '../map/locations.js';
 import { scanRank } from '../derive/deriveScanInfo.js';
+import { withPreviousName } from '../previousNames.js';
 
 /**
  * A field somebody corrected by hand outranks what the scan file says about
@@ -130,6 +131,9 @@ export function planImport(incoming, existing, {
       serialNumber: device.serialNumber ?? row.serialNumber ?? null,
     };
     const resolved = applyManualOverrides(carryV2Fields(carried, row), row);
+    // A report never knows the names a machine had; the row does. A serial
+    // match under a new Windows name is a rename too, and keeps the old one.
+    resolved.previousNames = withPreviousName(row.previousNames, row.computerName, resolved.computerName);
     const wasActive = inFleet(row);
     // A report scanned before the machine went to the stash or the graveyard
     // describes it as it was; it updates the specs but does not bring it back.

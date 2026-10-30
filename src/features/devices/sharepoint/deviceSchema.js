@@ -140,6 +140,9 @@ export const DEVICE_COLUMNS = [
   bool('ScanComplete', 'Scan Complete'),
   note('Remarks', 'Remarks'),
   note('ManualFields', 'Manually Set Fields'),
+  // Names it answered to before a rename, oldest first. The change log holds
+  // the same as "Renamed" lines; this copy is what the List and search read.
+  note('PreviousNames', 'Previous Names'),
   note('ExtraFields', 'Extra Fields'),
   note('RawReport', 'Raw Report'),
 ];
@@ -262,7 +265,7 @@ export function toListItem(device) {
 
 const ARRAY_COLUMNS = new Set([
   'GpuList', 'RiskReasons', 'MicrosoftOffice', 'AdobeProducts', 'ManualFields',
-  'OfficeSignedIn',
+  'OfficeSignedIn', 'PreviousNames',
 ]);
 
 export function fromListItem(row) {

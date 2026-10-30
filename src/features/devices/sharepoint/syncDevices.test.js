@@ -176,6 +176,19 @@ describe('planImport — lifecycle', () => {
     expect(plan.updates[0]).toMatchObject({ id: 7 });
     expect(plan.updates[0].body.Title).toBe('PC9');
     expect(plan.changeRows).toContainEqual(expect.objectContaining({ fieldName: 'computerName', oldValue: 'PC1', newValue: 'PC9', deviceId: 7 }));
+    expect(plan.updates[0].body.PreviousNames).toBe('PC1');
+  });
+
+  it('keeps the names a machine had when a report rewrites its row', () => {
+    const plan = planImport([device({ installedRamGB: 16 })], [row({ previousNames: ['OLD-1'] })], { now: NOW });
+    expect(plan.updates[0].body.PreviousNames).toBe('OLD-1');
+  });
+
+  it('keeps a hand-given name and its old names against a report under the old name', () => {
+    const renamed = row({ computerName: 'PC9', manualFields: ['computerName'], previousNames: ['PC1'] });
+    const plan = planImport([scan({ computerName: 'PC1', installedRamGB: 16 })], [renamed], { now: NOW });
+    expect(plan.updates[0].body.Title).toBe('PC9');
+    expect(plan.updates[0].body.PreviousNames).toBe('PC1');
   });
 
   it('never clears a location or serial an older report does not carry', () => {

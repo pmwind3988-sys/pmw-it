@@ -180,7 +180,7 @@ pmw-it/
 | Device SharePoint schema | `src/features/devices/sharepoint/deviceSchema.js` |
 | Device SharePoint list views | `src/features/devices/sharepoint/deviceViews.js` |
 | Editing or removing one device row | `src/features/devices/sharepoint/updateDevice.js` |
-| Renaming a machine (admin; old name kept as a "Renamed" history line, new name held against imports) | `planRename` / `renameDevice` in `src/features/devices/sharepoint/updateDevice.js`, `ui/RenameDialog.jsx` |
+| Renaming a machine (admin, from its page or the List's row menu; old name kept as a "Renamed" history line AND in the row's `PreviousNames`, which search reads and imports carry; new name held against imports) | `planRename` / `renameDevice` in `src/features/devices/sharepoint/updateDevice.js`, `previousNames.js`, `ui/RenameDialog.jsx` |
 | Removing several device rows at once | `deleteDevices` in `src/features/devices/sharepoint/updateDevice.js` |
 | Who may remove a device (admin = IT helpdesk site owner, Full Control) | `src/features/devices/sharepoint/deviceAdmin.js`, `useDeviceAdmin.js` |
 | What the register has ticked | `src/features/devices/selection.js` |

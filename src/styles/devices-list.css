@@ -252,6 +252,17 @@
   white-space: nowrap;
 }
 
+/* "was AMIR-HP": the name before the last rename, kept short so the ⋯ stays in reach. */
+.dt-was {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+
 .dt-edit-actions {
   display: flex;
   flex-wrap: wrap;

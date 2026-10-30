@@ -41,6 +41,8 @@ function fieldsOf(device) {
   const hardware = hardwareIdsOf(device);
   const fields = [
     { tier: TIER.name, label: 'Computer name', value: device.computerName },
+    // Somebody holding a laptop with the old name on a sticker still finds it.
+    ...(device.previousNames ?? []).map((name) => ({ tier: TIER.name, label: 'Was named', value: name })),
     { tier: TIER.owner, label: 'Owner', value: device.owner },
     { tier: TIER.serial, label: 'Serial number', value: device.serialNumber },
     { tier: TIER.serial, label: 'Product number', value: device.productNumber },

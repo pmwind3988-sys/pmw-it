@@ -28,6 +28,7 @@ import {
   unitsOf, serialiseUnits, filledCount, parseUnits, PER_UNIT_ONLY,
 } from '../features/assets/units';
 import UnitPager from '../features/assets/ui/UnitPager';
+import SerialList from '../features/assets/ui/SerialList';
 import QuantityInput from '../features/assets/ui/QuantityInput';
 import ScanField from '../features/assets/ui/ScanField';
 import TextScanSheet from '../features/assets/ui/TextScanSheet';
@@ -136,6 +137,8 @@ export default function AssetDetailPage() {
   // Whether the save had to add a missing column to the SharePoint list first.
   // Worth saying once: it explains why that one save took a minute.
   const [repaired, setRepaired] = useState(false);
+  // Which item the pager shows, held here so the serial list can open one.
+  const [unitAt, setUnitAt] = useState(0);
 
   // Cleared when the row itself changes, so opening a second item does not
   // arrive carrying the first one's unsaved edits.
@@ -148,6 +151,7 @@ export default function AssetDetailPage() {
     setShownId(id);
     setEdits({});
     setSaved(false);
+    setUnitAt(0);
   }
 
   const valueOf = (key) => (key in edits ? edits[key] : (asset?.[key] ?? ''));
@@ -512,7 +516,10 @@ export default function AssetDetailPage() {
                   {filledCount(units)} of {units.length} recorded
                 </span>
               </h2>
+              <SerialList units={units} at={unitAt} onPick={setUnitAt} />
               <UnitPager
+                at={unitAt}
+                onAt={setUnitAt}
                 units={units}
                 onChange={(next) => setEdits((current) => ({ ...current, units: serialiseUnits(next) }))}
                 siteUrl={SHAREPOINT_SITE_URL}

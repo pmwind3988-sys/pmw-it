@@ -32,9 +32,13 @@ import PhotoInput from './PhotoInput';
  */
 
 export default function UnitPager({
-  units, onChange, siteUrl, rowPhoto, poPhoto,
+  units, onChange, siteUrl, rowPhoto, poPhoto, at: shownAt, onAt,
 }) {
-  const [at, setAt] = useState(0);
+  // Controlled when the page passes `at` (the serial list above opens an item
+  // here), its own otherwise.
+  const [ownAt, setOwnAt] = useState(0);
+  const at = shownAt ?? ownAt;
+  const setAt = onAt ?? setOwnAt;
   const [scanning, setScanning] = useState(false);
   // What the camera read but would not write over something already typed.
   // Offered rather than dropped: the code on the box is evidence, and the

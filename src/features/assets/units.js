@@ -215,6 +215,36 @@ export function filledCount(units) {
   return units.filter((unit) => !isBlankUnit(unit)).length;
 }
 
+/**
+ * The serials on a line, newest item first, for the list above the pager.
+ *
+ * "Newest" is the item number, not a date: units carry no timestamp, but every
+ * route that adds one (a re-scanned box, a serial run, a count) puts it at the
+ * NEXT position (`mergeUnits`, `appendUnit`), so a higher number is a later
+ * arrival. An item with only a sticker label is listed by its label; one with
+ * neither is counted in `missing`, not listed — a list of "no serial" rows says
+ * less than the number does.
+ */
+export function serialList(units) {
+  const entries = [];
+  let missing = 0;
+
+  for (const unit of units ?? []) {
+    const serial = String(unit.serialNumber ?? '').trim();
+    const label = String(unit.assetTag ?? '').trim();
+    if (!serial && !label) {
+      missing += 1;
+      continue;
+    }
+    entries.push({
+      index: unit.index, serial, label, status: unit.status ?? '', condition: unit.condition ?? '',
+    });
+  }
+
+  entries.sort((a, b) => b.index - a.index);
+  return { entries, missing };
+}
+
 export function setUnitField(units, index, field, value) {
   return units.map((unit) => (
     unit.index === index ? { ...unit, [field]: value } : unit

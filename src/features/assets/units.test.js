@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   parseUnits, unitsOf, setUnitField, serialiseUnits, diffUnits, filledCount, isBlankUnit,
   withUnitsSplitOut, mergeUnits, appendUnit, perItem, countPerItem, trimUnits, PER_UNIT_CODES,
+  serialList,
 } from './units.js';
 
 const bulk = (quantity, units) => ({ quantity, trackingMode: 'Bulk', units });
@@ -342,5 +343,28 @@ describe('a photograph of one item', () => {
     const before = serialiseUnits([{ index: 0, serialNumber: 'SN-A' }]);
     const after = serialiseUnits([{ index: 0, serialNumber: 'SN-A', photoUrl: '/p/a.jpg' }]);
     expect(diffUnits(before, after)).toEqual([]);
+  });
+});
+
+describe('serialList', () => {
+  it('lists the newest item first, by item number', () => {
+    const units = unitsOf(bulk(4, JSON.stringify([
+      { index: 0, serialNumber: 'SN-A' },
+      { index: 2, serialNumber: 'SN-C' },
+      { index: 1, serialNumber: 'SN-B' },
+    ])));
+    expect(serialList(units).entries.map((entry) => entry.serial)).toEqual(['SN-C', 'SN-B', 'SN-A']);
+  });
+
+  it('counts items with no serial and no label instead of listing them', () => {
+    const units = unitsOf(bulk(3, JSON.stringify([{ index: 1, serialNumber: 'SN-B' }])));
+    const { entries, missing } = serialList(units);
+    expect(entries).toHaveLength(1);
+    expect(missing).toBe(2);
+  });
+
+  it('lists an item known only by its sticker label', () => {
+    const units = unitsOf(bulk(1, JSON.stringify([{ index: 0, assetTag: 'PMW-0042' }])));
+    expect(serialList(units).entries[0]).toMatchObject({ serial: '', label: 'PMW-0042' });
   });
 });

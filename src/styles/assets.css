@@ -2135,3 +2135,37 @@
 @media (prefers-reduced-motion: reduce) {
   .cat-logo svg * { animation: none !important; }
 }
+
+/* -- every serial on a bulk line, newest item first -- */
+.as-serials { display: grid; gap: 8px; margin-bottom: 14px; }
+.as-serials-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 10px; }
+.as-serials-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 280px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.as-serials-list li + li { border-top: 1px solid var(--border); }
+.as-serials-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.as-serials-row:hover { background: var(--bg); }
+.as-serials-row:focus-visible { outline: 2px solid var(--it-brand); outline-offset: -2px; }
+.as-serials-row.is-at { background: var(--bg); box-shadow: inset 3px 0 0 var(--it-brand); }
+.as-serials-no { color: var(--text-secondary); font-variant-numeric: tabular-nums; min-width: 3ch; }
+.as-serials-code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; overflow-wrap: anywhere; }
+.as-serials-meta { color: var(--text-secondary); font-size: 0.85em; text-align: right; }

@@ -180,6 +180,38 @@ describe('updateAsset', () => {
     expect(result.changes).toEqual([]);
     expect(rowWrites(sp.calls)).toHaveLength(1);
   });
+
+  /**
+   * Remarks, the specification, the MAC and the arrival date are editable but
+   * not in the change log. Deciding "anything to save?" from the log alone
+   * said "Changes saved", wrote nothing, and the old remark came back.
+   */
+  it.each([
+    ['remarks', 'Charger is with IT'],
+    ['specSummary', '16 GB, 512 GB SSD'],
+    ['macAddress', 'AA:BB:CC:DD:EE:FF'],
+  ])('writes the row when only %s changed', async (field, value) => {
+    const sp = fakeSharePoint();
+    vi.stubGlobal('fetch', sp.fetch);
+
+    const result = await updateAsset({
+      siteUrl: SITE, token: 't', existing: bulkRow({ trackingMode: 'Tracked', quantity: 1 }), edits: { [field]: value },
+    });
+
+    expect(result.record[field]).toBe(value);
+    expect(rowWrites(sp.calls)).toHaveLength(1);
+  });
+
+  it('writes nothing when nothing changed', async () => {
+    const sp = fakeSharePoint();
+    vi.stubGlobal('fetch', sp.fetch);
+    const existing = bulkRow({ remarks: 'Same as before' });
+
+    const result = await updateAsset({ siteUrl: SITE, token: 't', existing, edits: { remarks: 'Same as before' } });
+
+    expect(result.changes).toEqual([]);
+    expect(rowWrites(sp.calls)).toHaveLength(0);
+  });
 });
 
 describe('planEdit', () => {

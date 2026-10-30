@@ -199,12 +199,13 @@ export async function updateAsset({ siteUrl, token, existing, edits, changedBy }
   if (!existing?.id) throw new Error('That row has no id, so it cannot be updated');
 
   const { changes, record } = planEdit(existing, edits);
-  // The unit records are compared separately from the change log, because a
-  // photograph taken of item 3 changes the row and produces no log line — the
-  // log deliberately ignores photos, and without this the save would decide
-  // nothing had happened and quietly drop the picture.
-  const unitsMoved = String(record.units ?? '') !== String(existing.units ?? '');
-  if (!changes.length && !unitsMoved) return { changes: [] };
+  // Whether to write is decided from the ROW, not from the change log. The log
+  // leaves out remarks, the specification, the MAC, the arrival date and a
+  // photograph taken of item 3, so deciding from it said "saved", wrote
+  // nothing, and the old remark came back on the next read.
+  const rowMoved = [...EDITABLE_FIELDS, ...COMBINE_FIELDS]
+    .some((field) => asText(record[field]) !== asText(existing[field]));
+  if (!changes.length && !rowMoved) return { changes: [] };
 
   const digest = await getFormDigest(siteUrl, token);
 

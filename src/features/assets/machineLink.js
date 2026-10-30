@@ -15,9 +15,10 @@ import { ACTIONS } from '../devices/lifecycle/planLifecycle.js';
  * Same machine means, in order:
  *  1. the same serial (a Dell service tag is both the box's barcode and the
  *     BIOS serial the scan reads) -- any category;
- *  2. the row's label is the machine's computer name, now or before a rename
- *     (IT labels a laptop PMWL010 and names it PMWL010) -- computers only, so
- *     a monitor labelled like a PC is never taken for one.
+ *  2. one code in the row's label is the machine's computer name, now or
+ *     before a rename (IT labels a laptop PMWL010 and names it PMWL010; the
+ *     label often carries a second code beside it, "PMWL010 LTP-060526-3-SR-4")
+ *     -- computers only, so a monitor labelled like a PC is never taken for one.
  * A serial or a name that points at more than one machine links nothing:
  * guessing which of two would move the wrong one.
  */
@@ -44,9 +45,10 @@ export function machineFor(asset, devices = []) {
       return device ? { device, by: 'serial' } : null;
     }
   }
-  const label = nameKey(asset.assetTag);
-  if (!label || !COMPUTERS.has(asset.category)) return null;
-  const device = only(devices.filter((entry) => entry?.id != null && namesOf(entry).includes(label)));
+  const codes = nameKey(asset.assetTag).split(/[\s,;|]+/).filter(Boolean);
+  if (!codes.length || !COMPUTERS.has(asset.category)) return null;
+  const device = only(devices.filter((entry) => entry?.id != null
+    && namesOf(entry).some((name) => codes.includes(name))));
   return device ? { device, by: 'name' } : null;
 }
 

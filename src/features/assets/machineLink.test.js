@@ -20,6 +20,12 @@ describe('machineFor', () => {
     expect(hit?.by).toBe('name');
   });
 
+  it('links when the label carries a second code beside the name', () => {
+    const real = { ...laptop, serialNumber: 'BVPZBC4', assetTag: 'PMWL010 LTP-060526-3-SR-4' };
+    expect(machineFor(real, [{ ...machine, serialNumber: '' }])?.by).toBe('name');
+    expect(machineFor({ ...real, assetTag: 'PMWL0101' }, [{ ...machine, serialNumber: '' }])).toBeNull();
+  });
+
   it('links on a name the machine had before a rename', () => {
     const renamed = { ...machine, serialNumber: '', computerName: 'AISYAH-PC', previousNames: ['PMWL010'] };
     expect(machineFor(laptop, [renamed])?.device).toBe(renamed);

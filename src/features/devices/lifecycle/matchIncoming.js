@@ -12,12 +12,24 @@ export const MATCH = {
   RENAMED: 'renamed',
   NAME_REUSED: 'nameReused',
   DUPLICATE_SERIAL: 'duplicateSerial',
+  // Two reports in one import would both update the same machine.
+  DUPLICATE_TARGET: 'duplicateTarget',
 };
+
+/** Kinds that save nothing: the review says why, and the save skips them. */
+export const SKIPPED_KINDS = new Set([MATCH.DUPLICATE_SERIAL, MATCH.DUPLICATE_TARGET]);
+
+/** A choice in `targets` (keyed by source file name): a new machine, or a row id to update. */
+export const NEW_MACHINE = 'new';
 
 const nameKey = (name) => String(name ?? '').trim().toLowerCase();
 const serialKey = (serial) => (serial ? normaliseSerial(serial) : null);
 
-export function matchIncoming(incoming, existing) {
+export function matchIncoming(incoming, existing, targets = {}) {
+  return oneClaimEach(withChoices(autoMatch(incoming, existing), existing, targets));
+}
+
+function autoMatch(incoming, existing) {
   const bySerial = new Map();
   const byName = new Map();
   for (const row of existing) {
@@ -65,6 +77,74 @@ export function matchIncoming(incoming, existing) {
 
     return { device, existing: null, kind: MATCH.NEW, note: null };
   });
+}
+
+/**
+ * What IT chose in the review outranks what the serial and the name say. The
+ * automatic match is kept as `auto`, so the review can still offer it back.
+ */
+function withChoices(matches, existing, targets) {
+  return matches.map((match) => {
+    const auto = match.existing ?? null;
+    const choice = targets[match.device.sourceFileName];
+
+    if (choice === NEW_MACHINE) {
+      let note = 'Saved as a new machine, as chosen.';
+      if (auto) {
+        note += ` ${auto.computerName} is left as it is.`;
+        const serial = serialKey(match.device.serialNumber);
+        if (serial && serial === serialKey(auto.serialNumber)) {
+          note += ` Both carry serial ${auto.serialNumber}, so a later report with it will match only one of them.`;
+        }
+      }
+      return { ...match, existing: null, kind: MATCH.NEW, chosen: true, auto, note };
+    }
+
+    const row = choice === undefined || choice === null ? null : existing.find((item) => item.id === choice);
+    if (row) {
+      if (auto?.id === row.id && match.kind !== MATCH.DUPLICATE_SERIAL) return { ...match, chosen: true, auto };
+      const renamed = nameKey(row.computerName) !== nameKey(match.device.computerName);
+      return {
+        ...match,
+        existing: row,
+        kind: renamed ? MATCH.RENAMED : MATCH.SAME,
+        chosen: true,
+        auto,
+        note: `Updates ${row.computerName}, as chosen${renamed ? ` -- it takes the name ${match.device.computerName}` : ''}.`,
+      };
+    }
+
+    // A choice of a machine that has since been removed falls back to the automatic match.
+    return { ...match, auto };
+  });
+}
+
+/**
+ * One report per machine. A choice is served first, then the automatic
+ * matches in file order; a later claim on a machine already taken saves
+ * nothing, or two reports would both write the same row and one would be lost.
+ */
+function oneClaimEach(matches) {
+  const claimedBy = new Map();
+  const order = [...matches.keys()].sort((a, b) => Number(Boolean(matches[b].chosen)) - Number(Boolean(matches[a].chosen)));
+  const result = [...matches];
+  for (const index of order) {
+    const match = matches[index];
+    const id = match.existing?.id;
+    if (id === null || id === undefined) continue;
+    const first = claimedBy.get(id);
+    if (first === undefined) {
+      claimedBy.set(id, match.device.computerName ?? match.device.sourceFileName);
+      continue;
+    }
+    result[index] = {
+      ...match,
+      existing: null,
+      kind: MATCH.DUPLICATE_TARGET,
+      note: `${match.existing.computerName} is already updated by ${first} in this import, so this report is not saved. Choose another machine or New machine.`,
+    };
+  }
+  return result;
 }
 
 /** The line the review shows under a row, or null when there is nothing to say. */

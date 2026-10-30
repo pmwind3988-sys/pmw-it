@@ -284,3 +284,21 @@ describe('planImport after an admin rename', () => {
     for (const update of plan.updates) expect(update.body.Title).toBe('PMW-LT-042');
   });
 });
+
+describe('planImport with choices', () => {
+  const stored = { ...device(), id: 7 };
+
+  it('inserts a report chosen as a new machine and leaves the matched row alone', () => {
+    const plan = planImport([device({ installedRamGB: 16 })], [stored], { targets: { 'PC1_.txt': 'new' } });
+    expect(plan.inserts).toHaveLength(1);
+    expect(plan.updates).toHaveLength(0);
+  });
+
+  it('skips a second report aimed at a machine another report updates', () => {
+    const second = device({ computerName: 'PC2', sourceFileName: 'PC2_.txt', installedRamGB: 32 });
+    const plan = planImport([device({ installedRamGB: 16 }), second], [stored], { targets: { 'PC2_.txt': 7 } });
+    expect(plan.updates).toHaveLength(1);
+    expect(plan.updates[0].body.Title).toBe('PC2');
+    expect(plan.skipped).toEqual([expect.objectContaining({ computerName: 'PC1' })]);
+  });
+});

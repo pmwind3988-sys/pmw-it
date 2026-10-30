@@ -9,7 +9,7 @@ import { diffDevice } from './diffDevice.js';
 import { stintWrites, writeStints, lifecycleItem } from './writeLifecycle.js';
 import { runPool, withRetry } from '../../sharepoint/writePool.js';
 import { formatMYT } from '../../../utils/malaysiaTime.js';
-import { matchIncoming, MATCH } from '../lifecycle/matchIncoming.js';
+import { matchIncoming, SKIPPED_KINDS } from '../lifecycle/matchIncoming.js';
 import { replacementsFor, ANSWERS } from '../lifecycle/replacements.js';
 import { planLifecycle, ACTIONS } from '../lifecycle/planLifecycle.js';
 import { currentStint } from '../lifecycle/stints.js';
@@ -74,9 +74,9 @@ const ownerKey = (owner) => String(owner ?? '').trim().replace(/\s+/g, ' ').toLo
  * testable without a token. Replaces planSync, which matched by name only.
  */
 export function planImport(incoming, existing, {
-  stints = [], answers = {}, now = Date.now(), recordedBy = '',
+  stints = [], answers = {}, targets = {}, now = Date.now(), recordedBy = '',
 } = {}) {
-  const matches = matchIncoming(incoming, existing);
+  const matches = matchIncoming(incoming, existing, targets);
   const prompts = replacementsFor(matches, existing);
   const inserts = [];
   const updates = [];
@@ -96,7 +96,7 @@ export function planImport(incoming, existing, {
     const on = device.scannedOn ?? now;
     const holder = { owner: device.owner, location: device.location ?? null, department: device.department ?? null };
 
-    if (kind === MATCH.DUPLICATE_SERIAL) {
+    if (SKIPPED_KINDS.has(kind)) {
       skipped.push({ computerName: device.computerName, reason: match.note });
       continue;
     }
@@ -213,7 +213,7 @@ const itemPath = (listName) => `${listPath(listName)}/items`;
  * "0 of 3" throughout is indistinguishable from a hang.
  */
 export async function syncDevices({
-  siteUrl, token, devices, changedBy, onProgress, answers = {},
+  siteUrl, token, devices, changedBy, onProgress, answers = {}, targets = {},
 }) {
   const report = (phase, done = 0, total = 0) => onProgress?.({ phase, done, total });
 
@@ -225,7 +225,9 @@ export async function syncDevices({
   report('reading');
   const existing = await readAllDevices(siteUrl, token);
   const stints = await readAssignments(siteUrl, token);
-  const plan = planImport(devices, existing, { stints, answers, recordedBy: changedBy ?? '' });
+  const plan = planImport(devices, existing, {
+    stints, answers, targets, recordedBy: changedBy ?? '',
+  });
 
   const post = (path, body) =>
     withRetry(() => spFetch(siteUrl, path, { token, digest, method: 'POST', body, accept: ITEM_ACCEPT }));

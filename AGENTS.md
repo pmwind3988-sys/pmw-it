@@ -188,7 +188,7 @@ pmw-it/
 | A machine's status, and what counts in the fleet | `src/features/devices/lifecycle/status.js` |
 | What a change of owner, repair, stash, retire or bring-back writes | `src/features/devices/lifecycle/planLifecycle.js`, `sharepoint/writeLifecycle.js` |
 | Owner history (stints) and its list | `lifecycle/stints.js`, `sharepoint/assignmentSchema.js` |
-| How an import recognises a machine (serial, then name) | `src/features/devices/lifecycle/matchIncoming.js` |
+| How an import recognises a machine (serial, then name), and the review's "Saves as" choice (new machine / update another; one report per machine, later claims skipped) | `src/features/devices/lifecycle/matchIncoming.js` (`targets`, `NEW_MACHINE`, `DUPLICATE_TARGET`), `ui/ImportTarget.jsx` |
 | "Is this a replacement?" during import | `lifecycle/replacements.js`, `ui/ReplacementPrompt.jsx` |
 | Location out of the scan file name | `derive/deriveLocation.js`, `map/locations.js` |
 | The map's numbers and layout | `map/zones.js`, `map/mindMap.js` (wide and phone positions, branches), `ui/MindMap.jsx`, `map/mapLinks.js` |

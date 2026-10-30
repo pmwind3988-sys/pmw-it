@@ -427,6 +427,9 @@
 .dtf-note { margin: 2px 0 0; font-size: 12px; color: var(--it-ink-soft); }
 
 /* Import review: the scan badge and the one summary line above the grid. */
+/* Saves as: the choice, and the name box under it when another machine is being picked. */
+.it-target { display: grid; gap: 6px; min-width: 190px; }
+
 .rg-scan-line { margin: 0 0 10px; font-size: 14px; color: var(--it-ink); }
 .rg-scan {
   display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600;

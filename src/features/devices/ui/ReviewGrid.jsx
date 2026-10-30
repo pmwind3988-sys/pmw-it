@@ -2,6 +2,7 @@ import { Fragment } from 'react';
 import { formatMYT } from '../../../utils/malaysiaTime';
 import { issuesFor } from '../reviewIssues';
 import ReplacementPrompt from './ReplacementPrompt';
+import ImportTarget from './ImportTarget';
 import { SCAN_BADGES, scanKindOf } from '../fleetFacts.js';
 
 /**
@@ -35,7 +36,7 @@ const COLUMNS = [
  */
 export default function ReviewGrid({
   devices, excluded, onChange, onToggleRow, prompts = [], answers = {}, onAnswer, notices = new Map(),
-  scanLine = null,
+  scanLine = null, matches = new Map(), machines = [], onTarget,
 }) {
   const rows = devices;
 
@@ -48,7 +49,10 @@ export default function ReviewGrid({
             <tr>
               <th className="rg-check"><span className="sr-only">Include</span></th>
               {COLUMNS.map((column) => (
-                <th key={column.key}>{column.label}</th>
+                <Fragment key={column.key}>
+                  <th>{column.label}</th>
+                  {column.key === 'computerName' && onTarget && <th>Saves as</th>}
+                </Fragment>
               ))}
               <th>Scanned</th>
             </tr>
@@ -78,6 +82,21 @@ export default function ReviewGrid({
 
                     {COLUMNS.map((column) => {
                       const value = device[column.key];
+
+                      if (column.key === 'computerName' && onTarget) {
+                        const match = matches.get(id);
+                        return (
+                          <Fragment key={column.key}>
+                            <td>{value ?? '—'}</td>
+                            <td className="rg-editable">
+                              {match && (
+                                <ImportTarget match={match} machines={machines}
+                                  onChoose={(choice) => onTarget(id, choice)} />
+                              )}
+                            </td>
+                          </Fragment>
+                        );
+                      }
 
                       if (column.key === 'scanVersion') {
                         const kind = scanKindOf(device.scanVersion);
@@ -127,12 +146,12 @@ export default function ReviewGrid({
                   </tr>
                   {notices.get(id) && (
                     <tr className="rg-notice-row">
-                      <td colSpan={COLUMNS.length + 2}>{notices.get(id)}</td>
+                      <td colSpan={COLUMNS.length + (onTarget ? 3 : 2)}>{notices.get(id)}</td>
                     </tr>
                   )}
                   {!isExcluded && prompts.filter((p) => p.sourceFileName === id).map((prompt) => (
                     <tr key={prompt.key} className="rg-prompt-row">
-                      <td colSpan={COLUMNS.length + 2}>
+                      <td colSpan={COLUMNS.length + (onTarget ? 3 : 2)}>
                         <ReplacementPrompt prompt={prompt} answer={answers[prompt.key]} onAnswer={onAnswer} />
                       </td>
                     </tr>

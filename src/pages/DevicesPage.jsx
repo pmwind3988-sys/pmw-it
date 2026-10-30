@@ -105,6 +105,9 @@ export default function DevicesPage() {
   const [edits, setEdits] = useState({});
   const [excluded, setExcluded] = useState(new Set());
   const [answers, setAnswers] = useState({});
+  // "Saves as", per file: NEW_MACHINE or the id of the machine to update.
+  // Absent means the import's own match by serial, then name.
+  const [targets, setTargets] = useState({});
   const [save, setSave] = useState(IDLE_SAVE);
   const [rowBusy, setRowBusy] = useState(false);
   const [rowError, setRowError] = useState('');
@@ -115,7 +118,11 @@ export default function DevicesPage() {
     [parsed, edits],
   );
 
-  const matches = useMemo(() => matchIncoming(merged, saved), [merged, saved]);
+  const matches = useMemo(() => matchIncoming(merged, saved, targets), [merged, saved, targets]);
+  const matchByFile = useMemo(
+    () => new Map(matches.map((match) => [match.device.sourceFileName, match])),
+    [matches],
+  );
   const prompts = useMemo(() => replacementsFor(matches, saved), [matches, saved]);
   const notices = useMemo(() => new Map(
     matches
@@ -269,6 +276,7 @@ export default function DevicesPage() {
     setEdits({});
     setExcluded(new Set());
     setAnswers({});
+    setTargets({});
     setSave(IDLE_SAVE);
     setStage('drop');
   };
@@ -290,6 +298,7 @@ export default function DevicesPage() {
         token: tokenRes.accessToken,
         devices: toSave,
         answers,
+        targets,
         changedBy: tokenRes.account?.username ?? '',
         onProgress: ({ phase, done, total }) =>
           setSave((current) => ({ ...current, phase, done, total })),
@@ -698,6 +707,14 @@ export default function DevicesPage() {
                     answers={answers}
                     notices={notices}
                     onAnswer={(key, value) => setAnswers((current) => ({ ...current, [key]: value }))}
+                    matches={matchByFile}
+                    machines={saved}
+                    onTarget={(file, choice) => setTargets((current) => {
+                      const next = { ...current };
+                      if (choice === undefined) delete next[file];
+                      else next[file] = choice;
+                      return next;
+                    })}
                   />
                 )}
 

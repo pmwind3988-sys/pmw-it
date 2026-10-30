@@ -1,5 +1,5 @@
 import { inFleet } from './status.js';
-import { MATCH } from './matchIncoming.js';
+import { SKIPPED_KINDS } from './matchIncoming.js';
 
 /**
  * "Carmen already has CARMEN-HP. Is this a replacement?"
@@ -20,7 +20,7 @@ export function replacementsFor(matches, existing) {
   const rescanned = new Set(matches.map((match) => match.existing?.id).filter((id) => id !== null && id !== undefined));
 
   for (const match of matches) {
-    if (match.kind === MATCH.DUPLICATE_SERIAL) continue;
+    if (SKIPPED_KINDS.has(match.kind)) continue;
     const owner = ownerKey(match.device.owner);
     if (!owner) continue;
     if (match.existing && ownerKey(match.existing.owner) === owner) continue;

@@ -32,6 +32,8 @@ import { updateDevice, deleteDevice, renameDevice } from '../features/devices/sh
 import RenameDialog from '../features/devices/ui/RenameDialog';
 import { useDeviceAdmin } from '../features/devices/useDeviceAdmin';
 import { matchingGroups } from '../features/devices/fieldSearch';
+import { useAssets } from '../features/assets/useAssets';
+import RegisterNote from '../features/devices/ui/RegisterNote';
 
 /** Remembered per browser: somebody who turns the colouring off is not asked
  *  to turn it off again on the next machine they open. */
@@ -109,6 +111,8 @@ function SerialValue({ serial }) {
 export default function DeviceDetailPage() {
   const { id } = useParams();
   const { devices, loading, error, reload, standards } = useDevices();
+  // The asset-register row that is this same machine, if there is one.
+  const { assets } = useAssets();
   const [params, setParams] = useSearchParams();
   const tabBase = useId();
   const tabRefs = useRef({});
@@ -391,6 +395,7 @@ export default function DeviceDetailPage() {
                 <LifecycleActions device={device} owners={owners} locations={locations} departments={departments}
                   onAction={act} busy={acting} showTones={showTones} onToggleTones={toggleTones} />
               </div>
+              <RegisterNote device={device} assets={assets} onAction={act} busy={acting} />
               {actionNote && !actionError && <p className="dd-note" role="status">{actionNote}</p>}
               {actionError && <ErrorBanner message={actionError} busy={acting} onRetry={pending.length ? retry : undefined} />}
             </Card>

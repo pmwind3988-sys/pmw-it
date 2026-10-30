@@ -12,6 +12,9 @@ import { planHandover } from '../handover/planHandover.js';
 import { planReturn } from '../handover/planReturn.js';
 import { lastReturnOf, planUndoReturn } from '../handover/planUndoReturn.js';
 import { planPersonEdit } from '../handover/planPersonEdit.js';
+import { syncMachines } from './syncMachines.js';
+
+const landedKeys = (results) => results.filter((result) => !result.error).map((result) => result.value);
 
 const itemPath = (listName) => `${listPath(listName)}/items`;
 
@@ -111,7 +114,16 @@ export async function commitHandover({
     return update.assetKey;
   }, { concurrency: 4, onProgress: (done, total) => report('updating', done, total) });
 
+  // A laptop in the register that is also a machine in the device list goes
+  // to the same person there (`machineLink.js`).
+  report('machines');
+  const machines = await syncMachines({
+    siteUrl, token, assetKeys: landedKeys(updated), recordedBy: issuedBy ?? '',
+    note: `Handed out in the asset register${basket.person?.email ? ` to ${basket.person.email}` : ''}`,
+  });
+
   return {
+    machines,
     handedOver: written.filter((result) => !result.error).length,
     handoverIds: written.map((result) => (result.error ? null : result.value?.id)).filter((id) => id != null),
     signed: Boolean(issueSignature),
@@ -187,7 +199,15 @@ export async function commitReturn({
     return update.assetKey;
   }, { concurrency: 4, onProgress: (done, total) => report('updating', done, total) });
 
+  // ...and one handed back goes back to the IT Stash there.
+  report('machines');
+  const machines = await syncMachines({
+    siteUrl, token, assetKeys: landedKeys(updated), recordedBy: returnedBy ?? '',
+    note: 'Returned in the asset register', justReturned: true,
+  });
+
   return {
+    machines,
     returned: written.filter((result) => !result.error).length,
     // Which handover rows were returned, for an OUT checklist made with it.
     returnedIds: written.map((result, index) => (result.error ? null : plan.handoverUpdates[index].id)).filter((id) => id != null),
@@ -249,7 +269,13 @@ export async function commitUndoReturn({
     return update.assetKey;
   }, { concurrency: 4, onProgress: (done, total) => report('updating', done, total) });
 
+  report('machines');
+  const machines = await syncMachines({
+    siteUrl, token, assetKeys: landedKeys(updated), note: 'Return undone in the asset register',
+  });
+
   return {
+    machines,
     reopened: written.filter((result) => !result.error).length,
     blocked: plan.blocked,
     writeFailures: written.filter((result) => result.error).length,

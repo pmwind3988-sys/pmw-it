@@ -1,4 +1,6 @@
+import { Link } from 'react-router-dom';
 import { EmptyState } from '../../../components/ui/Surfaces';
+import { describeMove } from '../../assets/machineLink';
 import { todoItems } from '../stats/todoItems';
 import DepartmentHeatmap from './DepartmentHeatmap';
 import FleetMakeup from './FleetMakeup';
@@ -24,7 +26,9 @@ function Skeleton() {
   );
 }
 
-export default function ToDoView({ devices, loading, spareCount, onOpen, onDepartment }) {
+export default function ToDoView({
+  devices, loading, spareCount, offRegister = [], onOpen, onDepartment,
+}) {
   const items = todoItems(devices);
 
   return (
@@ -68,6 +72,26 @@ export default function ToDoView({ devices, loading, spareCount, onOpen, onDepar
           </ul>
         )}
       </section>
+
+      {offRegister.length > 0 && (
+        <section className="todo-card" aria-labelledby="todo-register-h">
+          <h2 id="todo-register-h" className="todo-title">
+            Not the same as the asset register <span className="todo-sub">· {offRegister.length}</span>
+          </h2>
+          <ul className="todo-list">
+            {offRegister.map(({ device, move }) => (
+              <li key={device.id} className="todo-row">
+                <span className="todo-mark todo-mark--triangle todo-mark--warning" aria-hidden="true">!</span>
+                <span className="todo-text">
+                  <span className="todo-item-title">{device.computerName || device.serialNumber || 'Machine'}</span>
+                  <span className="todo-why">{describeMove(move, device)}</span>
+                </span>
+                <Link className="todo-show" to={`/devices/${device.id}`}>Open machine →</Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <div className="todo-two">
         <DepartmentHeatmap devices={devices} onSelect={onDepartment} />

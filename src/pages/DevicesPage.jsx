@@ -37,6 +37,8 @@ import { inFleet, statusOf, SPARE } from '../features/devices/lifecycle/status';
 import { performLifecycle } from '../features/devices/sharepoint/writeLifecycle';
 import { ACTIONS } from '../features/devices/lifecycle/planLifecycle';
 import { formatMYT } from '../utils/malaysiaTime';
+import { useAssets } from '../features/assets/useAssets';
+import { disagreements } from '../features/assets/machineLink';
 import { olderScanNote, scanSummary, scanSummaryLine } from '../features/devices/scanReview';
 
 const SHAREPOINT_SITE_URL =
@@ -70,6 +72,9 @@ export default function DevicesPage() {
   const getToken = useSharePointToken();
   const [params, setParams] = useSearchParams();
   const { devices: saved, loading, error, reload, standards } = useDevices();
+  // Machines the asset register has handed out (or taken back) differently.
+  const { assets: register } = useAssets();
+  const offRegister = useMemo(() => disagreements(register, saved), [register, saved]);
   // Removing a machine is for admins (owners of the IT helpdesk site) only.
   const isAdmin = useDeviceAdmin();
 
@@ -603,6 +608,7 @@ export default function DevicesPage() {
                 devices={scoped}
                 loading={loading}
                 spareCount={spareCount}
+                offRegister={offRegister}
                 onOpen={openRegister}
                 onDepartment={(name, part) => openRegister('part', `${part}:Critical`, { department: name })}
               />

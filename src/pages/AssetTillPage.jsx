@@ -54,6 +54,7 @@ import {
 } from '../features/assets/till/stashMachines';
 import { useDevices } from '../features/devices/useDevices';
 import { performLifecycle } from '../features/devices/sharepoint/writeLifecycle';
+import { assetFor } from '../features/assets/machineLink';
 import { ACTIONS } from '../features/devices/lifecycle/planLifecycle';
 import { SPARE, statusOf, inFleet } from '../features/devices/lifecycle/status';
 import { createReadGate, guessKind } from '../features/assets/till/readGate';
@@ -94,6 +95,7 @@ const PHASE = {
   signature: 'Saving the signature',
   link: 'Creating the checklist link',
   machine: 'Updating the device list',
+  machines: 'Updating the device list',
   updating: 'Updating the register',
 };
 
@@ -141,7 +143,7 @@ export default function AssetTillPage() {
 
   const { instance } = useMsal();
   const getToken = useSharePointToken();
-  const { assets, error: assetsError, reload: reloadAssets } = useAssets();
+  const { assets, loading: assetsLoading, error: assetsError, reload: reloadAssets } = useAssets();
   const { handovers, reload: reloadHandovers } = useHandovers();
   // Spare machines in the IT Stash can be handed out too (`till/stashMachines.js`).
   const { devices, reload: reloadDevices } = useDevices();
@@ -170,10 +172,15 @@ export default function AssetTillPage() {
   // receipt as soon as the device list has loaded. Adjusted during render,
   // once, rather than from an effect.
   const [wantedMachine, setWantedMachine] = useState(() => params.get('machine'));
-  if (wantedMachine && devices.length) {
+  if (wantedMachine && devices.length && !assetsLoading) {
     setWantedMachine(null);
     const device = devices.find((entry) => String(entry.id) === wantedMachine);
-    if (device && mode === 'out' && statusOf(device) === SPARE) setMachines((list) => (list.some((entry) => entry.id === device.id) ? list : [...list, device]));
+    // A machine that is also a register row goes on as that row (`machineLink.js`).
+    const asset = device && assetFor(device, assets);
+    const code = asset && (asset.serialNumber || asset.assetTag);
+    if (code && mode === 'out') setBasket((current) => scanOut(current, code, assets).basket ?? current);
+    else if (code && mode === 'back') setBackLines((current) => scanBack(current, code, assets, handovers).lines ?? current);
+    else if (device && mode === 'out' && statusOf(device) === SPARE) setMachines((list) => (list.some((entry) => entry.id === device.id) ? list : [...list, device]));
     if (device && mode === 'back' && inFleet(device)) setMachinesBack((list) => (list.some((entry) => entry.id === device.id) ? list : [...list, device]));
   }
   const [condition, setCondition] = useState('Good');
@@ -342,12 +349,25 @@ export default function AssetTillPage() {
     return found;
   }, [mode, typed, assets, handovers, devices, machines, machinesBack]);
 
+  // A machine that is also a register row goes on as that row: the handover
+  // then moves it in the device list too (`machineLink.js`), and the same
+  // laptop cannot ride on the receipt twice.
+  const asRegisterRow = (device) => {
+    const asset = assetFor(device, assets);
+    const code = asset && (asset.serialNumber || asset.assetTag);
+    if (!code) return false;
+    handleCode(code);
+    return true;
+  };
+
   const addMachine = (device) => {
+    if (asRegisterRow(device)) return;
     if (machines.some((entry) => entry.id === device.id)) { say('ask', 'Already on this receipt'); return; }
     setMachines((list) => [...list, device]);
     say('ok', `Added from the IT Stash · ${machineTitle(device)}`);
   };
   const addMachineBack = (device) => {
+    if (asRegisterRow(device)) return;
     if (machinesBack.some((entry) => entry.id === device.id)) { say('ask', 'Already on this receipt'); return; }
     setMachinesBack((list) => [...list, device]);
     say('ok', `Back to the IT Stash · ${machineTitle(device)}`);

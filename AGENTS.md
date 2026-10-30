@@ -169,6 +169,7 @@ pmw-it/
 | What one scan does at the till, per mode | `src/features/assets/till/stockIn.js`, `handOut.js`, `takeBack.js` |
 | Type-to-find and the desk's quick keys | `src/features/assets/till/tillSearch.js` |
 | Handing out a spare machine from the IT Stash at the till | `src/features/assets/till/stashMachines.js` |
+| When a register row and a device-list machine are the same computer, and what the device list does to agree | `src/features/assets/machineLink.js`, `assets/sharepoint/syncMachines.js`, `devices/ui/RegisterNote.jsx` |
 | Which barcode the till believes, and when it asks | `src/features/assets/till/readGate.js` |
 | Entering the unlabelled backlog (catch-up count) | `src/features/assets/till/count.js`, `till/ui/CountPanel.jsx` |
 | The till page and its sheets | `src/pages/AssetTillPage.jsx`, `src/features/assets/till/ui/`, `src/styles/till.css` |
@@ -687,6 +688,21 @@ the receipt once the device list loads). The link records the machines it covers
 in `handovers.machines` so its detail panel can open each one, and a till link
 is recognised by `handovers.kind` (`fromTill`), not by having handover ids --
 a receipt of machines alone has none.
+
+**A laptop in the register and a machine in the device list can be ONE computer,
+and the register leads.** `machineLink.js` (pure) links them on the serial
+(any category), else on the row's label being the machine's computer name, now
+or before a rename (Laptop/Desktop only); a serial or name pointing at two
+machines links nothing. After a handover, a return or an undo, `commitHandover`
+/ `commitReturn` / `commitUndoReturn` call `syncMachines`, which does the device
+page's Assign / Change owner / To stash on the linked machine -- never throwing,
+because the handover is the record. "In stock" in the register moves a machine
+to the stash ONLY straight after a return (`justReturned`): a counted laptop
+reads In stock and may well be on a desk. A person edit is not synced -- a
+spelling fix is not a change of owner. The machine page shows the linked row and
+offers the move as one button (`RegisterNote`), the To do view lists every
+machine that disagrees, and the till puts a picked stash machine that has a row
+on the receipt AS that row, so it is not handed out twice.
 
 **"Who has it" is one line per PERSON.** `groupHolders` in
 `handover/availability.js` gathers the open handovers on an item by email:

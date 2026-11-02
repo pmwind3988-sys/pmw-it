@@ -2,6 +2,7 @@
 // The plot is an SVG stretched to the card; its labels, dots and tooltip are
 // positioned in percent over it, so text never stretches with the picture.
 import * as React from 'react';
+import { Drill, isPicked, Picker } from '../stats/drill';
 import { Bucket, Grain, GRAIN_RULES, GRAINS } from '../stats/stats';
 import {
   anchorShift, axisTicks, labelEvery, moveIndex, niceMax, PALETTE, snapIndex, svgArea, svgPoints, svgY, VIEW_H,
@@ -14,7 +15,15 @@ export interface TrendPlotProps {
   kind: 'lines' | 'area';
   /** Read out by screen readers for the focusable plot. */
   label: string;
+  /** A click, or Enter on the point the arrow keys reached, lists that point's tickets. */
+  pick: Picker;
 }
+
+const drillAt = (index: number, kind: 'lines' | 'area'): Drill => ({
+  kind: 'bucket',
+  index,
+  series: kind === 'lines' ? 'raised' : 'open'
+});
 
 const tipWords = (b: Bucket, kind: 'lines' | 'area'): string =>
   kind === 'lines'
@@ -30,7 +39,7 @@ function indexOfMax(values: number[]): number {
 }
 
 export function TrendPlot(props: TrendPlotProps): React.ReactElement {
-  const { buckets, kind, label } = props;
+  const { buckets, kind, label, pick } = props;
   const n = buckets.length;
   const [hover, setHover] = React.useState<number | undefined>(undefined);
 
@@ -49,7 +58,17 @@ export function TrendPlot(props: TrendPlotProps): React.ReactElement {
     const box = e.currentTarget.getBoundingClientRect();
     setHover(snapIndex((e.clientX - box.left) / box.width, n));
   };
+  // A tap has no hover before it, so the point comes from where the click landed.
+  const onClick = (e: React.MouseEvent<HTMLDivElement>): void => {
+    const box = e.currentTarget.getBoundingClientRect();
+    pick.onPick(drillAt(snapIndex((e.clientX - box.left) / box.width, n), kind));
+  };
   const onKey = (e: React.KeyboardEvent<HTMLDivElement>): void => {
+    if ((e.key === 'Enter' || e.key === ' ') && at !== undefined) {
+      e.preventDefault();
+      pick.onPick(drillAt(at, kind));
+      return;
+    }
     if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
     e.preventDefault();
     const step = e.key === 'ArrowLeft' ? -1 : 1;
@@ -62,6 +81,8 @@ export function TrendPlot(props: TrendPlotProps): React.ReactElement {
   const shownLabels = buckets.map((b, i) => ({ b, i })).filter((x) => x.i % every === 0);
   const hoverBucket = at !== undefined ? buckets[at] : undefined;
   const crossX = at !== undefined ? xPct(at, n) : 0;
+  let pinned = -1;
+  for (let i = 0; i < n; i += 1) if (isPicked(pick, drillAt(i, kind))) pinned = i;
 
   return (
     <div className={styles.chartBlock}>
@@ -77,8 +98,10 @@ export function TrendPlot(props: TrendPlotProps): React.ReactElement {
         <div
           className={styles.plot}
           role="group"
-          aria-label={label}
+          aria-label={`${label}. Arrow keys move between points; Enter lists that point's tickets.`}
           tabIndex={0}
+          style={{ cursor: 'pointer' }}
+          onClick={onClick}
           onMouseMove={onMove}
           onMouseLeave={() => setHover(undefined)}
           onFocus={() => setHover(last)}
@@ -149,6 +172,7 @@ export function TrendPlot(props: TrendPlotProps): React.ReactElement {
             )}
           </svg>
 
+          {pinned !== -1 && <div className={styles.pinned} style={{ left: `${xPct(pinned, n)}%` }} />}
           {at !== undefined && <div className={styles.crosshair} style={{ left: `${crossX}%` }} />}
 
           {kind === 'lines' && (
@@ -210,6 +234,7 @@ export function TrendPlot(props: TrendPlotProps): React.ReactElement {
               >
                 <strong>{hoverBucket.label}</strong>
                 <span>{tipWords(hoverBucket, kind)}</span>
+                <span>Click to see these tickets</span>
               </div>
             </>
           )}

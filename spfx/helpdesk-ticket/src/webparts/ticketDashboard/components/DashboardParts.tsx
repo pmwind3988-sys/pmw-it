@@ -91,10 +91,13 @@ export interface KpiTileProps {
   noteColour?: string;
   /** When set the whole tile is a link that opens in a new tab. */
   href?: string;
+  /** When set the whole tile is a button that lists the tickets behind the figure. */
+  onPick?: () => void;
+  picked?: boolean;
 }
 
 export function KpiTile(props: KpiTileProps): React.ReactElement {
-  const { label, value, note, noteColour, href } = props;
+  const { label, value, note, noteColour, href, onPick, picked } = props;
   const body = (
     <>
       <span className={styles.kpiLabel}>{label}</span>
@@ -109,6 +112,13 @@ export function KpiTile(props: KpiTileProps): React.ReactElement {
       <a className={`${styles.kpi} ${styles.kpiLink}`} href={href} target="_blank" rel="noopener noreferrer">
         {body}
       </a>
+    );
+  }
+  if (onPick !== undefined) {
+    return (
+      <button type="button" className={`${styles.kpi} ${styles.kpiLink} ${styles.mark}`} aria-pressed={!!picked} onClick={onPick}>
+        {body}
+      </button>
     );
   }
   return <div className={styles.kpi}>{body}</div>;

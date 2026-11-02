@@ -1,18 +1,22 @@
 // When tickets arrive, how long they take to close, how old the open ones are,
 // and which records are missing what. Each block has a plain-table twin.
 import * as React from 'react';
+import { Picker } from '../stats/drill';
 import { Gap, Heat, HEAT_DAYS, HEAT_HOURS, slotText } from '../stats/stats';
 import { barPct, heatColour, PALETTE, percentText, ticketsText } from './chartMath';
+import { Mark, Segment } from './Marks';
 import styles from './Dashboard.module.scss';
+
+const pickingClass = (pick: Picker): string => (pick.picked !== undefined ? styles.picking : '');
 
 // ---------------------------------------------------------------- when they arrive
 
-export function HeatMap(props: { heat: Heat }): React.ReactElement {
-  const { heat } = props;
+export function HeatMap(props: { heat: Heat; pick: Picker }): React.ReactElement {
+  const { heat, pick } = props;
   const days = heat.showWeekend ? HEAT_DAYS : HEAT_DAYS.slice(0, 5);
   return (
     <div className={styles.heatScroll}>
-      <div className={styles.heatGrid} role="group" aria-label="Tickets raised by weekday and hour">
+      <div className={`${styles.heatGrid} ${pickingClass(pick)}`} role="group" aria-label="Tickets raised by weekday and hour">
         <span />
         {HEAT_HOURS.map((h) => (
           <span key={h} className={styles.heatHead}>
@@ -23,11 +27,14 @@ export function HeatMap(props: { heat: Heat }): React.ReactElement {
           <React.Fragment key={day}>
             <span className={styles.heatDay}>{day}</span>
             {heat.grid[d].map((count, c) => (
-              <span
+              <Segment
                 key={c}
+                pick={pick}
+                drill={{ kind: 'heat', day: d, col: c }}
+                count={count}
+                label={`${slotText(d, c)}: ${ticketsText(count)}`}
                 className={styles.heatCell}
                 style={{ background: heatColour(count, heat.max, PALETTE.heatRamp, PALETTE.empty) }}
-                title={`${slotText(d, c)}: ${ticketsText(count)}`}
               />
             ))}
           </React.Fragment>
@@ -91,25 +98,35 @@ export interface SpeedRow {
   count: number;
 }
 
-export function SpeedBars(props: { rows: SpeedRow[] }): React.ReactElement {
-  const { rows } = props;
+export function SpeedBars(props: { rows: SpeedRow[]; pick: Picker }): React.ReactElement {
+  const { rows, pick } = props;
   const top = rows.reduce((m, r) => Math.max(m, r.count), 0);
   return (
     <div className={styles.speedBlock}>
-      <div className={styles.speedBars}>
-        {rows.map((r, i) => (
-          <div key={r.label} className={styles.speedCol}>
-            <span className={styles.speedCount}>{r.count}</span>
-            <div
-              className={styles.speedBar}
-              style={{
-                height: r.count > 0 ? `${Math.max(2, Math.round((r.count / top) * 120))}px` : '0px',
-                background: i < 3 ? PALETTE.raised : PALETTE.calm
-              }}
-              title={`${r.label}: ${ticketsText(r.count)}`}
-            />
-          </div>
-        ))}
+      <div className={`${styles.speedBars} ${pickingClass(pick)}`}>
+        {rows.map((r, i) => {
+          const bar = (
+            <>
+              <span className={styles.speedCount}>{r.count}</span>
+              <span
+                className={styles.speedBar}
+                style={{
+                  height: r.count > 0 ? `${Math.max(2, Math.round((r.count / top) * 120))}px` : '0px',
+                  background: i < 3 ? PALETTE.raised : PALETTE.calm
+                }}
+              />
+            </>
+          );
+          return r.count > 0 ? (
+            <Mark key={r.label} pick={pick} drill={{ kind: 'speed', index: i }} label={`${r.label}: ${ticketsText(r.count)}`} className={styles.speedCol}>
+              {bar}
+            </Mark>
+          ) : (
+            <div key={r.label} className={styles.speedCol}>
+              {bar}
+            </div>
+          );
+        })}
       </div>
       <div className={styles.speedLabels}>
         {rows.map((r) => (
@@ -152,20 +169,31 @@ export interface AgeRow {
   count: number;
 }
 
-export function AgeBars(props: { rows: AgeRow[] }): React.ReactElement {
-  const { rows } = props;
+export function AgeBars(props: { rows: AgeRow[]; pick: Picker }): React.ReactElement {
+  const { rows, pick } = props;
   const top = rows.reduce((m, r) => Math.max(m, r.count), 0);
   return (
-    <div className={styles.rows}>
-      {rows.map((r, i) => (
-        <div key={r.label} className={styles.ageRow}>
-          <span className={styles.rowName}>{r.label}</span>
-          <div className={styles.ageTrack}>
-            <div className={styles.ageFill} style={{ width: `${barPct(r.count, top)}%`, background: AGE_COLOURS[i] }} />
+    <div className={`${styles.rows} ${pickingClass(pick)}`}>
+      {rows.map((r, i) => {
+        const inner = (
+          <>
+            <span className={styles.rowName}>{r.label}</span>
+            <span className={styles.ageTrack}>
+              <span className={styles.ageFill} style={{ width: `${barPct(r.count, top)}%`, background: AGE_COLOURS[i] }} />
+            </span>
+            <span className={styles.rowNum}>{r.count}</span>
+          </>
+        );
+        return r.count > 0 ? (
+          <Mark key={r.label} pick={pick} drill={{ kind: 'age', index: i }} label={`Open ${r.label.toLowerCase()}: ${ticketsText(r.count)}`} className={`${styles.ageRow} ${styles.markRow}`}>
+            {inner}
+          </Mark>
+        ) : (
+          <div key={r.label} className={styles.ageRow}>
+            {inner}
           </div>
-          <span className={styles.rowNum}>{r.count}</span>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -193,10 +221,11 @@ export function AgeTable(props: { rows: AgeRow[] }): React.ReactElement {
 
 // ---------------------------------------------------------------- record gaps
 
-export function GapBars(props: { gaps: Gap[] }): React.ReactElement {
+export function GapBars(props: { gaps: Gap[]; pick: Picker }): React.ReactElement {
+  const { pick } = props;
   return (
-    <div className={styles.gapList}>
-      {props.gaps.map((g) => (
+    <div className={`${styles.gapList} ${pickingClass(pick)}`}>
+      {props.gaps.map((g, i) => (
         <div key={g.label} className={styles.gap}>
           <div className={styles.gapHead}>
             <span>{g.label}</span>
@@ -206,6 +235,16 @@ export function GapBars(props: { gaps: Gap[] }): React.ReactElement {
             <div className={styles.gapFill} style={{ width: `${g.of === 0 ? 0 : barPct(g.have, g.of)}%` }} />
           </div>
           <span className={styles.gapNote}>{g.note}</span>
+          {g.of - g.have > 0 && (
+            <Mark
+              pick={pick}
+              drill={{ kind: 'gap', index: i }}
+              label={`${g.missing}: ${ticketsText(g.of - g.have)}`}
+              className={styles.gapButton}
+            >
+              {`See the ${ticketsText(g.of - g.have)}: ${g.missing.toLowerCase()}`}
+            </Mark>
+          )}
         </div>
       ))}
     </div>

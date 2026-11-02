@@ -14,7 +14,7 @@
 // months when none are chosen), because a trend needs time on its x axis.
 
 import { DateChoice, describe as describeRange, inRange, Range, rangeOf } from '../../ticketQueue/queue/dateRange';
-import { QueueTicket } from '../../ticketQueue/queue/ticket';
+import { PersonRef, QueueTicket } from '../../ticketQueue/queue/ticket';
 
 const DAY = 24 * 60 * 60 * 1000;
 const CLOSED = ['Completed', 'Cancelled'];
@@ -159,21 +159,33 @@ export function trend(
     closed: 0,
     openAtEnd: 0
   }));
-  const find = (d: Date): Bucket | undefined => buckets.find((b) => d >= b.start && d < b.end);
   scope.forEach((t) => {
-    const made = new Date(t.created);
-    const shut = closedAt(t);
-    const rb = isNaN(made.getTime()) ? undefined : find(made);
-    if (rb) rb.raised += 1;
-    if (shut && t.status === 'Completed') {
-      const cb = find(shut);
-      if (cb) cb.closed += 1;
-    }
     buckets.forEach((b) => {
-      if (made < b.end && (!shut || shut >= b.end)) b.openAtEnd += 1;
+      if (raisedIn(t, b)) b.raised += 1;
+      if (closedIn(t, b)) b.closed += 1;
+      if (openAtEnd(t, b.end)) b.openAtEnd += 1;
     });
   });
   return { grain, grains, buckets };
+}
+
+/** Raised inside the bucket. */
+export function raisedIn(t: QueueTicket, b: { start: Date; end: Date }): boolean {
+  const made = new Date(t.created);
+  return made >= b.start && made < b.end;
+}
+
+/** Completed inside the bucket (a cancellation leaves the pile but is not a close). */
+export function closedIn(t: QueueTicket, b: { start: Date; end: Date }): boolean {
+  const shut = closedAt(t);
+  return t.status === 'Completed' && !!shut && shut >= b.start && shut < b.end;
+}
+
+/** Raised before `end` and not yet completed or cancelled by then. */
+export function openAtEnd(t: QueueTicket, end: Date): boolean {
+  const made = new Date(t.created);
+  const shut = closedAt(t);
+  return made < end && (!shut || shut >= end);
 }
 
 // ---------------------------------------------------------------- headline figures
@@ -278,8 +290,16 @@ export interface Headline {
   inView: number;
 }
 
+/** Raised in the headline span (which may have no start or no end). */
+export const raisedInRange = (t: QueueTicket, r: Range): boolean => inRange(new Date(t.created), r);
+
+/** Completed in the headline span, whenever it was raised. */
+export function closedInRange(t: QueueTicket, r: Range): boolean {
+  const at = closedAt(t);
+  return t.status === 'Completed' && !!at && inRange(at, r);
+}
+
 export function headline(scope: QueueTicket[], inView: QueueTicket[], period: Period, now: Date): Headline {
-  const within = (d: Date | undefined, r: Range): boolean => !!d && inRange(d, r);
   const open = inView.filter(isOpen);
   let oldest: { ticket: QueueTicket; days: number } | undefined;
   open.forEach((t) => {
@@ -287,18 +307,17 @@ export function headline(scope: QueueTicket[], inView: QueueTicket[], period: Pe
     if (!isNaN(days) && (!oldest || days > oldest.days)) oldest = { ticket: t, days };
   });
   // Closed counts every ticket closed in the period, whenever it was raised.
-  const done = scope.filter((t) => t.status === 'Completed');
-  const raisedIn = (r: Range): number => scope.filter((t) => within(new Date(t.created), r)).length;
-  const closedIn = (r: Range): number => done.filter((t) => within(closedAt(t), r)).length;
+  const raisedCount = (r: Range): number => scope.filter((t) => raisedInRange(t, r)).length;
+  const closedCount = (r: Range): number => scope.filter((t) => closedInRange(t, r)).length;
   const speeds = inView.map(daysToClose).filter((d): d is number => d !== undefined);
   const prev = period.prev;
   return {
     openNow: open.length,
     unassignedOpen: open.filter((t) => !t.assignedTo).length,
-    raised: raisedIn(period.range),
-    raisedBefore: prev ? raisedIn(prev) : undefined,
-    closed: closedIn(period.range),
-    closedBefore: prev ? closedIn(prev) : undefined,
+    raised: raisedCount(period.range),
+    raisedBefore: prev ? raisedCount(prev) : undefined,
+    closed: closedCount(period.range),
+    closedBefore: prev ? closedCount(prev) : undefined,
     medianDays: median(speeds),
     p90Days: percentile(speeds, 0.9),
     oldestOpen: oldest,
@@ -328,19 +347,27 @@ export interface Holder {
   total: number;
 }
 
+export type HoldState = 'new' | 'inProgress' | 'onHold';
+
+/** Which part of a person's bar an open ticket sits in. */
+export function holdState(t: QueueTicket): HoldState {
+  return t.status === 'In progress' ? 'inProgress' : t.status === 'On Hold' ? 'onHold' : 'new';
+}
+
+/** Who holds a ticket on the "who's holding what" chart; 0 is Unassigned. */
+export const holderId = (t: QueueTicket): number => (t.assignedTo ? t.assignedTo.id : 0);
+
 /** Open tickets per person (and "Unassigned"), most first. */
 export function holders(scope: QueueTicket[]): Holder[] {
   const map = new Map<number, Holder>();
   scope.filter(isOpen).forEach((t) => {
-    const id = t.assignedTo ? t.assignedTo.id : 0;
+    const id = holderId(t);
     let h = map.get(id);
     if (!h) {
       h = { id, name: t.assignedTo ? t.assignedTo.name : 'Unassigned', new: 0, inProgress: 0, onHold: 0, total: 0 };
       map.set(id, h);
     }
-    if (t.status === 'In progress') h.inProgress += 1;
-    else if (t.status === 'On Hold') h.onHold += 1;
-    else h.new += 1;
+    h[holdState(t)] += 1;
     h.total += 1;
   });
   const list: Holder[] = [];
@@ -359,15 +386,16 @@ export interface Closer {
  * Who closed what this calendar month. Credited to "Completed by" where the
  * list recorded it, else to whoever the ticket is assigned to.
  */
+/** Who a close counts for on this month's leaderboard; none when it was not closed this month. */
+export function closerOf(t: QueueTicket, now: Date): PersonRef | undefined {
+  if (!closedIn(t, { start: monthStart(now, 0), end: monthStart(now, -1) })) return undefined;
+  return t.completedBy ?? t.assignedTo;
+}
+
 export function leaderboard(scope: QueueTicket[], now: Date): { closers: Closer[]; fastest?: Closer } {
-  const from = monthStart(now, 0);
-  const to = monthStart(now, -1);
   const map = new Map<number, { c: Closer; speeds: number[] }>();
   scope.forEach((t) => {
-    if (t.status !== 'Completed') return;
-    const at = closedAt(t);
-    if (!at || at < from || at >= to) return;
-    const who = t.completedBy ?? t.assignedTo;
+    const who = closerOf(t, now);
     if (!who) return;
     let e = map.get(who.id);
     if (!e) {
@@ -430,11 +458,19 @@ export function splitCategory(category: string): { area: string; kind: string } 
   return { area: AREA_ALIASES[rawArea] ?? rawArea, kind };
 }
 
+export type AreaPart = 'incident' | 'request' | 'other';
+
+/** Where a ticket sits on "what tickets are about": its area ('' = no category) and which part of the bar. */
+export function areaOf(t: QueueTicket): { area: string; part: AreaPart } {
+  const { area, kind } = splitCategory(t.category);
+  return { area, part: kind === 'Incident' ? 'incident' : kind === 'Request' ? 'request' : 'other' };
+}
+
 export function byArea(inView: QueueTicket[]): { areas: AreaCount[]; uncategorised: number } {
   const map = new Map<string, AreaCount>();
   let uncategorised = 0;
   inView.forEach((t) => {
-    const { area, kind } = splitCategory(t.category);
+    const { area, part } = areaOf(t);
     if (!area) {
       uncategorised += 1;
       return;
@@ -444,9 +480,7 @@ export function byArea(inView: QueueTicket[]): { areas: AreaCount[]; uncategoris
       a = { area, label: AREA_LABELS[area] ?? area, incident: 0, request: 0, other: 0, total: 0 };
       map.set(area, a);
     }
-    if (kind === 'Incident') a.incident += 1;
-    else if (kind === 'Request') a.request += 1;
-    else a.other += 1;
+    a[part] += 1;
     a.total += 1;
   });
   const areas: AreaCount[] = [];
@@ -456,10 +490,13 @@ export function byArea(inView: QueueTicket[]): { areas: AreaCount[]; uncategoris
 
 export const PRIORITY_ORDER = ['Critical', 'High', 'Normal', 'Low'];
 
+/** A ticket's priority as the chart files it: anything unrecognised is "Not set". */
+export const priorityOf = (t: QueueTicket): string => (PRIORITY_ORDER.indexOf(t.priority) === -1 ? 'Not set' : t.priority);
+
 export function byPriority(inView: QueueTicket[]): { priority: string; count: number }[] {
   const counts: Record<string, number> = {};
   inView.forEach((t) => {
-    const p = PRIORITY_ORDER.indexOf(t.priority) === -1 ? 'Not set' : t.priority;
+    const p = priorityOf(t);
     counts[p] = (counts[p] ?? 0) + 1;
   });
   return PRIORITY_ORDER.concat(['Not set'])
@@ -488,12 +525,18 @@ export function heatColumn(hour: number): number {
   return hour - 7;
 }
 
+/** The heat-map square a ticket was raised in: day 0 = Monday. */
+export function heatSlot(t: QueueTicket): { day: number; col: number } | undefined {
+  const d = new Date(t.created);
+  if (isNaN(d.getTime())) return undefined;
+  return { day: (d.getDay() + 6) % 7, col: heatColumn(d.getHours()) };
+}
+
 export function arrivals(inView: QueueTicket[]): Heat {
   const grid = HEAT_DAYS.map(() => HEAT_HOURS.map(() => 0));
   inView.forEach((t) => {
-    const d = new Date(t.created);
-    if (isNaN(d.getTime())) return;
-    grid[(d.getDay() + 6) % 7][heatColumn(d.getHours())] += 1;
+    const s = heatSlot(t);
+    if (s) grid[s.day][s.col] += 1;
   });
   let max = 0;
   let busiest: Heat['busiest'];
@@ -527,12 +570,17 @@ export const SPEED_BUCKETS = [
   { label: 'Over a month', max: Infinity }
 ];
 
+/** Which time-to-close bar a ticket counts in; -1 when it is not completed. */
+export function speedIndex(t: QueueTicket): number {
+  const d = daysToClose(t);
+  return d === undefined ? -1 : SPEED_BUCKETS.findIndex((b) => d < b.max);
+}
+
 export function speeds(inView: QueueTicket[]): { label: string; count: number }[] {
   const counts = SPEED_BUCKETS.map(() => 0);
   inView.forEach((t) => {
-    const d = daysToClose(t);
-    if (d === undefined) return;
-    counts[SPEED_BUCKETS.findIndex((b) => d < b.max)] += 1;
+    const i = speedIndex(t);
+    if (i !== -1) counts[i] += 1;
   });
   return SPEED_BUCKETS.map((b, i) => ({ label: b.label, count: counts[i] }));
 }
@@ -545,12 +593,18 @@ export const AGE_BUCKETS = [
   { label: 'Over 6 months', max: Infinity }
 ];
 
+/** Which age bar an open ticket counts in; -1 when it is closed or has no date. */
+export function ageIndex(t: QueueTicket, now: Date): number {
+  if (!isOpen(t)) return -1;
+  const days = (now.getTime() - new Date(t.created).getTime()) / DAY;
+  return isNaN(days) ? -1 : AGE_BUCKETS.findIndex((b) => days < b.max);
+}
+
 export function ages(scope: QueueTicket[], now: Date): { label: string; count: number; ids: number[] }[] {
   const out = AGE_BUCKETS.map((b) => ({ label: b.label, count: 0, ids: [] as number[] }));
-  scope.filter(isOpen).forEach((t) => {
-    const days = (now.getTime() - new Date(t.created).getTime()) / DAY;
-    if (isNaN(days)) return;
-    const i = AGE_BUCKETS.findIndex((b) => days < b.max);
+  scope.forEach((t) => {
+    const i = ageIndex(t, now);
+    if (i === -1) return;
     out[i].count += 1;
     out[i].ids.push(t.id);
   });
@@ -561,33 +615,34 @@ export function ages(scope: QueueTicket[], now: Date): { label: string; count: n
 
 export interface Gap {
   label: string;
+  /** What the tickets a tap lists are missing: "No department". */
+  missing: string;
   have: number;
   of: number;
   note: string;
 }
 
+/**
+ * Each gap's test: whether a ticket counts towards it at all, and whether it
+ * has the detail. A tap on a gap lists the ones that count and lack it.
+ */
+export const GAP_TESTS: { counts: (t: QueueTicket) => boolean; has: (t: QueueTicket) => boolean }[] = [
+  { counts: () => true, has: (t) => t.department.trim() !== '' },
+  { counts: () => true, has: (t) => t.category.trim() !== '' },
+  { counts: (t) => t.status === 'Completed', has: (t) => t.rootCause.trim() !== '' }
+];
+
+export const GAP_TEXT = [
+  { label: 'Tickets with a department', missing: 'No department', note: 'The Raise a ticket form fills it from the sign-in.' },
+  { label: 'Tickets with a category', missing: 'No category', note: 'The Raise a ticket form always sets one.' },
+  { label: 'Closed tickets with a root cause', missing: 'Closed with no root cause', note: 'Filled in by IT when closing a ticket.' }
+];
+
 export function gaps(inView: QueueTicket[]): Gap[] {
-  const done = inView.filter((t) => t.status === 'Completed');
-  return [
-    {
-      label: 'Tickets with a department',
-      have: inView.filter((t) => t.department.trim() !== '').length,
-      of: inView.length,
-      note: 'The Raise a ticket form fills it from the sign-in.'
-    },
-    {
-      label: 'Tickets with a category',
-      have: inView.filter((t) => t.category.trim() !== '').length,
-      of: inView.length,
-      note: 'The Raise a ticket form always sets one.'
-    },
-    {
-      label: 'Closed tickets with a root cause',
-      have: done.filter((t) => t.rootCause.trim() !== '').length,
-      of: done.length,
-      note: 'Filled in by IT when closing a ticket.'
-    }
-  ];
+  return GAP_TESTS.map((g, i) => {
+    const pool = inView.filter(g.counts);
+    return { label: GAP_TEXT[i].label, missing: GAP_TEXT[i].missing, have: pool.filter(g.has).length, of: pool.length, note: GAP_TEXT[i].note };
+  });
 }
 
 // ---------------------------------------------------------------- the three sentences on top

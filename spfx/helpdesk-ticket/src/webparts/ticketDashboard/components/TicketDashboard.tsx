@@ -39,7 +39,9 @@ import {
   stories,
   trend
 } from '../stats/stats';
+import { Drill, drillKey, drillList, Picker } from '../stats/drill';
 import { ChartCard, KpiTile, LegendItem, StoryCard } from './DashboardParts';
+import { TicketPreview } from './TicketPreview';
 import { GrainSwitch, TrendPlot, TrendTable } from './TrendPlot';
 import {
   AREA_LEGEND,
@@ -309,9 +311,35 @@ function DashboardBody(props: DashboardBodyProps): React.ReactElement {
   // Untouched, the trend charts pick their points from the span; once picked,
   // the choice holds for as long as the Raised dates allow it.
   const [grainPick, setGrainPick] = React.useState<Grain | undefined>(undefined);
+  // The mark a tap opened, and the tickets behind it.
+  const [drill, setDrill] = React.useState<Drill | undefined>(undefined);
 
   const t = trend(scope, range, now, grainPick);
-  const grainSwitch = <GrainSwitch grain={t.grain} grains={t.grains} onPick={setGrainPick} />;
+  // A switch of grain re-numbers the points, so it never keeps a point open.
+  const pickGrain = (g: Grain): void => {
+    setGrainPick(g);
+    setDrill(undefined);
+  };
+  const grainSwitch = <GrainSwitch grain={t.grain} grains={t.grains} onPick={pickGrain} />;
+
+  const openKey = drill !== undefined ? drillKey(drill) : undefined;
+  const pickFor = (...kinds: Drill['kind'][]): Picker => ({
+    picked: drill !== undefined && kinds.indexOf(drill.kind) !== -1 ? openKey : undefined,
+    onPick: setDrill
+  });
+  const trendPick: Picker = { picked: openKey, onPick: setDrill };
+  const nameOf = (id: number): string => {
+    for (const x of scope) {
+      if (x.assignedTo?.id === id) return x.assignedTo.name;
+      if (x.completedBy?.id === id) return x.completedBy.name;
+    }
+    return 'Someone else';
+  };
+  const list = drill !== undefined ? drillList(drill, { scope, inView, period, buckets: t.buckets, now, nameOf }) : undefined;
+  const kpiPick = (d: Drill): { onPick: () => void; picked: boolean } => ({
+    onPick: () => setDrill(d),
+    picked: openKey === drillKey(d)
+  });
   const h = headline(scope, inView, period, now);
   const heat = arrivals(inView);
   const team = holders(scope);
@@ -338,17 +366,20 @@ function DashboardBody(props: DashboardBodyProps): React.ReactElement {
 
   const kpis = [
     {
+      ...kpiPick({ kind: 'open' }),
       label: 'Open now',
       value: String(h.openNow),
       note: h.unassignedOpen > 0 ? `${h.unassignedOpen} nobody has picked up` : 'All picked up',
       noteColour: h.unassignedOpen > 0 ? PALETTE.critical : '#107c10'
     },
     {
+      ...kpiPick({ kind: 'raised' }),
       label: `Raised ${period.label}`,
       value: String(h.raised),
       note: changeText(h.raised, h.raisedBefore, period.prevLabel)
     },
     {
+      ...kpiPick({ kind: 'closed' }),
       label: `Closed ${period.label}`,
       value: String(h.closed),
       note: changeText(h.closed, h.closedBefore, period.prevLabel),
@@ -366,6 +397,7 @@ function DashboardBody(props: DashboardBodyProps): React.ReactElement {
       href: oldest !== undefined ? api.displayFormUrl(oldest.ticket.id) : undefined
     },
     {
+      ...kpiPick({ kind: 'critical' }),
       label: 'Critical',
       value: String(h.criticalInView),
       note: `${percentText(h.criticalInView, h.inView)} of these tickets`
@@ -399,7 +431,7 @@ function DashboardBody(props: DashboardBodyProps): React.ReactElement {
             </>
           }
           tools={grainSwitch}
-          chart={<TrendPlot buckets={t.buckets} kind="lines" label={`${trendTitle}: tickets raised and closed`} />}
+          chart={<TrendPlot buckets={t.buckets} kind="lines" label={`${trendTitle}: tickets raised and closed`} pick={trendPick} />}
           table={<TrendTable buckets={t.buckets} grain={t.grain} kind="lines" />}
         />
         <ChartCard
@@ -408,7 +440,7 @@ function DashboardBody(props: DashboardBodyProps): React.ReactElement {
           subtitle="The pile IT is carrying. Lower is better."
           empty={empty}
           tools={grainSwitch}
-          chart={<TrendPlot buckets={t.buckets} kind="area" label={`${openTitle}: tickets still open`} />}
+          chart={<TrendPlot buckets={t.buckets} kind="area" label={`${openTitle}: tickets still open`} pick={trendPick} />}
           table={<TrendTable buckets={t.buckets} grain={t.grain} kind="area" />}
         />
       </div>
@@ -423,7 +455,7 @@ function DashboardBody(props: DashboardBodyProps): React.ReactElement {
             <LegendItem key={l.label} colour={l.colour} label={l.label} square={true} />
           ))}
           chart={
-            team.length > 0 ? <HoldersBars holders={team} /> : <p className={styles.empty}>Nothing open right now.</p>
+            team.length > 0 ? <HoldersBars holders={team} pick={pickFor('holder')} /> : <p className={styles.empty}>Nothing open right now.</p>
           }
           table={<HoldersTable holders={team} />}
         />
@@ -432,7 +464,7 @@ function DashboardBody(props: DashboardBodyProps): React.ReactElement {
           title="Closed this month"
           subtitle={`${monthName}'s leaderboard. Resets on the 1st.`}
           empty={empty}
-          chart={<Leaderboard closers={board.closers} fastest={board.fastest} monthName={monthName} />}
+          chart={<Leaderboard closers={board.closers} fastest={board.fastest} monthName={monthName} pick={pickFor('closer')} />}
           table={<LeaderboardTable closers={board.closers} />}
         />
       </div>
@@ -446,7 +478,7 @@ function DashboardBody(props: DashboardBodyProps): React.ReactElement {
           legend={AREA_LEGEND.map((l) => (
             <LegendItem key={l.label} colour={l.colour} label={l.label} square={true} />
           ))}
-          chart={<AreaBars areas={area.areas} uncategorised={area.uncategorised} />}
+          chart={<AreaBars areas={area.areas} uncategorised={area.uncategorised} pick={pickFor('area')} />}
           table={<AreaTable areas={area.areas} uncategorised={area.uncategorised} />}
           footer={
             <p className={styles.quiet}>
@@ -459,7 +491,7 @@ function DashboardBody(props: DashboardBodyProps): React.ReactElement {
           title="How urgent they were"
           subtitle="Priority as it stands after IT's review."
           empty={empty}
-          chart={<PriorityBar rows={pri} total={inView.length} />}
+          chart={<PriorityBar rows={pri} total={inView.length} pick={pickFor('priority')} />}
           table={<PriorityTable rows={pri} total={inView.length} />}
           footer={criticalNote !== undefined ? <p className={styles.quiet}>{criticalNote}</p> : undefined}
         />
@@ -471,7 +503,7 @@ function DashboardBody(props: DashboardBodyProps): React.ReactElement {
           title="When tickets arrive"
           subtitle="Darker = more tickets. Plan cover around the dark squares."
           empty={empty}
-          chart={<HeatMap heat={heat} />}
+          chart={<HeatMap heat={heat} pick={pickFor('heat')} />}
           table={<HeatTable heat={heat} />}
           footer={<HeatLegend heat={heat} />}
         />
@@ -480,7 +512,7 @@ function DashboardBody(props: DashboardBodyProps): React.ReactElement {
           title="How long tickets take to close"
           subtitle="From raised to completed."
           empty={empty}
-          chart={<SpeedBars rows={sp} />}
+          chart={<SpeedBars rows={sp} pick={pickFor('speed')} />}
           table={<SpeedTable rows={sp} />}
           footer={
             h.medianDays !== undefined && h.p90Days !== undefined ? (
@@ -501,7 +533,7 @@ function DashboardBody(props: DashboardBodyProps): React.ReactElement {
           title="How old the open tickets are"
           subtitle={`${h.openNow} open. The right-hand end is where tickets go to be forgotten.`}
           empty={empty}
-          chart={<AgeBars rows={ag} />}
+          chart={<AgeBars rows={ag} pick={pickFor('age')} />}
           table={<AgeTable rows={ag} />}
           footer={
             oldBucket !== undefined && oldBucket.count > 0 ? (
@@ -522,14 +554,26 @@ function DashboardBody(props: DashboardBodyProps): React.ReactElement {
           title="Gaps in the records"
           subtitle="What the charts can't see yet."
           empty={empty}
-          chart={<GapBars gaps={gp} />}
+          chart={<GapBars gaps={gp} pick={pickFor('gap')} />}
           table={<GapTable gaps={gp} />}
         />
       </div>
 
       <p className={styles.footNote}>
-        Each chart has a &quot;Show as table&quot; switch with the same numbers. Export gives the tickets behind every figure here.
+        Tap any bar, square, point or figure to see the tickets behind it. Each chart has a &quot;Show as table&quot;
+        switch with the same numbers. Export gives the tickets behind every figure here.
       </p>
+
+      {drill !== undefined && list !== undefined && list.title !== '' && (
+        <TicketPreview
+          key={JSON.stringify(drill)}
+          list={list}
+          urlOf={(id) => api.displayFormUrl(id)}
+          onPick={setDrill}
+          tabIndex={drill.kind === 'bucket' && drill.series === 'closed' ? 1 : 0}
+          onClose={() => setDrill(undefined)}
+        />
+      )}
     </div>
   );
 }

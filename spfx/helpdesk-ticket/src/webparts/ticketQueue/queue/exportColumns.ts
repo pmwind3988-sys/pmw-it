@@ -2,6 +2,7 @@
 // reads the same columns, so the two files can never disagree on content.
 
 import { QueueTicket, PersonRef } from './ticket';
+import { timeToCompleteText } from './timeToComplete';
 
 export type CellValue = string | number | Date | boolean | undefined;
 
@@ -38,6 +39,7 @@ export const EXPORT_COLUMNS: ExportColumn[] = [
   { key: 'modified', header: 'Last updated', width: 18, read: (t) => when(t.modified) },
   { key: 'completedDate', header: 'Completed on', width: 18, read: (t) => when(t.completedDate) },
   { key: 'completedBy', header: 'Completed by', width: 26, read: (t) => who(t.completedBy) },
+  { key: 'timeToComplete', header: 'Time to complete', width: 16, read: (t) => timeToCompleteText(t) },
   { key: 'rootCause', header: 'Root cause', width: 20, read: (t) => t.rootCause },
   { key: 'resolution', header: 'Resolution summary', width: 50, wrap: true, read: (t) => t.resolution },
   { key: 'comments', header: 'Comments', width: 50, wrap: true, read: (t) => t.comments },

@@ -3,6 +3,7 @@
 
 import { DateChoice, inRange, rangeOf } from './dateRange';
 import { PersonRef, QueueTicket } from './ticket';
+import { hoursToComplete } from './timeToComplete';
 
 /** The assignee filter's entry for tickets nobody has been given yet. */
 export const UNASSIGNED = 0;
@@ -63,14 +64,26 @@ export function assigneesOf(rows: QueueTicket[]): { person: PersonRef; count: nu
   return list.sort((a, b) => a.person.name.localeCompare(b.person.name));
 }
 
-export type SortKey = 'created' | 'modified' | 'number' | 'priority' | 'status' | 'assignedTo';
+export type SortKey =
+  | 'created'
+  | 'modified'
+  | 'number'
+  | 'priority'
+  | 'status'
+  | 'assignedTo'
+  | 'timeToComplete'
+  | 'completedDate';
 
 const PRIORITY_RANK: Record<string, number> = { Critical: 0, High: 1, Normal: 2, Low: 3, Undefined: 4 };
 const STATUS_RANK: Record<string, number> = { New: 0, 'In progress': 1, 'On Hold': 2, Completed: 3, Cancelled: 4 };
 
-/** Sorted copy. Ties fall back to newest first, so the order never shuffles between renders. */
+/**
+ * Sorted copy. Ties fall back to newest first, so the order never shuffles
+ * between renders. A ticket with no value for the column (not completed yet)
+ * goes last whichever way the column is sorted.
+ */
 export function sortTickets(rows: QueueTicket[], key: SortKey, desc: boolean): QueueTicket[] {
-  const value = (t: QueueTicket): string | number => {
+  const value = (t: QueueTicket): string | number | undefined => {
     switch (key) {
       case 'created': return t.created;
       case 'modified': return t.modified;
@@ -78,12 +91,16 @@ export function sortTickets(rows: QueueTicket[], key: SortKey, desc: boolean): Q
       case 'priority': return PRIORITY_RANK[t.priority] ?? 9;
       case 'status': return STATUS_RANK[t.status] ?? 9;
       case 'assignedTo': return t.assignedTo ? t.assignedTo.name.toLowerCase() : '￿';
+      case 'timeToComplete': return hoursToComplete(t);
+      case 'completedDate': return t.status === 'Completed' ? t.completedDate || t.modified : undefined;
     }
   };
   return rows.slice().sort((a, b) => {
     const va = value(a);
     const vb = value(b);
-    const c = va < vb ? -1 : va > vb ? 1 : 0;
+    if (va === undefined && vb !== undefined) return 1;
+    if (vb === undefined && va !== undefined) return -1;
+    const c = va === undefined || vb === undefined ? 0 : va < vb ? -1 : va > vb ? 1 : 0;
     if (c !== 0) return desc ? -c : c;
     return a.created < b.created ? 1 : a.created > b.created ? -1 : b.id - a.id;
   });

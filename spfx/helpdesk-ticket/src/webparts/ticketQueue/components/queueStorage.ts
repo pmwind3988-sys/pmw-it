@@ -3,6 +3,8 @@
 
 export const FILTER_KEY = 'ticketQueue:filter:v1';
 export const COLUMNS_KEY = 'ticketQueue:columns:v1';
+/** The table's own columns and their order; COLUMNS_KEY is the export's. */
+export const TABLE_COLUMNS_KEY = 'ticketQueue:tableColumns:v1';
 
 export function readStored(key: string): string | undefined {
   try {

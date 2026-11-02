@@ -18,7 +18,9 @@ import {
   parseFilter,
   sortDescription
 } from './queueFormat';
-import { FILTER_KEY, readStored, writeStored } from './queueStorage';
+import { FILTER_KEY, readStored, TABLE_COLUMNS_KEY, writeStored } from './queueStorage';
+import { parseTableColumns } from '../queue/tableColumns';
+import { ColumnsDialog } from './ColumnsDialog';
 import { QueueFilters } from './QueueFilters';
 import { SortState, TicketTable } from './TicketTable';
 import { ExportDialog } from './ExportDialog';
@@ -52,6 +54,9 @@ function QueueScreen(props: QueueScreenProps): React.ReactElement {
   const [sort, setSort] = React.useState<SortState>({ key: 'created', desc: true });
   const [page, setPage] = React.useState(0);
   const [exportOpen, setExportOpen] = React.useState(false);
+  const [columns, setColumns] = React.useState<string[]>(() => parseTableColumns(readStored(TABLE_COLUMNS_KEY)));
+  const [columnsOpen, setColumnsOpen] = React.useState(false);
+  const columnsBtn = React.useRef<HTMLButtonElement>(null);
   const seq = React.useRef(0);
   const mounted = useMountedRef();
   const exportBtn = React.useRef<HTMLButtonElement>(null);
@@ -81,6 +86,10 @@ function QueueScreen(props: QueueScreenProps): React.ReactElement {
   React.useEffect(() => {
     writeStored(FILTER_KEY, JSON.stringify(filter));
   }, [filter]);
+
+  React.useEffect(() => {
+    writeStored(TABLE_COLUMNS_KEY, JSON.stringify(columns));
+  }, [columns]);
 
   // The search box applies 200ms after the last keystroke, not on every one.
   React.useEffect(() => {
@@ -130,6 +139,11 @@ function QueueScreen(props: QueueScreenProps): React.ReactElement {
     fileParts: [assigneeText, dateText]
   };
 
+  const closeColumns = (): void => {
+    setColumnsOpen(false);
+    columnsBtn.current?.focus();
+  };
+
   const closeExport = (): void => {
     setExportOpen(false);
     exportBtn.current?.focus();
@@ -157,6 +171,9 @@ function QueueScreen(props: QueueScreenProps): React.ReactElement {
               }}
             >
               <RefreshIcon className={loading ? styles.spin : undefined} />
+            </button>
+            <button ref={columnsBtn} type="button" className={styles.secondaryBtn} onClick={() => setColumnsOpen(true)}>
+              Columns
             </button>
             <button
               ref={exportBtn}
@@ -235,10 +252,12 @@ function QueueScreen(props: QueueScreenProps): React.ReactElement {
             sort={sort}
             onSort={onSort}
             onPage={setPage}
+            columns={columns}
           />
         )}
       </section>
 
+      {columnsOpen && <ColumnsDialog keys={columns} onChange={setColumns} onClose={closeColumns} />}
       {exportOpen && <ExportDialog rows={sorted} context={exportContext} onClose={closeExport} />}
     </div>
   );

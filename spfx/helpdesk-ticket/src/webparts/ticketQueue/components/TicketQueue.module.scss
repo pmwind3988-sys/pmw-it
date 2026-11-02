@@ -712,3 +712,149 @@ th[aria-sort='descending'] .sortBtn svg {
   color: $text-3;
   text-align: left;
 }
+
+// ---------------------------------------------------------------- the table's columns
+
+.longCell {
+  min-width: 220px;
+  max-width: 360px;
+}
+
+.clamp {
+  display: -webkit-box;
+  overflow: hidden;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.durationCell {
+  color: $text;
+  font-variant-numeric: tabular-nums;
+}
+
+.colList,
+.addList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.colItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 2px 6px;
+  border: 1px solid $border-soft;
+  border-radius: 4px;
+  background: #ffffff;
+
+  &[draggable='true'] {
+    cursor: grab;
+  }
+}
+
+.colDragging {
+  opacity: 0.4;
+}
+
+.colOverBefore {
+  box-shadow: inset 0 3px 0 $primary;
+}
+
+.colOverAfter {
+  box-shadow: inset 0 -3px 0 $primary;
+}
+
+.grip,
+.gripOff {
+  display: flex;
+  flex: none;
+  color: $text-3;
+}
+
+.gripOff {
+  visibility: hidden;
+}
+
+.colName {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 15px;
+}
+
+.colNote {
+  font-size: 12px;
+  color: $text-3;
+}
+
+.colActions {
+  display: flex;
+  flex: none;
+  gap: 2px;
+}
+
+.smallBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: $text;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: $soft-bg;
+  }
+
+  &:disabled {
+    color: $border;
+    cursor: default;
+  }
+
+  &:focus-visible {
+    outline: 2px solid $primary;
+    outline-offset: 1px;
+  }
+}
+
+.addList {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.addBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px dashed $input-border;
+  border-radius: 20px;
+  background: #ffffff;
+  color: $text;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+
+  &:hover {
+    border-style: solid;
+    background: $soft-bg;
+  }
+
+  &:focus-visible {
+    outline: 2px solid $primary;
+    outline-offset: 2px;
+  }
+}

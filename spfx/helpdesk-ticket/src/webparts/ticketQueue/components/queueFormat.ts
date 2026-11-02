@@ -81,7 +81,9 @@ const SORT_WORDS: Record<SortKey, { label: string; asc: string; desc: string }> 
   status: { label: 'Status', asc: 'New first', desc: 'Cancelled first' },
   assignedTo: { label: 'Assigned to', asc: 'A–Z', desc: 'Z–A' },
   created: { label: 'Raised on', asc: 'oldest first', desc: 'newest first' },
-  modified: { label: 'Updated', asc: 'oldest first', desc: 'newest first' }
+  modified: { label: 'Updated', asc: 'oldest first', desc: 'newest first' },
+  timeToComplete: { label: 'Time to complete', asc: 'quickest first', desc: 'slowest first' },
+  completedDate: { label: 'Completed on', asc: 'oldest first', desc: 'newest first' }
 };
 
 /** "Raised on (newest first)" for the export's "Sorted by" line. */
@@ -92,7 +94,7 @@ export function sortDescription(key: SortKey, desc: boolean): string {
 
 /** Dates start newest first; every other column starts A–Z or most-important first. */
 export function initialDesc(key: SortKey): boolean {
-  return key === 'created' || key === 'modified';
+  return key === 'created' || key === 'modified' || key === 'completedDate';
 }
 
 export function pageCount(total: number): number {

@@ -1,6 +1,6 @@
 import { fromQueueItem, QueueTicket } from '../../ticketQueue/queue/ticket';
 import {
-  ages, arrivals, byArea, byPriority, changeText, closedAt, daysToClose, gaps, grainFor, headline, holders,
+  ages, arrivals, byArea, byPriority, changeText, closedAt, daysToClose, gaps, grainFor, grainsFor, headline, holders,
   leaderboard, median, percentile, periodOf, slotText, speeds, splitCategory, stories, trend, trendWindow
 } from './stats';
 
@@ -40,6 +40,22 @@ describe('trend', () => {
     expect(grainFor(new Date(2026, 9, 1), new Date(2026, 10, 1))).toBe('day');
     expect(grainFor(new Date(2026, 6, 1), new Date(2026, 10, 1))).toBe('week');
     expect(grainFor(new Date(2025, 10, 1), new Date(2026, 10, 1))).toBe('month');
+  });
+
+  it('offers the grains a span allows, always including the one it would pick', () => {
+    expect(grainsFor(new Date(2026, 9, 22), new Date(2026, 9, 29))).toEqual(['day']);
+    expect(grainsFor(new Date(2026, 9, 1), new Date(2026, 10, 1))).toEqual(['week', 'day']);
+    expect(grainsFor(new Date(2026, 6, 1), new Date(2026, 10, 1))).toEqual(['month', 'week']);
+    expect(grainsFor(new Date(2024, 10, 1), new Date(2026, 10, 1))).toEqual(['month']);
+    const w = trendWindow({}, NOW);
+    expect(grainsFor(w.from, w.to)).toEqual(['month', 'week']);
+  });
+
+  it('draws the chosen grain, and falls back to the span\'s own when the dates rule it out', () => {
+    const rows = [t({ Created: at(2026, 10, 5) })];
+    expect(trend(rows, {}, NOW, 'week').grain).toBe('week');
+    expect(trend(rows, {}, NOW, 'day').grain).toBe('month');
+    expect(trend(rows, {}, NOW).grains).toEqual(['month', 'week']);
   });
 
   it('"any time" shows the past 12 months, and stops at today', () => {

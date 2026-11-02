@@ -444,6 +444,18 @@ $story: #1b2a6b;
   &:hover {
     background: $soft-bg;
   }
+
+  &:disabled {
+    background: #ffffff;
+    color: $text-2;
+    border-style: dashed;
+    cursor: not-allowed;
+  }
+}
+
+.grainSwitch {
+  display: flex;
+  gap: 4px;
 }
 
 .legendItem {

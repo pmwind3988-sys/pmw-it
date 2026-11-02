@@ -29,6 +29,7 @@ import {
   changeText,
   days1,
   gaps,
+  Grain,
   headline,
   holders,
   leaderboard,
@@ -39,7 +40,7 @@ import {
   trend
 } from '../stats/stats';
 import { ChartCard, KpiTile, LegendItem, StoryCard } from './DashboardParts';
-import { TrendPlot, TrendTable } from './TrendPlot';
+import { GrainSwitch, TrendPlot, TrendTable } from './TrendPlot';
 import {
   AREA_LEGEND,
   AreaBars,
@@ -305,8 +306,12 @@ const AlertIcon = (): React.ReactElement => (
 function DashboardBody(props: DashboardBodyProps): React.ReactElement {
   const { api, scope, inView, range, period, now } = props;
   const empty = inView.length === 0;
+  // Untouched, the trend charts pick their points from the span; once picked,
+  // the choice holds for as long as the Raised dates allow it.
+  const [grainPick, setGrainPick] = React.useState<Grain | undefined>(undefined);
 
-  const t = trend(scope, range, now);
+  const t = trend(scope, range, now, grainPick);
+  const grainSwitch = <GrainSwitch grain={t.grain} grains={t.grains} onPick={setGrainPick} />;
   const h = headline(scope, inView, period, now);
   const heat = arrivals(inView);
   const team = holders(scope);
@@ -393,6 +398,7 @@ function DashboardBody(props: DashboardBodyProps): React.ReactElement {
               <LegendItem colour={PALETTE.closed} label="Closed" />
             </>
           }
+          tools={grainSwitch}
           chart={<TrendPlot buckets={t.buckets} kind="lines" label={`${trendTitle}: tickets raised and closed`} />}
           table={<TrendTable buckets={t.buckets} grain={t.grain} kind="lines" />}
         />
@@ -401,6 +407,7 @@ function DashboardBody(props: DashboardBodyProps): React.ReactElement {
           title={openTitle}
           subtitle="The pile IT is carrying. Lower is better."
           empty={empty}
+          tools={grainSwitch}
           chart={<TrendPlot buckets={t.buckets} kind="area" label={`${openTitle}: tickets still open`} />}
           table={<TrendTable buckets={t.buckets} grain={t.grain} kind="area" />}
         />

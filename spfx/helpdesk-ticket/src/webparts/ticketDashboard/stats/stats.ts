@@ -79,6 +79,25 @@ export function grainFor(from: Date, to: Date): Grain {
   return 'month';
 }
 
+export const GRAINS: Grain[] = ['month', 'week', 'day'];
+
+/**
+ * What each point may be, for the switch on the trend charts: a month needs two
+ * months to draw a line, a week needs two weeks and stops at a year, and a day
+ * stops at three months. Whatever `grainFor` picks is always among them.
+ */
+export function grainsFor(from: Date, to: Date): Grain[] {
+  const days = (to.getTime() - from.getTime()) / DAY;
+  return GRAINS.filter((g) => (g === 'month' ? days >= 60 : g === 'week' ? days >= 14 && days <= 400 : days <= 92));
+}
+
+/** Why a grain is not offered for the current dates, for its greyed-out button. */
+export const GRAIN_RULES: Record<Grain, string> = {
+  month: 'Needs Raised dates of 2 months or more',
+  week: 'Needs Raised dates of 2 weeks to a year',
+  day: 'Needs Raised dates of 3 months or less'
+};
+
 /**
  * The window the trend charts cover: the chosen dates, or the past twelve
  * calendar months (this one included) when "Any time" is chosen. A window that
@@ -117,9 +136,19 @@ function labelOf(d: Date, grain: Grain, multiYear: boolean): string {
   return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
 }
 
-export function trend(scope: QueueTicket[], range: Range, now: Date): { grain: Grain; buckets: Bucket[] } {
+/**
+ * `chosen` is the switch on the charts; when the dates no longer allow it (or
+ * nobody has touched it) the points are whatever suits the span.
+ */
+export function trend(
+  scope: QueueTicket[],
+  range: Range,
+  now: Date,
+  chosen?: Grain
+): { grain: Grain; grains: Grain[]; buckets: Bucket[] } {
   const win = trendWindow(range, now);
-  const grain = grainFor(win.from, win.to);
+  const grains = grainsFor(win.from, win.to);
+  const grain = chosen !== undefined && grains.indexOf(chosen) !== -1 ? chosen : grainFor(win.from, win.to);
   const starts = bucketStarts(win.from, win.to, grain);
   const multiYear = starts.length > 0 && starts[0].getFullYear() !== starts[starts.length - 1].getFullYear();
   const buckets: Bucket[] = starts.map((start, i) => ({
@@ -144,7 +173,7 @@ export function trend(scope: QueueTicket[], range: Range, now: Date): { grain: G
       if (made < b.end && (!shut || shut >= b.end)) b.openAtEnd += 1;
     });
   });
-  return { grain, buckets };
+  return { grain, grains, buckets };
 }
 
 // ---------------------------------------------------------------- headline figures

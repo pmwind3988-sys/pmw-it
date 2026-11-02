@@ -16,10 +16,12 @@ export interface ChartCardProps {
   table: React.ReactNode;
   legend?: React.ReactNode;
   footer?: React.ReactNode;
+  /** Controls of the chart's own, beside "Show as table". */
+  tools?: React.ReactNode;
 }
 
 export function ChartCard(props: ChartCardProps): React.ReactElement {
-  const { title, subtitle, className, empty, chart, table, legend, footer } = props;
+  const { title, subtitle, className, empty, chart, table, legend, footer, tools } = props;
   const [asTable, setAsTable] = React.useState(false);
   const headingId = useInstanceId('dash-card');
   return (
@@ -34,6 +36,7 @@ export function ChartCard(props: ChartCardProps): React.ReactElement {
         {!empty && (
           <div className={styles.cardTools}>
             {legend}
+            {tools}
             <button
               type="button"
               className={styles.toggle}

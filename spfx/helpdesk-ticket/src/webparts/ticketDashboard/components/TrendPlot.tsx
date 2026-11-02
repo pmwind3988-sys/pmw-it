@@ -2,7 +2,7 @@
 // The plot is an SVG stretched to the card; its labels, dots and tooltip are
 // positioned in percent over it, so text never stretches with the picture.
 import * as React from 'react';
-import { Bucket, Grain } from '../stats/stats';
+import { Bucket, Grain, GRAIN_RULES, GRAINS } from '../stats/stats';
 import {
   anchorShift, axisTicks, labelEvery, moveIndex, niceMax, PALETTE, snapIndex, svgArea, svgPoints, svgY, VIEW_H,
   VIEW_W, xPct, yPct
@@ -256,5 +256,35 @@ export function TrendTable(props: { buckets: Bucket[]; grain: Grain; kind: 'line
         ))}
       </tbody>
     </table>
+  );
+}
+
+const GRAIN_LABELS: Record<Grain, string> = { month: 'Month', week: 'Week', day: 'Day' };
+
+/**
+ * Month / Week / Day for both trend charts. A grain the Raised dates do not
+ * allow stays on screen, greyed out, and says why when hovered.
+ */
+export function GrainSwitch(props: { grain: Grain; grains: Grain[]; onPick: (g: Grain) => void }): React.ReactElement {
+  const { grain, grains, onPick } = props;
+  return (
+    <div className={styles.grainSwitch} role="group" aria-label="Show each point as">
+      {GRAINS.map((g) => {
+        const allowed = grains.indexOf(g) !== -1;
+        return (
+          <button
+            key={g}
+            type="button"
+            className={styles.toggle}
+            aria-pressed={g === grain}
+            disabled={!allowed}
+            title={allowed ? undefined : GRAIN_RULES[g]}
+            onClick={() => onPick(g)}
+          >
+            {GRAIN_LABELS[g]}
+          </button>
+        );
+      })}
+    </div>
   );
 }

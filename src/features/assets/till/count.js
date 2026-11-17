@@ -155,3 +155,29 @@ export function addCounted(batch, entry, assets = []) {
   });
   return { batch: addDraft(batch, draft), result: COUNT_RESULT.ADDED, draft };
 }
+
+/**
+ * The makes worth offering for a category: this receipt's, newest first, then
+ * the register's, most-held first. Each once, whatever its case.
+ */
+export function knownMakes(category, assets = [], drafts = [], limit = 8) {
+  const seen = new Set();
+  const out = [];
+  const offer = (make) => {
+    if (!clean(make) || seen.has(key(make))) return;
+    seen.add(key(make));
+    out.push(clean(make));
+  };
+  for (const draft of [...drafts].reverse()) {
+    if (draft.category === category) offer(draft.manufacturer);
+  }
+  const tally = new Map();
+  for (const asset of assets) {
+    if (asset.category !== category || !clean(asset.manufacturer)) continue;
+    const entry = tally.get(key(asset.manufacturer)) ?? { make: asset.manufacturer, n: 0 };
+    entry.n += asset.trackingMode === TRACKED ? 1 : (asset.quantity ?? 1);
+    tally.set(key(asset.manufacturer), entry);
+  }
+  for (const entry of [...tally.values()].sort((a, b) => b.n - a.n)) offer(entry.make);
+  return out.slice(0, limit);
+}

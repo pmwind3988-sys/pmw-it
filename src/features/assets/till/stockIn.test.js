@@ -6,7 +6,7 @@ import { assetTitle } from '../identity.js';
 import {
   scanIn, addModel, STOCK_RESULT, matchRegister, needsKind, needsSerial, setKind, nextTag,
   linkToModel, addSerialsTo, serialCount, applySweep, asCounted, isShopCode,
-  noCodeDraft, holdsFor, itemCount,
+  noCodeDraft, holdsFor, itemCount, nameLine, addSameModel,
 } from './stockIn.js';
 
 const LAPTOP = {
@@ -286,5 +286,58 @@ describe('one box: its serial and its shop barcode', () => {
   it('knows what a shop barcode looks like', () => {
     expect(isShopCode('5099206092372')).toBe(true);
     expect(isShopCode('2140LZ0B1')).toBe(false);
+  });
+});
+
+describe('nameLine and addSameModel', () => {
+  const unknown = (code) => scanIn(newBatch(), code, []);
+
+  it('names a new line in one go: type, brand, model', () => {
+    const { batch, draft } = unknown('5CG9999AB1');
+    const named = nameLine(batch, draft.localId, { category: 'Laptop', manufacturer: 'HP', model: 'EliteBook 840 G10' });
+    const line = named.drafts[0];
+    expect(needsKind(line)).toBe(false);
+    expect(line).toMatchObject({ category: 'Laptop', trackingMode: TRACKED, manufacturer: 'HP', model: 'EliteBook 840 G10' });
+  });
+
+  it('leaves a blank brand or model alone', () => {
+    const { batch, draft } = unknown('5CG9999AB1');
+    const named = nameLine(batch, draft.localId, { category: 'Laptop', manufacturer: '  ', model: '' });
+    expect(named.drafts[0].manufacturer ?? '').toBe('');
+  });
+
+  it('moves the scanned serial onto item 1 of a counted type', () => {
+    const { batch, draft } = unknown('2140LZ0B1');
+    const named = nameLine(batch, draft.localId, { category: 'Mouse', manufacturer: 'Logitech', model: 'M90' });
+    expect(serialCount(named.drafts[0])).toBe(1);
+  });
+
+  it('makes one line per serial for a tracked type, all the same model', () => {
+    const { batch, draft } = unknown('5CG9999AB1');
+    let next = nameLine(batch, draft.localId, { category: 'Laptop', manufacturer: 'HP', model: 'EliteBook 840 G10' });
+    next = addSameModel(next, draft.localId, { serials: ['5CG9999AB2', '5CG9999AB3'], without: 0, boxCodes: [] });
+    expect(next.drafts).toHaveLength(3);
+    expect(next.drafts.map((d) => d.serialNumber)).toEqual(['5CG9999AB1', '5CG9999AB2', '5CG9999AB3']);
+    for (const d of next.drafts) expect(d).toMatchObject({ category: 'Laptop', manufacturer: 'HP', model: 'EliteBook 840 G10', trackingMode: TRACKED });
+    expect(new Set(next.drafts.map((d) => d.localId)).size).toBe(3);
+    expect(holdsFor(next).size).toBe(0);
+  });
+
+  it('fills the first line when it was only waiting for its serial', () => {
+    const { batch, draft } = unknown('5099206092372');
+    let next = nameLine(batch, draft.localId, { category: 'Monitor', manufacturer: 'Dell', model: 'P2422H' });
+    expect(needsSerial(next.drafts[0])).toBe(true);
+    next = addSameModel(next, draft.localId, { serials: ['CN0AA1', 'CN0AA2'], without: 0, boxCodes: [] });
+    expect(next.drafts.map((d) => d.serialNumber)).toEqual(['CN0AA1', 'CN0AA2']);
+    expect(next.drafts[1].partNumber).toBe('5099206092372');
+  });
+
+  it('puts serials onto items of one line for a counted type', () => {
+    const { batch, draft } = unknown('2140LZ0B1');
+    let next = nameLine(batch, draft.localId, { category: 'Mouse', manufacturer: 'Logitech', model: 'M90' });
+    next = addSameModel(next, draft.localId, { serials: ['2140LZ0B2', '2140LZ0B3'], without: 1, boxCodes: [] });
+    expect(next.drafts).toHaveLength(1);
+    expect(serialCount(next.drafts[0])).toBe(3);
+    expect(next.drafts[0].quantity).toBe(4);
   });
 });

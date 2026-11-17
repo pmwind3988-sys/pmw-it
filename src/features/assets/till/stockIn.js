@@ -493,3 +493,59 @@ export function applySweep(batch, localId, found = {}) {
   }
   return replaceDraft(batch, { ...draft, guessed: [...guessed] });
 }
+
+/**
+ * A new line named in one go, from the till's "New item" sheet: what it is,
+ * then make and model. The category goes first, through `setKind`, because it
+ * decides whether the line is one item or a count — and a counted line moves
+ * the code it was scanned by onto item 1. A blank make or model is left as it
+ * was rather than written over.
+ */
+export function nameLine(batch, localId, { category, manufacturer = '', model = '' } = {}) {
+  let next = category ? setKind(batch, localId, category) : batch;
+  for (const [field, value] of [['manufacturer', manufacturer], ['model', model]]) {
+    const clean = String(value ?? '').trim();
+    if (clean) next = setLineField(next, localId, field, clean);
+  }
+  return next;
+}
+
+/**
+ * More of the same product, each with its own serial: the end of a serial run
+ * started from a line just named.
+ *
+ * A tracked thing is one row per physical item, so every serial is its OWN
+ * line of the same model — five laptops are five lines, nobody answers type,
+ * make and model five times. When the named line itself was only waiting for
+ * its serial (the code first scanned was the box's part number), the first
+ * serial is that line's. A counted thing keeps one line, and the serials go
+ * onto its items, exactly as a serial run always has.
+ */
+export function addSameModel(batch, localId, { serials = [], without = 0, boxCodes = [] } = {}) {
+  const line = batch.drafts.find((entry) => entry.localId === localId);
+  if (!line) return batch;
+  if (line.trackingMode !== TRACKED) return addSerialsTo(batch, localId, serials, without, boxCodes);
+
+  let next = batch;
+  let rest = serials;
+  if (needsSerial(line) && rest.length) {
+    next = replaceDraft(next, { ...line, serialNumber: rest[0] });
+    rest = rest.slice(1);
+  }
+  for (const serialNumber of rest) {
+    next = addDraft(next, newDraft({
+      category: line.category,
+      trackingMode: TRACKED,
+      manufacturer: line.manufacturer ?? '',
+      model: line.model ?? '',
+      partNumber: line.partNumber ?? '',
+      additionalCodes: union(line.additionalCodes ?? [], boxCodes),
+      specSummary: line.specSummary ?? '',
+      location: line.location ?? '',
+      serialNumber,
+      scanSource: 'Camera',
+      manualFields: ['category', 'manufacturer', 'model'],
+    }));
+  }
+  return next;
+}

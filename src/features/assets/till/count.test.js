@@ -3,7 +3,7 @@ import { TRACKED, BULK } from '../assetKinds.js';
 import { parseUnits } from '../units.js';
 import { holdsFor, itemCount } from './stockIn.js';
 import {
-  newCount, addCounted, recentModels, knownLocations, COUNT_RESULT, COUNT_REMARK,
+  newCount, addCounted, recentModels, knownLocations, knownMakes, COUNT_RESULT, COUNT_REMARK,
 } from './count.js';
 
 const REGISTER = [
@@ -105,5 +105,15 @@ describe('a count run’s shop barcode', () => {
     const { draft } = addCounted(newCount(), { category: 'Mouse', manufacturer: 'Logitech', model: 'M90', location: 'F1', serials: ['A1'], boxCodes: ['5099206092372'] });
     expect(draft.additionalCodes).toEqual(['5099206092372']);
     expect(parseUnits(draft.units).map((unit) => unit.serialNumber)).toEqual(['A1']);
+  });
+});
+
+describe('knownMakes', () => {
+  it('offers this receipt first, then what the register holds most of', () => {
+    const drafts = [{ category: 'Monitor', manufacturer: 'Samsung' }];
+    expect(knownMakes('Monitor', REGISTER, drafts)).toEqual(['Samsung', 'Dell', 'LG']);
+  });
+  it('lists each make once whatever its case', () => {
+    expect(knownMakes('Monitor', [...REGISTER, { category: 'Monitor', manufacturer: 'dell', model: 'X' }])).toEqual(['Dell', 'LG']);
   });
 });

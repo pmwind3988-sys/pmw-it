@@ -649,6 +649,14 @@ select.till-chip { padding-right: 12px; }
 .till-fieldset { margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 8px; }
 .till-fieldset legend { padding: 0; margin-bottom: 8px; font-weight: 600; font-size: 14px; }
 
+/* The "New item" sheet: adding a type, and the named product before "more?". */
+.till-newtype { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--it-line); border-radius: 14px; background: var(--it-canvas); }
+.till-newtype-actions { display: flex; align-items: center; gap: 12px; }
+.till-newtype-note { margin: 0; font-size: 13px; color: var(--it-ink-soft); }
+.till-newtype-problem { color: var(--it-danger); }
+.till-newitem-name { margin: 0; font-size: 18px; font-weight: 600; }
+.till-newitem-name span { font-weight: 400; color: var(--it-ink-soft); }
+
 .till-newtag {
   display: flex;
   flex-wrap: wrap;

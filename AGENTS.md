@@ -640,6 +640,19 @@ existing serials first, then the run's, numbered by item. The register page
 (`/assets`) no longer offers "Add by hand" or "Scan a delivery": the till does
 both; `/assets/scan` still exists but nothing links to it.
 
+**A new code at the till is named once, then its siblings are scanned.** An
+unknown stock-in scan (`STOCK_RESULT.NEW`) opens `till/ui/NewItemSheet.jsx`:
+type (with "Add a new type…", written to SharePoint at once via `addCategory`),
+brand, model, then "more of this same product, each with its own serial?".
+`nameLine` names the line (a register model picked from the chips goes through
+`linkToModel` instead); "Yes" opens the serial run with `same: true`, and
+`addSameModel` makes one line PER SERIAL for a tracked type (five laptops are
+five rows of one model; a line still waiting for its serial takes the first)
+and items on one line for a counted type. A tracked run offers no "one without
+a serial" -- a laptop with nothing on it goes through "Nothing on it". A type
+added here is counted, per `trackingModeFor`. Closing the sheet leaves the line
+asking on the receipt as before.
+
 **A box sweep reads the packaging, and only suggests.** `till/boxSweep.js`
 (pure) turns each pass of the text reader into votes: a known make starting a
 line and the model after it ("Logitech M90 Wireless Mouse" → Logitech, M90,

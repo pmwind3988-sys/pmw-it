@@ -21,7 +21,7 @@ import {
  * is known by.
  */
 export default function SerialRunSheet({
-  title, assets, drafts, existing = [], boxCodes = [], onCancel, onDone,
+  title, assets, drafts, existing = [], boxCodes = [], allowWithout = true, onCancel, onDone,
 }) {
   const [run, setRun] = useState(newRun);
   const [typed, setTyped] = useState('');
@@ -97,7 +97,9 @@ export default function SerialRunSheet({
           {existing.length ? ` · ${existing.length} already on this line` : ''}
         </span>
         <span className="till-run-actions">
-          <button type="button" className="till-chip" onClick={() => change(withoutSerial(run))}>One without a serial</button>
+          {allowWithout && (
+            <button type="button" className="till-chip" onClick={() => change(withoutSerial(run))}>One without a serial</button>
+          )}
           <button type="button" className="till-chip" onClick={() => change(undoLast(run))} disabled={!count}>Undo last</button>
         </span>
       </div>

@@ -24,6 +24,7 @@ import CountPanel from '../features/assets/till/ui/CountPanel';
 import SerialRunSheet from '../features/assets/till/ui/SerialRunSheet';
 import SameAsSearch from '../features/assets/till/ui/SameAsSearch';
 import BoxSweepSheet from '../features/assets/till/ui/BoxSweepSheet';
+import NewItemSheet from '../features/assets/till/ui/NewItemSheet';
 import ChoiceSheet from '../features/assets/till/ui/ChoiceSheet';
 import { checklistFromTill } from '../features/assets/till/checklistFromTill';
 import { useOrgDirectory } from '../hooks/useOrgDirectory';
@@ -40,7 +41,7 @@ import { parseUnits } from '../features/assets/units';
 import { TRACKED, CONDITIONS } from '../features/assets/assetKinds';
 import {
   scanIn, addModel, setKind, setLineField, needsKind, needsSerial, holdsFor, nextTag, matchRegister,
-  noCodeDraft, itemCount as itemsIn, STOCK_RESULT, linkToModel, addSerialsTo, serialCount, applySweep,
+  noCodeDraft, itemCount as itemsIn, STOCK_RESULT, linkToModel, addSerialsTo, serialCount, applySweep, nameLine, addSameModel,
 } from '../features/assets/till/stockIn';
 import {
   scanOut, addAsset, refusalsFor, sendable, itemCount as itemsOut, withTerms, DUE_CHOICES, OUT_RESULT,
@@ -206,6 +207,8 @@ export default function AssetTillPage() {
   const [runFor, setRunFor] = useState(null);
   // A box sweep onto one line: { localId, which }.
   const [sweepFor, setSweepFor] = useState(null);
+  // A code the till has never seen, being named: { localId, code }.
+  const [newFor, setNewFor] = useState(null);
 
   // What the scan handlers read. A camera frame can carry several codes, and
   // each must see the receipt the previous one left — not the one this render
@@ -237,7 +240,10 @@ export default function AssetTillPage() {
       if (out.result === STOCK_RESULT.ADDED) say('ok', `Added · ${name}`);
       else if (out.result === STOCK_RESULT.COUNTED) say('ok', `+1 · ${name} (now ${out.draft.quantity})`);
       else if (out.result === STOCK_RESULT.FILLED) say('ok', `Serial added · ${name}`);
-      else if (out.result === STOCK_RESULT.NEW) say('ask', 'New code — say what it is');
+      else if (out.result === STOCK_RESULT.NEW) {
+        say('ask', 'New code — say what it is');
+        setNewFor({ localId: out.draft.localId, code: String(raw).trim() });
+      }
       else if (out.result === STOCK_RESULT.DUPLICATE) say('ask', 'Already on this receipt');
       else if (out.result === STOCK_RESULT.KNOWN) say('ask', `${out.asset.title || 'That'} is already in the register`);
       return;
@@ -1052,7 +1058,7 @@ export default function AssetTillPage() {
             <div className="till-scan">
               {cameraOn && !done && (
                 <TillCamera
-                  active={!sheet && !runFor && !sweepFor}
+                  active={!sheet && !runFor && !sweepFor && !newFor}
                   onCodes={onCodes}
                   flash={flash}
                   onQuiet={onQuiet}
@@ -1330,6 +1336,31 @@ export default function AssetTillPage() {
         />
       )}
 
+      {newFor && (
+        <NewItemSheet
+          code={newFor.code}
+          categories={categories}
+          assets={assets}
+          drafts={batch.drafts}
+          onName={({ asset, ...answers }) => {
+            setBatch((current) => (asset ? linkToModel(current, newFor.localId, asset) : nameLine(current, newFor.localId, answers)));
+          }}
+          onMore={() => {
+            const line = lineFor({ localId: newFor.localId, which: 'in' });
+            setNewFor(null);
+            if (line) {
+              setRunFor({
+                localId: line.localId, which: 'in', same: true,
+                tracked: line.trackingMode === TRACKED,
+                title: `More of · ${[line.manufacturer, line.model].filter(Boolean).join(' ') || assetTitle(line)}`,
+              });
+            }
+          }}
+          onSweep={() => { setSweepFor({ localId: newFor.localId, which: 'in' }); setNewFor(null); }}
+          onSkip={() => setNewFor(null)}
+        />
+      )}
+
       {runFor && (
         <SerialRunSheet
           title={runFor.title}
@@ -1337,10 +1368,13 @@ export default function AssetTillPage() {
           drafts={(runFor.which === 'count' ? countBatch : batch).drafts}
           existing={serialsOn(runFor)}
           boxCodes={boxCodesOf(runFor)}
+          allowWithout={!runFor.tracked}
           onCancel={() => setRunFor(null)}
           onDone={(run) => {
             const setTarget = runFor.which === 'count' ? setCountBatch : setBatch;
-            setTarget((current) => addSerialsTo(current, runFor.localId, run.serials, run.without, run.boxCodes));
+            setTarget((current) => (runFor.same
+              ? addSameModel(current, runFor.localId, run)
+              : addSerialsTo(current, runFor.localId, run.serials, run.without, run.boxCodes)));
             setRunFor(null);
             say('ok', `${run.serials.length + run.without} items recorded`);
           }}

@@ -27,8 +27,8 @@ export default function PartsPanel({ device }) {
           <div key={field.key} className="pp-id">
             <dt>{field.label}</dt>
             <dd className={field.mono ? 'mh-mono' : undefined}>
-              {field.brand && field.value && <BrandLogo brand={brandOf(...field.brand)} fallback={field.brand[0]} size={26} />}
-              {dash(field.value)}
+              <span className="pp-id-value">{dash(field.value)}</span>
+              {field.brand && field.value && <BrandLogo brand={brandOf(...field.brand)} fallback={field.brand[0]} size={30} />}
             </dd>
           </div>
         ))}
@@ -39,6 +39,7 @@ export default function PartsPanel({ device }) {
           <div className="pp-row pp-head" role="row">
             <span role="columnheader">Part</span>
             <span role="columnheader">What</span>
+            <span role="columnheader" aria-label="Brand" />
             <span role="columnheader">Part number</span>
             <span role="columnheader">Serial number</span>
             <span role="columnheader">Where</span>
@@ -46,10 +47,8 @@ export default function PartsPanel({ device }) {
           {rows.map((row) => (
             <div key={row.key} className="pp-row" role="row">
               <span role="cell" className="pp-part">{row.part}</span>
-              <span role="cell" className="pp-what">
-                <BrandLogo brand={brandOf(row.what)} fallback={row.what} size={28} />
-                {row.what}
-              </span>
+              <span role="cell" className="pp-what">{row.what}</span>
+              <span role="cell" className="pp-logo"><BrandLogo brand={brandOf(row.what)} fallback={row.what} size={30} /></span>
               <span role="cell" className="pp-pn mh-mono">{dash(row.partNumber)}</span>
               <span role="cell" className="pp-sn mh-mono">
                 {row.serial || <span className="mh-muted">not reported</span>}

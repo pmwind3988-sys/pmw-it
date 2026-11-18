@@ -137,6 +137,7 @@ export default function SoftwarePanel({ device }) {
             <div className="sw-table" role="table" aria-label="Installed programs">
               <div className="sw-row sw-head" role="row">
                 <span role="columnheader">Program</span>
+                <span role="columnheader" aria-label="Brand" />
                 <span role="columnheader">Version</span>
                 <span role="columnheader">Publisher</span>
                 <span role="columnheader">Installed</span>
@@ -147,7 +148,6 @@ export default function SoftwarePanel({ device }) {
                   <div key={`${entry.name}|${entry.version}|${index}`}
                     className={`sw-row${tag ? ' sw-row-background' : ''}`} role="row">
                     <span role="cell" className="sw-name">
-                      <BrandLogo brand={softwareBrandOf(entry.name, entry.publisher)} fallback={entry.name} size={28} />
                       {highlightParts(entry.name, query).map((part, at) => (part.match
                         ? <b key={at}>{part.text}</b>
                         : <span key={at}>{part.text}</span>))}
@@ -157,6 +157,9 @@ export default function SoftwarePanel({ device }) {
                         <span className="sw-sep" aria-hidden="true"> · </span>
                         <span className="sw-publisher">{entry.publisher || '—'}</span>
                       </span>
+                    </span>
+                    <span role="cell" className="sw-logo">
+                      <BrandLogo brand={softwareBrandOf(entry.name, entry.publisher)} fallback={entry.name} size={30} />
                     </span>
                     <span role="cell" className="sw-version-col">{entry.version || '—'}</span>
                     <span role="cell" className="sw-publisher-col">{entry.publisher || '—'}</span>

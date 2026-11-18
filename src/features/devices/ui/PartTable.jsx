@@ -51,10 +51,12 @@ export default function PartTable({ device }) {
                 {GLYPH[grade]}
               </span>
               <span className="mh-part-name">{label}</span>
-              <span className="mh-part-value">
-                {part.value && <BrandLogo brand={partBrandOf(key, device, part.value)} fallback={label} size={26} />}
-                {part.value || '—'}
-              </span>
+              <span className="mh-part-value">{part.value || '—'}</span>
+              {part.value && (
+                <span className="mh-part-logo">
+                  <BrandLogo brand={partBrandOf(key, device, part.value)} fallback={label} size={40} />
+                </span>
+              )}
               <span className="mh-part-grade">{grade}</span>
               <span className={`pc-chip g-${slug} mh-chip`}>
                 <span aria-hidden="true">{GLYPH[grade]}</span> {grade}

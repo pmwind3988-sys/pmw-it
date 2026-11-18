@@ -299,14 +299,34 @@
 .mh-register-fix { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; margin-top: 8px; padding: 10px 12px; border-radius: 10px; background: var(--it-accent-wash); }
 .mh-register-fix p { margin: 0; flex: 1 1 260px; }
 
-/* Brand logos beside parts and programs ----------------------------------- */
-/* A white tile in both themes: logos come in the brand's own colour, and many are dark. */
+/* Brand logos: on the right, no tile, in a column of their own ------------ */
 .brand-logo {
   display: inline-flex; flex: none; align-items: center; justify-content: center; vertical-align: middle;
-  margin-right: 8px; border-radius: 6px; background: #fff; border: 1px solid var(--it-line);
-  overflow: hidden; box-sizing: border-box;
+  border-radius: 6px; overflow: hidden; box-sizing: border-box;
 }
-.brand-logo img { width: 76%; height: 76%; object-fit: contain; }
-.brand-logo-initials { font-size: 11px; font-weight: 700; letter-spacing: 0.02em; color: #555; }
-.pp-what, .sw-name, .pp-id dd, .mh-part-value { display: flex; align-items: center; }
-.sw-name { flex-wrap: wrap; }
+.brand-logo img, .brand-logo svg { width: 100%; height: 100%; object-fit: contain; }
+.brand-logo-initials { font-size: 11px; font-weight: 700; letter-spacing: 0.02em; color: var(--it-ink-soft); }
+/* Many brand colours are dark: on the dark theme a logo gets a light backing, still no border. */
+[data-theme="dark"] .brand-logo:has(img), [data-theme="dark"] .brand-logo:has(svg) { background: #fff; padding: 3px; }
+
+/* Health: the logo centred top to bottom on the right of each tile */
+.mh-part { position: relative; padding-right: 66px; }
+.mh-part-logo { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); display: flex; }
+
+/* Identity fields: the value, then its logo at the column's end */
+.pp-id dd { display: grid; grid-template-columns: minmax(0, 1fr) 40px; align-items: center; gap: 8px; }
+.pp-id dd .brand-logo { justify-self: center; }
+
+/* Tables: a narrow logo column after the name, the logo centred in it */
+.pp-row { grid-template-columns: 110px minmax(0, 1.4fr) 64px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr); }
+.sw-row { grid-template-columns: minmax(0, 2fr) 64px minmax(0, 1fr) minmax(0, 1.4fr) 120px; }
+.pp-logo, .sw-logo { display: flex; justify-content: center; align-items: center; }
+
+@media (max-width: 640px) {
+  .mh-part { padding-right: 0; }
+  .mh-part-logo { display: none; }
+  .pp-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "part where" "what logo" "pn sn"; }
+  .pp-logo { grid-area: logo; }
+  .sw-row { grid-template-columns: minmax(0, 1fr) 40px; }
+  .sw-logo { grid-row: 1; grid-column: 2; }
+}

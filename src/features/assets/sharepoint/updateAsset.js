@@ -43,7 +43,7 @@ export const EDITABLE_FIELDS = [
  * app never reads them off the row, and the handover list still says exactly
  * when the thing went out and when it is due.
  */
-export const COMBINE_FIELDS = ['quantityOut', 'assignedTo', 'assignedToEmail'];
+export const COMBINE_FIELDS = ['quantityOut', 'assignedTo', 'assignedToEmail', 'additionalCodes'];
 
 const asText = (value) => (value === null || value === undefined ? '' : String(value));
 

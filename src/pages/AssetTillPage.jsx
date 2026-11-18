@@ -48,7 +48,7 @@ import {
 import {
   scanBack, addHandover, chooseHolder, setReturnQuantity, toReturns, itemCount as itemsBack, BACK_RESULT,
 } from '../features/assets/till/takeBack';
-import { tillSearch, quickKeys } from '../features/assets/till/tillSearch';
+import { tillSearch, quickKeys, stockByCategory } from '../features/assets/till/tillSearch';
 import {
   inStash, findInStash, searchStash, findOutOfStash, searchOutOfStash, machineRow, machineTitle, machineSub,
 } from '../features/assets/till/stashMachines';
@@ -418,6 +418,15 @@ export default function AssetTillPage() {
   };
 
   const keys = useMemo(() => quickKeys(assets, handovers), [assets, handovers]);
+  // Hand out shows stock per category first ("Keyboard · 7"), products inside.
+  const stock = useMemo(() => stockByCategory(assets), [assets]);
+  const [openCategory, setOpenCategory] = useState(null);
+  const takeProduct = (product) => {
+    // One row (a bulk line, or a single laptop) goes straight on the receipt;
+    // several tracked rows of one model list their serials to pick from.
+    if (product.rows.length === 1) pressKey(product.rows[0]);
+    else setTyped(product.name);
+  };
   const stashLeft = useMemo(
     () => inStash(devices).filter((device) => !machines.some((entry) => entry.id === device.id)),
     [devices, machines],
@@ -1115,7 +1124,7 @@ export default function AssetTillPage() {
               </div>
             </div>
 
-            {mode !== 'back' && keys.length > 0 && (
+            {mode !== 'back' && mode !== 'out' && keys.length > 0 && (
               <section className="till-keys" aria-label="Quick keys">
                 <h2 className="till-kicker">Quick keys</h2>
                 <div className="till-keys-grid">
@@ -1130,6 +1139,39 @@ export default function AssetTillPage() {
                     );
                   })}
                 </div>
+              </section>
+            )}
+
+            {mode === 'out' && stock.length > 0 && (
+              <section className="till-keys" aria-label="In stock by category">
+                <h2 className="till-kicker">In stock</h2>
+                <ul className="till-cats">
+                  {stock.map((group) => {
+                    const open = openCategory === group.category;
+                    return (
+                      <li key={group.category} className={group.left ? 'till-cat' : 'till-cat empty'}>
+                        <button type="button" className="till-cat-head" aria-expanded={open} onClick={() => setOpenCategory(open ? null : group.category)}>
+                          <span className="till-mono">{badgeOf(group.category)}</span>
+                          <strong>{group.category}</strong>
+                          <span>{group.left ? `${group.left} available` : 'None left'}</span>
+                        </button>
+                        {open && (
+                          <ul className="till-outnow">
+                            {group.products.map((product) => (
+                              <li key={product.name}>
+                                <span>
+                                  <strong>{product.name}</strong>
+                                  <span>{product.left ? `${product.left} available` : 'Out of stock'}</span>
+                                </span>
+                                <button type="button" className="till-chip" disabled={!product.left} onClick={() => takeProduct(product)}>Hand out</button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
               </section>
             )}
 

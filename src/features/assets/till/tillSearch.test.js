@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { TRACKED, BULK } from '../assetKinds.js';
-import { tillSearch, quickKeys } from './tillSearch.js';
+import { tillSearch, quickKeys, stockByCategory } from './tillSearch.js';
 
 const A = (over) => ({ quantityOut: 0, quantity: 1, ...over });
 const ASSETS = [
@@ -64,5 +64,26 @@ describe('quickKeys', () => {
     const keys = quickKeys(ASSETS, HANDOVERS);
     expect(keys.map((key) => key.asset.id)).toEqual([3, 4]);
     expect(keys[0].left).toBe(15);
+  });
+});
+
+describe('stockByCategory', () => {
+  const rows = [
+    { id: 1, category: 'Keyboard', title: 'ABC Keyboard', trackingMode: 'bulk', quantity: 4, quantityOut: 1 },
+    { id: 2, category: 'Keyboard', title: 'XYZ Keyboard', trackingMode: 'bulk', quantity: 4, quantityOut: 0 },
+    { id: 3, category: 'Laptop', title: 'Dell 5440', trackingMode: 'tracked', quantity: 1 },
+    { id: 4, category: 'Laptop', title: 'Dell 5440', trackingMode: 'tracked', quantity: 1 },
+    { id: 5, category: 'Mouse', title: 'M90', trackingMode: 'bulk', quantity: 2, quantityOut: 2 },
+  ];
+
+  it('adds up what is left per category, products inside', () => {
+    const [keyboards, laptops, mice] = stockByCategory(rows);
+    expect(keyboards.category).toBe('Keyboard');
+    expect(keyboards.left).toBe(7);
+    expect(keyboards.products.map((p) => [p.name, p.left])).toEqual([['XYZ Keyboard', 4], ['ABC Keyboard', 3]]);
+    expect(laptops.products).toHaveLength(1);
+    expect(laptops.products[0].left).toBe(2);
+    expect(laptops.products[0].rows).toHaveLength(2);
+    expect(mice.left).toBe(0);
   });
 });

@@ -2169,3 +2169,6 @@
 .as-serials-no { color: var(--text-secondary); font-variant-numeric: tabular-nums; min-width: 3ch; }
 .as-serials-code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; overflow-wrap: anywhere; }
 .as-serials-meta { color: var(--text-secondary); font-size: 0.85em; text-align: right; }
+
+/* The combine step's "Keep the name" picker. 16px: iOS zooms on anything smaller. */
+.as-combine-name select { font-size: 16px; margin-left: 4px; max-width: 100%; }

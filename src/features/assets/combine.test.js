@@ -177,3 +177,28 @@ describe('rows that are out with somebody', () => {
     expect(move.unitIndex).toBe(2);
   });
 });
+
+describe('choosing the name the combined line keeps', () => {
+  const old = { id: 1, arrivedOn: 1, category: 'Keyboard', manufacturer: 'ABC', model: 'Keyboard', quantity: 3, additionalCodes: ['111'] };
+  const later = { id: 2, arrivedOn: 2, category: 'Keyboard', manufacturer: 'ABC', model: 'Wireless Keyboard', quantity: 2, additionalCodes: ['222'] };
+
+  it('keeps the oldest row and its name by default', () => {
+    const plan = planCombine([later, old]);
+    expect(plan.keep.id).toBe(1);
+    expect(plan.named.id).toBe(1);
+    expect(plan.edits.model).toBeUndefined();
+    expect(plan.edits.quantity).toBe(5);
+  });
+
+  it('renames the surviving row to the picked one', () => {
+    const plan = planCombine([old, later], [], { nameFrom: 2 });
+    expect(plan.keep.id).toBe(1);
+    expect(plan.edits.model).toBe('Wireless Keyboard');
+    expect(plan.edits.manufacturer).toBe('ABC');
+    expect(plan.remove.map((r) => r.id)).toEqual([2]);
+  });
+
+  it('carries every box barcode onto the one line', () => {
+    expect(planCombine([old, later]).edits.additionalCodes).toEqual(['111', '222']);
+  });
+});

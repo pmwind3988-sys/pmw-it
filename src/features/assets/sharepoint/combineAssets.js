@@ -67,10 +67,10 @@ export function repointFor(move, kept) {
  * handover has to move too.
  */
 export async function combineAssets({
-  siteUrl, token, rows, changedBy,
+  siteUrl, token, rows, changedBy, nameFrom,
 }) {
   const handovers = await readAllHandovers(siteUrl, token);
-  const plan = planCombine(rows, handovers);
+  const plan = planCombine(rows, handovers, { nameFrom });
 
   const written = await updateAsset({
     siteUrl,

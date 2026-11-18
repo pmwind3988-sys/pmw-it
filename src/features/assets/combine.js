@@ -151,9 +151,17 @@ export function differencesIn(rows) {
  * "who had this monitor last year" is worth as much as "who has it now", and
  * it would be pointing at a row that no longer exists.
  */
-export function planCombine(rows, handovers = []) {
+export function planCombine(rows, handovers = [], { nameFrom } = {}) {
   const ordered = [...rows].sort(byOldest);
   const [keep, ...remove] = ordered;
+  // Whose name the line goes on under. The oldest row still survives -- its
+  // history and delivery stay attached -- but two products typed two ways
+  // ("abc keyboard", "abc wireless keyboard") are often only told apart by
+  // which spelling is right, and that is the person's call, not the age's.
+  const named = ordered.find((row) => row.id === nameFrom) ?? keep;
+  // Every barcode any of these rows was known by, so a box of either kind
+  // still scans to the one line afterwards.
+  const codes = [...new Set(ordered.flatMap((row) => row.additionalCodes ?? []))];
 
   let units = '';
   let at = 0;
@@ -190,7 +198,15 @@ export function planCombine(rows, handovers = []) {
     moves,
     // Only what has to change. Everything else on the keeper — where it came
     // from, its supplier, its PO, its photographs — is already right.
+    named,
     edits: {
+      ...(named === keep ? {} : {
+        category: named.category,
+        manufacturer: named.manufacturer,
+        model: named.model,
+        ...(named.specSummary ? { specSummary: named.specSummary } : {}),
+      }),
+      ...(codes.length > (keep.additionalCodes ?? []).length ? { additionalCodes: codes } : {}),
       trackingMode: BULK,
       quantity: at,
       units,

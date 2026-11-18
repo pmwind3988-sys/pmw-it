@@ -138,3 +138,36 @@ export function quickKeys(assets = [], handovers = [], limit = 8) {
     .sort((a, b) => (b.issued - a.issued) || ((b.asset.quantity ?? 0) - (a.asset.quantity ?? 0)))
     .slice(0, limit);
 }
+
+/**
+ * Hand out's overview: how many of each KIND of thing are on the shelf, then
+ * which products make that up. "Keyboards · 7" is the question somebody at the
+ * desk is asking; which of two keyboard lines the seven sit on is the second
+ * question, and the handover still has to name one, so each category carries
+ * its products. Products group by name, so five tracked laptops of one model
+ * are one entry of 5 (`rows` holds them) and a bulk line is an entry of its own.
+ * Categories with nothing left still show, at 0, so "we have none" is visible.
+ */
+export function stockByCategory(assets = []) {
+  const categories = new Map();
+  for (const asset of assets) {
+    const category = String(asset.category ?? '').trim() || 'Other';
+    const name = String(asset.title || asset.model || '').trim();
+    if (!name) continue;
+    const left = available(asset);
+    const group = categories.get(category) ?? { category, left: 0, products: new Map() };
+    group.left += left;
+    const product = group.products.get(name.toLowerCase()) ?? { name, left: 0, rows: [] };
+    product.left += left;
+    product.rows.push(asset);
+    group.products.set(name.toLowerCase(), product);
+    categories.set(category, group);
+  }
+  return [...categories.values()]
+    .map((group) => ({
+      ...group,
+      products: [...group.products.values()]
+        .sort((a, b) => (b.left - a.left) || a.name.localeCompare(b.name)),
+    }))
+    .sort((a, b) => (b.left > 0) - (a.left > 0) || a.category.localeCompare(b.category));
+}

@@ -53,6 +53,8 @@ export default function AssetsPage() {
   const [combining, setCombining] = useState(false);
   const [combined, setCombined] = useState('');
   const [combineError, setCombineError] = useState('');
+  // Which ticked row's name the combined line takes; null = the oldest's.
+  const [nameFrom, setNameFrom] = useState(null);
   const { ask, dialog } = useConfirm();
 
   // Only the page being looked at is built. Two thousand rows laid out at once
@@ -127,7 +129,8 @@ export default function AssetsPage() {
     [assets, picked],
   );
   const blockers = picked.length ? blockersFor(chosen) : [];
-  const plan = picked.length >= 2 && !blockers.length ? planCombine(chosen, handovers) : null;
+  const plan = picked.length >= 2 && !blockers.length ? planCombine(chosen, handovers, { nameFrom }) : null;
+  const nameOf = (row) => row.title || [row.manufacturer, row.model].filter(Boolean).join(' ') || `Row ${row.id}`;
   // What is on somebody's desk right now. Not a refusal any more: it stays
   // out, and its handover follows it onto the combined line.
   const outNow = picked.length ? stillOut(chosen, handovers) : [];
@@ -142,6 +145,7 @@ export default function AssetsPage() {
   const stopPicking = () => {
     setPicking(false);
     setPicked([]);
+    setNameFrom(null);
     setCombineError('');
   };
 
@@ -152,7 +156,7 @@ export default function AssetsPage() {
    */
   const combine = async () => {
     const summary = `Everything on them is kept as ${plan.edits.quantity} `
-      + `items on "${plan.keep.title || plan.keep.model || 'the oldest row'}", `
+      + `items on one line named "${nameOf(plan.named)}", `
       + `and the other ${plan.remove.length} rows are removed. This cannot be undone.`
       + (outNow.length
         ? ` The ${outNow.length} still out stay out — the same people keep the same `
@@ -174,6 +178,7 @@ export default function AssetsPage() {
         siteUrl: SHAREPOINT_SITE_URL,
         token: tokenRes.accessToken,
         rows: chosen,
+        nameFrom: plan.named.id,
         changedBy: account?.username ?? account?.name ?? '',
       });
 
@@ -382,6 +387,19 @@ export default function AssetsPage() {
               </>
             )}
             {blockers.map((blocker) => <strong key={blocker}> {blocker}</strong>)}
+            {plan && (
+              <label className="as-combine-name">
+                {' '}Keep the name{' '}
+                <select
+                  value={plan.named.id}
+                  onChange={(event) => setNameFrom(Number(event.target.value))}
+                >
+                  {chosen.map((row) => (
+                    <option key={row.id} value={row.id}>{nameOf(row)}</option>
+                  ))}
+                </select>
+              </label>
+            )}
           </span>
           <Button
             size="sm"

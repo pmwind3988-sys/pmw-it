@@ -170,7 +170,7 @@ pmw-it/
 | Type-to-find and the desk's quick keys | `src/features/assets/till/tillSearch.js` |
 | Handing out a spare machine from the IT Stash at the till | `src/features/assets/till/stashMachines.js` |
 | When a register row and a device-list machine are the same computer, and what the device list does to agree | `src/features/assets/machineLink.js`, `assets/sharepoint/syncMachines.js`, `devices/ui/RegisterNote.jsx` |
-| Which barcode the till believes, and when it asks | `src/features/assets/till/readGate.js` |
+| What the till camera offers to be tapped, and what it never offers | `src/features/assets/till/pickList.js`, `till/ui/TillCamera.jsx` |
 | Entering the unlabelled backlog (catch-up count) | `src/features/assets/till/count.js`, `till/ui/CountPanel.jsx` |
 | The till page and its sheets | `src/pages/AssetTillPage.jsx`, `src/features/assets/till/ui/`, `src/styles/till.css` |
 | Finding a person in the directory | `src/features/assets/people/peopleSearch.js` |
@@ -573,7 +573,7 @@ so the horizontal bar stays on screen instead of parking below the fold.
 **The till is a cashier, not a new data model.** `/assets/till` puts stock in,
 hand out and take back on one screen: scan or type onto a receipt, one button
 to finish. Its receipts ARE the existing objects -- a delivery batch (kept in
-IndexedDB, id in localStorage `tillBatchId`, so it survives a reload and shows
+IndexedDB, id in localStorage `tillBatchId`, so it survives a reload; a receipt emptied by hand DROPS that copy (`till/storedReceipt.js`) -- saving only non-empty ones left the last line to come back and shows
 in the unsaved-deliveries banner), a handover basket, and `commitReturn`
 entries -- and checkout calls the existing writers. What it adds is in
 `features/assets/till/`, pure and tested: a repeat scan of a BULK line's part
@@ -582,15 +582,20 @@ tracked serial already in the register is refused at stock-in rather than
 re-saved from what a barcode knows; a tracked part number is "another of this
 model" waiting for its serial, and the next serial-shaped code fills it; a
 refusal shows on its line the moment it is scanned; a return finds its holder
-and ASKS when several people hold the same bulk line. Every camera read goes
-through `readGate.js`: a code counts only on its SECOND read within 1.5s (a
-misread is one bad frame and does not repeat); a code read inside the aiming
-box silences everything outside it, even after it has been taken, or the
-shipping label at the edge of the picture wins next; two confirmed codes in
-the box are OFFERED as "Which one did you mean?" rather than guessed, unless
-the till is waiting for a serial and exactly one looks like one; and a code
-is taken once per sighting, so one box of mice held still is not thirty.
-`useScanner` passes `{ aimed }` beside each frame's codes for this. Checkout is held
+and ASKS when several people hold the same bulk line. The camera takes
+NOTHING on its own (2026-11-18, the user's call): `TillCamera` opens full
+screen, portalled under the till's sheets (z 65; the serial run's own camera
+`over` its sheet at 75), and lists what it reads on a card over the picture;
+only a TAPPED code goes on the receipt. `till/pickList.js` (pure, tested)
+decides the card: a code appears on its SECOND read within 1.5s (a misread is
+one bad frame), a code the receipt already holds is never offered (`skip` --
+a dry run of the mode's own scan rule returning "already on this receipt", so
+a counting shop barcode stays tappable), a tapped one reads "Added" while in
+view, and anything unseen for 4s is forgotten, which also lets the next
+identical box be tapped. Frames only arrive while something is read, so the
+card is cleared by a clock. The camera never opens by itself any more -- full
+screen, it would hide the tabs and the receipt. `readGate.js` now only lends
+`guessKind` / `looksLikeSerial`; its gate is no longer on the camera path. Checkout is held
 while any delivery line needs an answer (`holdOf`). "Can't scan?" offers the
 label reader, type-to-find, and (stock in only) "nothing on it", which gives a
 tracked thing the next free `PMW-NNNN` (`nextTag`). The old scan, batch and

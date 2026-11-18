@@ -160,10 +160,128 @@
   color: var(--till-dark-ink);
 }
 
-.till-viewfinder.as-viewfinder {
+/* ── The full-screen camera ──────────────────────────────────────────────
+   Over the whole screen and under the till's sheets (70), so a question a
+   tapped code raises opens on top. The serial run's camera belongs above its
+   own sheet. */
+.till-fullcam {
+  position: fixed;
+  inset: 0;
+  z-index: 65;
+  display: flex;
+  background: #000;
+  color: #fff;
+}
+.till-fullcam-over { z-index: 75; }
+
+.till-fullcam .till-viewfinder.as-viewfinder {
+  flex: 1 1 auto;
   aspect-ratio: auto;
-  height: clamp(180px, 30vh, 300px);
+  max-height: none;
+  height: 100%;
+  border-radius: 0;
+}
+
+.till-fullcam-bar {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  left: 12px;
+  right: 12px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.till-fullcam-close {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.6);
+  color: #fff;
+  cursor: pointer;
+}
+.till-fullcam-close:hover, .till-fullcam-close:focus-visible { background: rgb(0 0 0 / 0.85); outline: none; }
+.till-fullcam-status {
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.6);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.till-fullcam-flash.till-flash {
+  top: calc(72px + env(safe-area-inset-top, 0px));
+  bottom: auto;
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  max-width: min(560px, calc(100% - 24px));
+}
+
+/* What the camera has read, on a card over the picture. Nothing is taken
+   until a row is tapped. Sits above the torch and zoom controls. */
+.till-picks {
+  position: absolute;
+  left: 50%;
+  bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 3;
+  width: min(560px, calc(100% - 24px));
+  max-height: 45%;
+  overflow-y: auto;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
   border-radius: 24px;
+  background: rgb(17 19 23 / 0.88);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.4);
+}
+.till-picks-head { padding: 2px 6px 4px; font-size: 14px; font-weight: 600; color: #c9ced6; }
+.till-pick {
+  flex: none;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px 8px 16px;
+  border: 1px solid #2e333c;
+  border-radius: 18px;
+  background: #1b1e24;
+  color: #f2f4f7;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background-color 0.18s ease, transform 0.18s ease;
+}
+.till-pick:hover:not(:disabled), .till-pick:focus-visible { border-color: var(--it-brand); background: #232832; outline: none; }
+.till-pick:active:not(:disabled) { transform: scale(0.98); }
+.till-pick-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.till-pick-text .till-mono { font-size: 17px; font-weight: 600; letter-spacing: 0.02em; overflow-wrap: anywhere; }
+.till-pick-text > span:last-child { font-size: 13px; color: #7cc4ff; }
+.till-pick-mark {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--it-brand);
+  color: #fff;
+}
+.till-pick.taken { cursor: default; border-color: transparent; background: rgb(16 185 129 / 0.16); }
+.till-pick.taken .till-pick-text > span:last-child { color: #6ee7b7; }
+.till-pick.taken .till-pick-mark { background: #059669; }
+
+@media (prefers-reduced-motion: reduce) {
+  .till-pick { transition: none; }
+  .till-pick:active:not(:disabled) { transform: none; }
 }
 
 .till-entry {
@@ -587,6 +705,11 @@ select.till-chip { padding-right: 12px; }
   box-shadow: 0 -12px 40px rgb(0 0 0 / 0.2);
 }
 
+/* The sheet scrolls; its contents never squeeze. A capped list (the serial
+   run's, the box sweep's) is the only child flex can shrink, so on a short
+   screen it shrank to a sliver and the serials just scanned vanished. */
+.till-sheet > * { flex-shrink: 0; }
+
 /* The grab handle a phone sheet is pulled by. */
 .till-sheet::before {
   content: '';
@@ -855,45 +978,6 @@ select.till-chip { padding-right: 12px; }
   .till-cat strong { font-size: 14px; }
 }
 
-/* Several barcodes in the aiming box: the person picks. Over the picture,
-   on the dark, so it reads as part of the scanner rather than a dialog. */
-.till-choose {
-  position: absolute;
-  inset: 8px;
-  z-index: 3;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px;
-  overflow-y: auto;
-  border-radius: 24px;
-  background: var(--till-dark);
-  color: var(--till-dark-ink);
-}
-.till-choose-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-left: 4px; }
-.till-choose-head .till-link { color: var(--till-dark-soft); }
-.till-choice {
-  flex: none;
-  min-height: 52px;
-  padding: 8px 16px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  border: 1px solid var(--till-dark-line);
-  border-radius: 20px;
-  background: var(--till-dark-2);
-  color: var(--till-dark-ink);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition: transform 0.18s ease, border-color 0.18s ease, background-color 0.18s ease;
-}
-.till-choice .till-mono { font-size: 17px; font-weight: 600; letter-spacing: 0.02em; overflow-wrap: anywhere; }
-.till-choice > span:last-child { font-size: 13px; color: var(--till-key-light); }
-.till-choice:hover, .till-choice:focus-visible { border-color: var(--it-brand); background: #232832; transform: translateY(-1px); outline: none; }
-/* Room for three or four choices without scrolling. */
-.till-viewfinder.as-viewfinder:has(.till-choose) { height: 300px; }
 
 /* ── Serial run and "same as one we have" ──────────────────────────────── */
 

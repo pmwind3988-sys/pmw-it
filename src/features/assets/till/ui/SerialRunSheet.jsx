@@ -2,9 +2,9 @@ import { useCallback, useRef, useState } from 'react';
 import TillSheet from './TillSheet';
 import TillCamera from './TillCamera';
 import Button from '../../../../components/ui/Button';
-import { Check } from '../../../../components/ui/Icons';
+import { Camera, Check } from '../../../../components/ui/Icons';
 import { signalAccepted, signalDuplicate } from '../../scan/feedback';
-import { createReadGate, guessKind } from '../readGate';
+import { guessKind } from '../readGate';
 import {
   newRun, addToRun, withoutSerial, undoLast, runSize, RUN_RESULT,
 } from '../serialRun';
@@ -26,8 +26,8 @@ export default function SerialRunSheet({
   const [run, setRun] = useState(newRun);
   const [typed, setTyped] = useState('');
   const [flash, setFlash] = useState(null);
-  const [choices, setChoices] = useState([]);
-  const gateRef = useRef(createReadGate());
+  // Full screen and over this sheet; closing it shows the list and "Add".
+  const [cameraOn, setCameraOn] = useState(true);
   const runRef = useRef(run);
   const timer = useRef(null);
 
@@ -51,11 +51,15 @@ export default function SerialRunSheet({
     else if (out.result === RUN_RESULT.REGISTERED) say('bad', `Already registered: ${out.asset.title || 'that serial'}`);
   }, [assets, drafts, boxCodes, existing.length, say]);
 
-  const onCodes = useCallback((codes, meta = {}) => {
-    const { accept, choices: unsure } = gateRef.current(codes, { aimed: Boolean(meta.aimed), expect: 'serial' });
-    for (const code of accept) take(code);
-    if (unsure.length) setChoices(unsure);
-  }, [take]);
+  // A serial this run or the receipt already holds is never offered.
+  const alreadyListed = useCallback((code) => {
+    const { result } = addToRun(runRef.current, code, { assets, drafts, boxCodes });
+    return result === RUN_RESULT.REPEAT || result === RUN_RESULT.ON_RECEIPT;
+  }, [assets, drafts, boxCodes]);
+
+  // Escape, Cancel and a tap outside close the camera first, never the run
+  // under it — that would throw away every serial just scanned.
+  const close = () => (cameraOn ? setCameraOn(false) : onCancel());
 
   const change = (next) => { runRef.current = next; setRun(next); };
   const count = runSize(run);
@@ -69,17 +73,27 @@ export default function SerialRunSheet({
   ].reverse();
 
   return (
-    <TillSheet title={title} onClose={onCancel} wide>
+    <TillSheet title={title} onClose={close} wide>
       <p className="till-sheet-lede">Scan each one’s serial. The count is how many you scan. Shop barcodes are skipped.</p>
       <div className="till-scan">
-        <TillCamera
-          active
-          onCodes={onCodes}
-          flash={flash}
-          choices={choices.map((code) => ({ code, kind: guessKind(code) }))}
-          onPick={(code) => { setChoices([]); take(code); }}
-          onDismiss={() => setChoices([])}
-        />
+        {cameraOn ? (
+          <TillCamera
+            active
+            over
+            onTake={take}
+            skip={alreadyListed}
+            describe={guessKind}
+            flash={flash}
+            onClose={() => setCameraOn(false)}
+            status={`${count} scanned`}
+          />
+        ) : (
+          <div className="till-scan-foot">
+            <button type="button" className="till-link" onClick={() => setCameraOn(true)}>
+              <Camera size={14} /> Use the camera
+            </button>
+          </div>
+        )}
         <form
           className="till-entry"
           onSubmit={(event) => { event.preventDefault(); if (typed.trim()) take(typed); setTyped(''); }}

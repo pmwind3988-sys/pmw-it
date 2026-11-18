@@ -17,7 +17,6 @@ import PersonPicker from '../features/assets/ui/PersonPicker';
 import { newBatch, addDraft, replaceDraft, removeDraft } from '../features/assets/draft/batch';
 import { newDraft } from '../features/assets/draft/draftAsset';
 import { saveBatch, loadPhoto } from '../features/assets/store/assetDb';
-import { readPref, writePref } from '../features/assets/till/prefs';
 import { newCount, addCounted, COUNT_RESULT } from '../features/assets/till/count';
 import { useStoredBatch } from '../features/assets/till/ui/useStoredBatch';
 import CountPanel from '../features/assets/till/ui/CountPanel';
@@ -58,7 +57,7 @@ import { performLifecycle } from '../features/devices/sharepoint/writeLifecycle'
 import { assetFor } from '../features/assets/machineLink';
 import { ACTIONS } from '../features/devices/lifecycle/planLifecycle';
 import { SPARE, statusOf, inFleet } from '../features/devices/lifecycle/status';
-import { createReadGate, guessKind } from '../features/assets/till/readGate';
+import { guessKind } from '../features/assets/till/readGate';
 import { findScanTarget } from '../features/assets/handover/scanMatch';
 import TillCamera from '../features/assets/till/ui/TillCamera';
 import TillReceipt from '../features/assets/till/ui/TillReceipt';
@@ -113,15 +112,8 @@ const RECEIPT_EMPTY = {
 const COMMON_KINDS = ['Laptop', 'Monitor', 'Mouse', 'Keyboard', 'Cable', 'Accessory'];
 const BATCH_KEY = 'tillBatchId';
 const COUNT_KEY = 'tillCountId';
-const CAMERA_KEY = 'tillCamera';
 
 
-/** Phones scan with the camera; a desk has a scanner gun and keeps it off. */
-function cameraByDefault() {
-  const saved = readPref(CAMERA_KEY);
-  if (saved != null) return saved === 'on';
-  return typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
-}
 
 const BADGES = {
   Laptop: 'LT', Desktop: 'DT', Monitor: 'MN', Printer: 'PR', 'Docking Station': 'DK', Phone: 'PH',
@@ -189,7 +181,7 @@ export default function AssetTillPage() {
   const [typed, setTyped] = useState('');
   const [flash, setFlash] = useState(null);
   const [nudge, setNudge] = useState(false);
-  const [cameraOn, setCameraOn] = useState(cameraByDefault);
+  const [cameraOn, setCameraOn] = useState(false);
   const [sheet, setSheet] = useState(null);
   const [headerOpen, setHeaderOpen] = useState(false);
   const [signature, setSignature] = useState(null);
@@ -200,9 +192,6 @@ export default function AssetTillPage() {
   const inputRef = useRef(null);
   const flashTimer = useRef(null);
   const labelDraftRef = useRef(null);
-  const gateRef = useRef(createReadGate());
-  // Codes the camera could not choose between, offered to the person.
-  const [choices, setChoices] = useState([]);
   // A serial run onto one counted line: { localId, which: 'in' | 'count', title }.
   const [runFor, setRunFor] = useState(null);
   // A box sweep onto one line: { localId, which }.
@@ -301,27 +290,29 @@ export default function AssetTillPage() {
   }, [say, setBatch]);
 
   /**
-   * Every camera read goes through the gate (`till/readGate.js`): read twice,
-   * aim wins, and when it cannot tell which barcode is meant it asks. While
-   * the last delivery line is waiting for its serial, a serial-shaped code is
-   * taken without asking.
+   * Whether the receipt already holds this code, so the camera never offers
+   * it. Asked of the mode's own scan rule, on the receipt as it stands: what
+   * that rule would refuse as "already on this receipt" is what is skipped.
+   * A shop barcode that counts up is NOT skipped — the next box is tappable.
    */
-  const onCodes = useCallback((codes, meta = {}) => {
+  const alreadyListed = useCallback((code) => {
     const state = live.current;
-    const last = state.batch?.drafts[state.batch.drafts.length - 1];
-    const expect = state.mode === 'in' && last && needsSerial(last) && !needsKind(last) ? 'serial' : null;
-    const { accept, choices: unsure } = gateRef.current(codes, { aimed: Boolean(meta.aimed), expect });
-    for (const code of accept) handleCode(code);
-    if (unsure.length) {
-      signalDuplicate();
-      setChoices(unsure);
+    if (state.mode === 'in') return scanIn(state.batch, code, state.assets).result === STOCK_RESULT.DUPLICATE;
+    if (state.mode === 'out') {
+      const out = scanOut(state.basket, code, state.assets);
+      if (out.result === OUT_RESULT.MISSING) {
+        const machine = findInStash(state.devices, code);
+        return Boolean(machine && state.machines.some((device) => device.id === machine.id));
+      }
+      return out.result === OUT_RESULT.DUPLICATE;
     }
-  }, [handleCode]);
-
-  const pickChoice = (code) => {
-    setChoices([]);
-    handleCode(code);
-  };
+    const out = scanBack(state.backLines, code, state.assets, state.handovers);
+    if (out.result === BACK_RESULT.MISSING) {
+      const machine = findOutOfStash(state.devices, code);
+      return Boolean(machine && state.machinesBack.some((device) => device.id === machine.id));
+    }
+    return out.result === BACK_RESULT.DUPLICATE;
+  }, []);
 
   /** What a code is, in words, so the right one can be picked. */
   const describe = (code) => {
@@ -1006,12 +997,12 @@ export default function AssetTillPage() {
     setParams((current) => { const next = new URLSearchParams(current); next.set('mode', id); return next; }, { replace: true });
     setTyped('');
     setFlash(null);
-    setChoices([]);
     setDone(null);
   };
 
   const toggleCamera = () => {
-    setCameraOn((on) => { writePref(CAMERA_KEY, on ? 'off' : 'on'); return !on; });
+    // Never on by itself: full screen, it would hide the tabs and the receipt.
+    setCameraOn((on) => !on);
   };
 
   const counts = {
@@ -1064,12 +1055,13 @@ export default function AssetTillPage() {
               {cameraOn && !done && (
                 <TillCamera
                   active={!sheet && !runFor && !sweepFor && !newFor}
-                  onCodes={onCodes}
+                  onTake={handleCode}
+                  skip={alreadyListed}
+                  describe={describe}
                   flash={flash}
                   onQuiet={onQuiet}
-                  choices={choices.map((code) => ({ code, kind: describe(code) }))}
-                  onPick={pickChoice}
-                  onDismiss={() => setChoices([])}
+                  onClose={() => setCameraOn(false)}
+                  status={`${counts[mode] ?? 0} on list`}
                 />
               )}
 

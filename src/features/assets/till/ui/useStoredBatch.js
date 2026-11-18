@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { saveBatch, loadBatch, deleteBatch } from '../../store/assetDb';
 import { readPref, writePref } from '../prefs';
+import { storeAction, STORE } from '../storedReceipt';
 
 /**
  * A receipt that is a batch, kept on this device: picked back up after a
@@ -25,7 +26,15 @@ export function useStoredBatch(storageKey, make) {
   }, [storageKey]);
 
   useEffect(() => {
-    if (!ready || !batch.drafts.length) return;
+    if (!ready) return;
+    const action = storeAction(batch, readPref(storageKey));
+    if (action === STORE.DROP) {
+      // The last line was removed: the device copy goes, or it comes back.
+      writePref(storageKey, null);
+      deleteBatch(batch.id).catch(() => {});
+      return;
+    }
+    if (action !== STORE.SAVE) return;
     writePref(storageKey, batch.id);
     saveBatch(batch).catch(() => {
       // Storage full or blocked: the receipt is still on screen and saving

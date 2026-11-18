@@ -52,7 +52,7 @@ export default function PartTable({ device }) {
               </span>
               <span className="mh-part-name">{label}</span>
               <span className="mh-part-value">
-                {part.value && <BrandLogo brand={partBrandOf(key, device, part.value)} fallback={label} size={20} />}
+                {part.value && <BrandLogo brand={partBrandOf(key, device, part.value)} fallback={label} size={26} />}
                 {part.value || '—'}
               </span>
               <span className="mh-part-grade">{grade}</span>

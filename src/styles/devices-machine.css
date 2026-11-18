@@ -306,7 +306,7 @@
   margin-right: 8px; border-radius: 6px; background: #fff; border: 1px solid var(--it-line);
   overflow: hidden; box-sizing: border-box;
 }
-.brand-logo img { width: 70%; height: 70%; object-fit: contain; }
-.brand-logo-initials { font-size: 10px; font-weight: 700; letter-spacing: 0.02em; color: #555; }
+.brand-logo img { width: 76%; height: 76%; object-fit: contain; }
+.brand-logo-initials { font-size: 11px; font-weight: 700; letter-spacing: 0.02em; color: #555; }
 .pp-what, .sw-name, .pp-id dd, .mh-part-value { display: flex; align-items: center; }
 .sw-name { flex-wrap: wrap; }

@@ -298,3 +298,15 @@
 .mh-register-line { margin: 0; overflow-wrap: anywhere; }
 .mh-register-fix { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; margin-top: 8px; padding: 10px 12px; border-radius: 10px; background: var(--it-accent-wash); }
 .mh-register-fix p { margin: 0; flex: 1 1 260px; }
+
+/* Brand logos beside parts and programs ----------------------------------- */
+/* A white tile in both themes: logos come in the brand's own colour, and many are dark. */
+.brand-logo {
+  display: inline-flex; flex: none; align-items: center; justify-content: center; vertical-align: middle;
+  margin-right: 8px; border-radius: 6px; background: #fff; border: 1px solid var(--it-line);
+  overflow: hidden; box-sizing: border-box;
+}
+.brand-logo img { width: 70%; height: 70%; object-fit: contain; }
+.brand-logo-initials { font-size: 10px; font-weight: 700; letter-spacing: 0.02em; color: #555; }
+.pp-what, .sw-name, .pp-id dd, .mh-part-value { display: flex; align-items: center; }
+.sw-name { flex-wrap: wrap; }

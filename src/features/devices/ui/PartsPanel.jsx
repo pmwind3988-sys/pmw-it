@@ -1,6 +1,8 @@
 import { useId } from 'react';
 import { Card } from '../../../components/ui/Surfaces';
 import { identityFieldsOf, partRowsOf } from '../partsView';
+import { brandOf } from '../brandLogo';
+import BrandLogo from './BrandLogo';
 
 const dash = (value) => value || '—';
 
@@ -24,7 +26,10 @@ export default function PartsPanel({ device }) {
         {identity.map((field) => (
           <div key={field.key} className="pp-id">
             <dt>{field.label}</dt>
-            <dd className={field.mono ? 'mh-mono' : undefined}>{dash(field.value)}</dd>
+            <dd className={field.mono ? 'mh-mono' : undefined}>
+              {field.brand && field.value && <BrandLogo brand={brandOf(...field.brand)} fallback={field.brand[0]} size={20} />}
+              {dash(field.value)}
+            </dd>
           </div>
         ))}
       </dl>
@@ -41,7 +46,10 @@ export default function PartsPanel({ device }) {
           {rows.map((row) => (
             <div key={row.key} className="pp-row" role="row">
               <span role="cell" className="pp-part">{row.part}</span>
-              <span role="cell" className="pp-what">{row.what}</span>
+              <span role="cell" className="pp-what">
+                <BrandLogo brand={brandOf(row.what)} fallback={row.what} size={22} />
+                {row.what}
+              </span>
               <span role="cell" className="pp-pn mh-mono">{dash(row.partNumber)}</span>
               <span role="cell" className="pp-sn mh-mono">
                 {row.serial || <span className="mh-muted">not reported</span>}

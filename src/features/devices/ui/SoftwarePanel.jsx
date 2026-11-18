@@ -8,6 +8,8 @@ import { scanKindOf } from '../licenceView';
 import {
   backgroundCount, copyTextOf, highlightParts, installedLabel, kindTagOf, visibleSoftware,
 } from '../softwareView';
+import { softwareBrandOf } from '../brandLogo';
+import BrandLogo from './BrandLogo';
 
 const PAGE_SIZE = 25;
 
@@ -145,6 +147,7 @@ export default function SoftwarePanel({ device }) {
                   <div key={`${entry.name}|${entry.version}|${index}`}
                     className={`sw-row${tag ? ' sw-row-background' : ''}`} role="row">
                     <span role="cell" className="sw-name">
+                      <BrandLogo brand={softwareBrandOf(entry.name, entry.publisher)} fallback={entry.name} size={22} />
                       {highlightParts(entry.name, query).map((part, at) => (part.match
                         ? <b key={at}>{part.text}</b>
                         : <span key={at}>{part.text}</span>))}

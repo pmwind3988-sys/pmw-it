@@ -13,9 +13,14 @@ export function identityFieldsOf(device) {
     ? `${device.chassis}${device.assetTag ? ` · asset tag ${device.assetTag}` : ' · no asset tag'}`
     : null;
   return [
-    { key: 'manufacturer', label: 'Manufacturer', value: device.manufacturer || null, mono: false },
+    { key: 'manufacturer', label: 'Manufacturer', value: device.manufacturer || null, mono: false, brand: [device.manufacturer] },
     { key: 'productNumber', label: 'Product number', value: device.productNumber || null, mono: true },
     { key: 'serialNumber', label: 'Serial number', value: device.serialNumber || null, mono: true },
+    {
+      key: 'motherboard', label: 'Motherboard',
+      value: [device.motherboardVendor, device.motherboardModel].filter(Boolean).join(' ') || null,
+      mono: false, brand: [device.motherboardVendor, device.motherboardModel],
+    },
     { key: 'motherboardSerial', label: 'Motherboard serial', value: device.motherboardSerial || null, mono: true },
     { key: 'bios', label: 'BIOS', value: bios, mono: false },
     { key: 'chassis', label: 'Chassis', value: chassis, mono: false },

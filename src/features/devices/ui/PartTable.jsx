@@ -3,6 +3,8 @@ import { PARTS } from '../standards/defaultStandard';
 import { GRADE_SLUG } from '../standards/gradeColors';
 import { worstGradeOf, securityRiskOf } from '../health';
 import { formatScalar } from '../formatValue';
+import { partBrandOf } from '../brandLogo';
+import BrandLogo from './BrandLogo';
 
 // The glyph travels with the word, so a grade is never carried by colour alone.
 const GLYPH = { Critical: '!', 'Needs attention': '!', Moderate: '–', Optimal: '✓', Unknown: '?' };
@@ -49,7 +51,10 @@ export default function PartTable({ device }) {
                 {GLYPH[grade]}
               </span>
               <span className="mh-part-name">{label}</span>
-              <span className="mh-part-value">{part.value || '—'}</span>
+              <span className="mh-part-value">
+                {part.value && <BrandLogo brand={partBrandOf(key, device, part.value)} fallback={label} size={20} />}
+                {part.value || '—'}
+              </span>
               <span className="mh-part-grade">{grade}</span>
               <span className={`pc-chip g-${slug} mh-chip`}>
                 <span aria-hidden="true">{GLYPH[grade]}</span> {grade}

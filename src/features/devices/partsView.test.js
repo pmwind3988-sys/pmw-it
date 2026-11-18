@@ -14,10 +14,10 @@ const FULL = deriveDevice(load('./__fixtures__/v2/[F1 IT] V2-SAMPLE_.txt', '[F1 
 const OLD = deriveDevice(load('./__fixtures__/ASHRAF-PC_.txt', 'ASHRAF-PC_.txt'));
 
 describe('identityFieldsOf', () => {
-  it('gives the six identity fields in order, with the BIOS date written out', () => {
+  it('gives the identity fields in order, with the BIOS date written out', () => {
     const fields = identityFieldsOf(FULL);
     expect(fields.map((f) => f.label)).toEqual([
-      'Manufacturer', 'Product number', 'Serial number', 'Motherboard serial', 'BIOS', 'Chassis',
+      'Manufacturer', 'Product number', 'Serial number', 'Motherboard', 'Motherboard serial', 'BIOS', 'Chassis',
     ]);
     expect(fields.find((f) => f.key === 'serialNumber').value).toBe('5CD333KBWH');
     expect(fields.find((f) => f.key === 'manufacturer').value).toBe('HP');

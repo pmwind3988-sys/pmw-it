@@ -55,7 +55,7 @@ import {
 } from '../features/assets/till/stashMachines';
 import { useDevices } from '../features/devices/useDevices';
 import { performLifecycle } from '../features/devices/sharepoint/writeLifecycle';
-import { assetFor } from '../features/assets/machineLink';
+import { assetFor, onTheShelf } from '../features/assets/machineLink';
 import { ACTIONS } from '../features/devices/lifecycle/planLifecycle';
 import { SPARE, statusOf, inFleet } from '../features/devices/lifecycle/status';
 import { guessKind } from '../features/assets/till/readGate';
@@ -141,6 +141,8 @@ export default function AssetTillPage() {
   const { handovers, reload: reloadHandovers } = useHandovers();
   // Spare machines in the IT Stash can be handed out too (`till/stashMachines.js`).
   const { devices, reload: reloadDevices } = useDevices();
+  // What Hand out may offer: the register, less machines the device list says are on a desk.
+  const shelf = useMemo(() => onTheShelf(assets, devices), [assets, devices]);
   const assetsById = useMemo(() => new Map(assets.map((asset) => [asset.id, asset])), [assets]);
   // Entity and department choices a checklist link carries for the employee.
   const directory = useOrgDirectory();
@@ -172,7 +174,7 @@ export default function AssetTillPage() {
     // A machine that is also a register row goes on as that row (`machineLink.js`).
     const asset = device && assetFor(device, assets);
     const code = asset && (asset.serialNumber || asset.assetTag);
-    if (code && mode === 'out') setBasket((current) => scanOut(current, code, assets).basket ?? current);
+    if (code && mode === 'out') setBasket((current) => scanOut(current, code, shelf).basket ?? current);
     else if (code && mode === 'back') setBackLines((current) => scanBack(current, code, assets, handovers).lines ?? current);
     else if (device && mode === 'out' && statusOf(device) === SPARE) setMachines((list) => (list.some((entry) => entry.id === device.id) ? list : [...list, device]));
     if (device && mode === 'back' && inFleet(device)) setMachinesBack((list) => (list.some((entry) => entry.id === device.id) ? list : [...list, device]));
@@ -205,7 +207,7 @@ export default function AssetTillPage() {
   // closed over.
   const live = useRef({});
   useEffect(() => {
-    live.current = { mode, batch, basket, backLines, assets, handovers, devices, machines, machinesBack };
+    live.current = { mode, batch, basket, backLines, assets, shelf, handovers, devices, machines, machinesBack };
   });
 
   useEffect(() => () => clearTimeout(flashTimer.current), []);
@@ -240,7 +242,7 @@ export default function AssetTillPage() {
     }
 
     if (state.mode === 'out') {
-      const out = scanOut(state.basket, raw, state.assets);
+      const out = scanOut(state.basket, raw, state.shelf);
       if (out.result === OUT_RESULT.MISSING) {
         // Not in the asset register, but it may be a machine in the IT Stash.
         const machine = findInStash(state.devices, raw);
@@ -258,7 +260,7 @@ export default function AssetTillPage() {
       if (out.result === OUT_RESULT.DUPLICATE) { say('ask', 'Already on this receipt'); return; }
       live.current = { ...state, basket: out.basket };
       setBasket(out.basket);
-      const reason = refusalsFor(out.basket, state.assets).get(out.line?.lineId);
+      const reason = refusalsFor(out.basket, state.shelf).get(out.line?.lineId);
       if (reason) say('bad', reason);
       else say('ok', out.result === OUT_RESULT.COUNTED ? `+1 · ${out.line.itemTitle} (now ${out.line.quantity})` : `Added · ${out.line.itemTitle}`);
       return;
@@ -300,7 +302,7 @@ export default function AssetTillPage() {
     const state = live.current;
     if (state.mode === 'in') return scanIn(state.batch, code, state.assets).result === STOCK_RESULT.DUPLICATE;
     if (state.mode === 'out') {
-      const out = scanOut(state.basket, code, state.assets);
+      const out = scanOut(state.basket, code, state.shelf);
       if (out.result === OUT_RESULT.MISSING) {
         const machine = findInStash(state.devices, code);
         return Boolean(machine && state.machines.some((device) => device.id === machine.id));
@@ -341,11 +343,11 @@ export default function AssetTillPage() {
   // ── Picks without a scan: search results, quick keys, the holder list ────
 
   const results = useMemo(() => {
-    const found = tillSearch(mode, typed, { assets, handovers });
+    const found = tillSearch(mode, typed, { assets: mode === 'out' ? shelf : assets, handovers });
     if (mode === 'out') return [...found, ...searchStash(devices, typed, machines)];
     if (mode === 'back') return [...found, ...searchOutOfStash(devices, typed, machinesBack)];
     return found;
-  }, [mode, typed, assets, handovers, devices, machines, machinesBack]);
+  }, [mode, typed, assets, shelf, handovers, devices, machines, machinesBack]);
 
   // A machine that is also a register row goes on as that row: the handover
   // then moves it in the device list too (`machineLink.js`), and the same
@@ -420,7 +422,7 @@ export default function AssetTillPage() {
 
   const keys = useMemo(() => quickKeys(assets, handovers), [assets, handovers]);
   // Hand out shows stock per category first ("Keyboard · 7"), products inside.
-  const stock = useMemo(() => stockByCategory(assets), [assets]);
+  const stock = useMemo(() => stockByCategory(shelf), [shelf]);
   const [openCategory, setOpenCategory] = useState(null);
   const takeProduct = (product) => {
     // One row (a bulk line, or a single laptop) goes straight on the receipt;
@@ -475,7 +477,7 @@ export default function AssetTillPage() {
 
   const holds = useMemo(() => holdsFor(batch, assets), [batch, assets]);
   const countHolds = useMemo(() => holdsFor(countBatch, assets), [countBatch, assets]);
-  const refusals = useMemo(() => refusalsFor(basket, assets), [basket, assets]);
+  const refusals = useMemo(() => refusalsFor(basket, shelf), [basket, shelf]);
   const busy = Boolean(progress);
   const busyLabel = progress ? `${PHASE[progress.phase] ?? 'Working'}…` : '';
   const who = () => {

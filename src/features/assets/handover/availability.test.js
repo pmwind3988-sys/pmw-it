@@ -236,3 +236,11 @@ describe('titleOfHeld', () => {
     expect(titleOfHeld({}, undefined)).toBe('');
   });
 });
+
+describe('a tracked row the register says is with somebody', () => {
+  it('is not available even with no count out', () => {
+    expect(available({ trackingMode: 'Tracked', status: 'Assigned', quantityOut: 0 })).toBe(0);
+    expect(available({ trackingMode: 'Tracked', status: 'In stock', assignedTo: 'Aina' })).toBe(0);
+    expect(available({ trackingMode: 'Tracked', status: 'In stock' })).toBe(1);
+  });
+});

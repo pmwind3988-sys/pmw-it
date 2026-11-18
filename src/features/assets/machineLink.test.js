@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  machineFor, assetFor, machineMove, disagreements,
+  machineFor, assetFor, machineMove, disagreements, onTheShelf,
 } from './machineLink.js';
 import { ACTIONS } from '../devices/lifecycle/planLifecycle.js';
 
@@ -94,5 +94,18 @@ describe('disagreements', () => {
     const agreed = { ...laptop, id: 9, serialNumber: 'AAA111', assetTag: 'PMWL012' };
     const found = disagreements([laptop, agreed], [machine, { id: 43, serialNumber: 'AAA111', status: 'In use', owner: 'Nur Aisyah' }]);
     expect(found.map((entry) => entry.device.id)).toEqual([41]);
+  });
+});
+
+describe('onTheShelf', () => {
+  const laptop = { id: 1, category: 'Laptop', trackingMode: 'Tracked', serialNumber: 'DZ2YDK4', status: 'In stock', quantityOut: 0 };
+  it('takes a laptop off the shelf when its machine is on somebody\'s desk', () => {
+    const [row] = onTheShelf([laptop], [{ id: 9, serialNumber: 'DZ2YDK4', status: 'In use', owner: 'Aina' }]);
+    expect(row.quantityOut).toBe(1);
+    expect(row.onDeskWith).toBe('Aina');
+  });
+  it('leaves it when the machine is a spare', () => {
+    const [row] = onTheShelf([laptop], [{ id: 9, serialNumber: 'DZ2YDK4', status: 'Spare', owner: '' }]);
+    expect(row).toBe(laptop);
   });
 });

@@ -27,8 +27,21 @@ export function owned(asset) {
   return Number.isFinite(asset?.quantity) ? asset.quantity : 1;
 }
 
+/**
+ * Register statuses that mean a tracked thing is not on the shelf, whatever
+ * `QuantityOut` says. A laptop marked Assigned by hand, or with a holder typed
+ * on it, was never handed out through the portal, so its count stayed 0 -- and
+ * the till offered a laptop sitting on somebody's desk.
+ */
+const OFF_SHELF = new Set(['Assigned', 'Borrowed', 'In repair', 'Retired', 'Disposed']);
+
 export function out(asset) {
-  return count(asset?.quantityOut);
+  const counted = count(asset?.quantityOut);
+  if (asset?.trackingMode !== TRACKED || counted > 0) return counted;
+  const held = OFF_SHELF.has(asset?.status)
+    || String(asset?.assignedTo ?? '').trim()
+    || String(asset?.assignedToEmail ?? '').trim();
+  return held ? 1 : 0;
 }
 
 /** Never negative: a bad figure should read as "none left", not as a credit. */

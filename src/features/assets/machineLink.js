@@ -1,3 +1,4 @@
+import { TRACKED } from './assetKinds.js';
 import { cleanSerial } from '../devices/parse/placeholders.js';
 import { statusOf, inFleet, SPARE, RETIRED } from '../devices/lifecycle/status.js';
 import { ACTIONS } from '../devices/lifecycle/planLifecycle.js';
@@ -58,6 +59,23 @@ export function assetFor(device, assets = []) {
   const linked = assets.filter((asset) => machineFor(asset, [device])?.device === device);
   // Two rows both claiming one machine: the same rule as above, link neither.
   return only(linked);
+}
+
+/**
+ * The register as the till should SEE it for handing out: a laptop or desktop
+ * whose machine in the device list is in use by somebody is not on the shelf,
+ * even when its register row still reads In stock (counted in, then given out
+ * from the device page). Display and refusal only -- these copies are never
+ * written back, so the register's own figures are untouched.
+ */
+export function onTheShelf(assets = [], devices = []) {
+  if (!devices.length) return assets;
+  return assets.map((asset) => {
+    if (asset?.trackingMode !== TRACKED || Number(asset.quantityOut) > 0) return asset;
+    const device = machineFor(asset, devices)?.device;
+    if (!device || !inFleet(device) || !text(device.owner)) return asset;
+    return { ...asset, quantityOut: 1, onDeskWith: text(device.owner) };
+  });
 }
 
 /** Who the register says has it, or null when it is not out. */

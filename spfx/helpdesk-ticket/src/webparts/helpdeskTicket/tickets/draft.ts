@@ -24,9 +24,35 @@ export function emptyDraft(): Draft {
   return { area: '', kind: '', priority: DEFAULT_PRIORITY, title: '', details: '', cc: [] };
 }
 
+/**
+ * What the Tickets list's Department column asks for, read from the list
+ * itself so a change made in SharePoint (required on/off, a choice list)
+ * reaches the form on the next page load with no new release.
+ */
+export interface DepartmentColumn {
+  required: boolean;
+  /** The column's choices; empty means it is free text. */
+  choices: string[];
+  maxLength: number;
+}
+
+export const FREE_TEXT_DEPARTMENT: DepartmentColumn = { required: false, choices: [], maxLength: 255 };
+
+/**
+ * What the Department field starts as: the profile's department, but for a
+ * choice column only when it is one of the choices (matched ignoring case),
+ * since anything else could not be saved.
+ */
+export function prefillDepartment(profile: string, col: DepartmentColumn): string {
+  const p = profile.trim();
+  if (!col.choices.length) return p.slice(0, col.maxLength);
+  return col.choices.find((c) => c.toLowerCase() === p.toLowerCase()) ?? '';
+}
+
 /** What the person still has to answer, in the order the form asks it. */
-export function missingOf(d: Draft): string[] {
+export function missingOf(d: Draft, dept?: { value: string; column: DepartmentColumn }): string[] {
   const missing: string[] = [];
+  if (dept?.column.required && !dept.value.trim()) missing.push('Department');
   if (!areaById(d.area)) missing.push("What it's about");
   else if (!effectiveKind(d.area, d.kind)) missing.push('Broken, or need something');
   if (!d.title.trim()) missing.push('Short description');

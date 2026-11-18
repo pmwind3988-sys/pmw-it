@@ -2,7 +2,17 @@
 import * as React from 'react';
 import { TicketsApi } from '../sharepoint/ticketsApi';
 import { AREAS, areaById, categoryValue, DEFAULT_PRIORITY, effectiveKind, KIND_LABELS, Kind, PRIORITIES, Priority } from '../tickets/categories';
-import { Draft, emptyDraft, missingOf, Person, toTicketItem, TITLE_MAX } from '../tickets/draft';
+import {
+  DepartmentColumn,
+  Draft,
+  emptyDraft,
+  FREE_TEXT_DEPARTMENT,
+  missingOf,
+  Person,
+  prefillDepartment,
+  toTicketItem,
+  TITLE_MAX
+} from '../tickets/draft';
 import { Attachments } from './Attachments';
 import { CcPicker } from './CcPicker';
 import { useInstanceId, useMountedRef } from './hooks';
@@ -13,7 +23,10 @@ import styles from './HelpdeskTicket.module.scss';
 export interface RaiseTicketProps {
   api: TicketsApi;
   user: { name: string; email: string; id: number };
+  /** The department on the person's Microsoft 365 profile, or ''. */
   department: string;
+  /** The list's Department column, or undefined while it is still being read. */
+  departmentColumn: DepartmentColumn | undefined;
   onShowMine: () => void;
 }
 
@@ -41,8 +54,14 @@ const initialsOf = (name: string): string => {
 const messageOf = (e: unknown): string => (e instanceof Error ? e.message : 'Something went wrong.');
 
 export function RaiseTicket(props: RaiseTicketProps): React.ReactElement {
-  const { api, user, department, onShowMine } = props;
+  const { api, user, onShowMine } = props;
+  const column = props.departmentColumn ?? FREE_TEXT_DEPARTMENT;
   const [draft, setDraft] = React.useState<Draft>(emptyDraft);
+  // null until the person touches the field; until then it shows the profile's
+  // department, so a profile that loads late still fills it in.
+  const [typedDepartment, setTypedDepartment] = React.useState<string | null>(null);
+  const department = typedDepartment ?? prefillDepartment(props.department, column);
+  const departmentLoading = props.departmentColumn === undefined;
   const [files, setFiles] = React.useState<File[]>([]);
   const [sizeNote, setSizeNote] = React.useState('');
   const [tried, setTried] = React.useState(false);
@@ -53,11 +72,14 @@ export function RaiseTicket(props: RaiseTicketProps): React.ReactElement {
   const [createdId, setCreatedId] = React.useState<number | null>(null);
   const shotNo = React.useRef(0);
   const mounted = useMountedRef();
+  const deptRef = React.useRef<HTMLInputElement & HTMLSelectElement>(null);
   const areaRef = React.useRef<HTMLSelectElement>(null);
   const kindRef = React.useRef<HTMLInputElement>(null);
   const titleRef = React.useRef<HTMLInputElement>(null);
   const ids = {
     title: useInstanceId('rt-title'),
+    dept: useInstanceId('rt-dept'),
+    deptHelp: useInstanceId('rt-dept-help'),
     area: useInstanceId('rt-area'),
     pri: useInstanceId('rt-pri'),
     kind: useInstanceId('rt-kind'),
@@ -93,20 +115,24 @@ export function RaiseTicket(props: RaiseTicketProps): React.ReactElement {
     }
   };
 
-  const missing = missingOf(draft);
+  const missing = missingOf(draft, { value: department, column });
+  const deptMissing = column.required && !department.trim();
   const area = areaById(draft.area);
   const kinds: Kind[] = area && area.kinds.length > 1 ? area.kinds : [];
   const chosenKind = effectiveKind(draft.area, draft.kind);
   const category = categoryValue(draft.area, draft.kind);
 
   const focusFirstMissing = (): void => {
-    if (!area) areaRef.current?.focus();
+    if (deptMissing) deptRef.current?.focus();
+    else if (!area) areaRef.current?.focus();
     else if (!chosenKind) kindRef.current?.focus();
     else titleRef.current?.focus();
   };
 
   const submit = async (): Promise<void> => {
-    if (phase === 'working') return;
+    // Until the list has said whether Department is required, sending could
+    // skip a rule SharePoint itself will not enforce on this save.
+    if (phase === 'working' || departmentLoading) return;
     if (missing.length) {
       setTried(true);
       focusFirstMissing();
@@ -271,13 +297,55 @@ export function RaiseTicket(props: RaiseTicketProps): React.ReactElement {
                 </div>
               </div>
               <div className={styles.field}>
-                <span className={styles.label}>Department</span>
-                <div className={styles.readOnly}>
-                  <span className={styles.readOnlyText}>{department || '—'}</span>
-                </div>
+                <label htmlFor={ids.dept} className={styles.label}>
+                  {column.required && (
+                    <span className={styles.req} aria-hidden="true">
+                      *{' '}
+                    </span>
+                  )}
+                  Department
+                </label>
+                {column.choices.length > 0 ? (
+                  <select
+                    id={ids.dept}
+                    ref={deptRef}
+                    className={styles.control}
+                    aria-required={column.required || undefined}
+                    aria-invalid={tried && deptMissing ? true : undefined}
+                    aria-describedby={ids.deptHelp}
+                    value={department}
+                    disabled={working}
+                    onChange={(e) => setTypedDepartment(e.target.value)}
+                  >
+                    <option value="">Choose one</option>
+                    {column.choices.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    id={ids.dept}
+                    ref={deptRef}
+                    type="text"
+                    className={styles.control}
+                    maxLength={column.maxLength}
+                    aria-required={column.required || undefined}
+                    aria-invalid={tried && deptMissing ? true : undefined}
+                    aria-describedby={ids.deptHelp}
+                    placeholder="e.g. Finance"
+                    value={department}
+                    disabled={working || departmentLoading}
+                    onChange={(e) => setTypedDepartment(e.target.value)}
+                  />
+                )}
               </div>
             </div>
-            <div className={styles.caption}>Filled in from your Microsoft 365 sign-in.</div>
+            <div id={ids.deptHelp} className={styles.caption}>
+              Your name comes from your Microsoft 365 sign-in. Department is filled in from your profile when it has
+              one; change it if it&apos;s wrong.
+            </div>
 
             <div className={styles.twoCol}>
               <div className={styles.field}>
@@ -410,8 +478,14 @@ export function RaiseTicket(props: RaiseTicketProps): React.ReactElement {
 
         <aside className={styles.aside} aria-label="Send">
           <div className={styles.sendCard}>
-            <button type="button" className={styles.submit} onClick={() => submit()} disabled={working} aria-busy={working || undefined}>
-              {working && <span className={styles.spinner} aria-hidden="true" />}
+            <button
+              type="button"
+              className={styles.submit}
+              onClick={() => submit()}
+              disabled={working || departmentLoading}
+              aria-busy={working || departmentLoading || undefined}
+            >
+              {(working || departmentLoading) && <span className={styles.spinner} aria-hidden="true" />}
               Submit
             </button>
             {missing.length > 0 && (

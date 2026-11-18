@@ -4,17 +4,23 @@ import { IHelpdeskTicketProps, View } from './IHelpdeskTicketProps';
 import { MyTickets } from './MyTickets';
 import { RaiseTicket } from './RaiseTicket';
 import { useMountedRef } from './hooks';
+import { DepartmentColumn } from '../tickets/draft';
 import styles from './HelpdeskTicket.module.scss';
 
 export default function HelpdeskTicket(props: IHelpdeskTicketProps): React.ReactElement {
   const { api, user, startView } = props;
   const [view, setViewState] = React.useState<View>(startView);
   const [department, setDepartment] = React.useState('');
+  // undefined until the list has said what the Department column is.
+  const [departmentColumn, setDepartmentColumn] = React.useState<DepartmentColumn | undefined>(undefined);
   const mounted = useMountedRef();
 
   React.useEffect(() => {
     api.myDepartment().then((d) => {
       if (mounted.current) setDepartment(d);
+    }).catch(() => undefined);
+    api.departmentColumn().then((c) => {
+      if (mounted.current) setDepartmentColumn(c);
     }).catch(() => undefined);
   }, [api, mounted]);
 
@@ -39,7 +45,7 @@ export default function HelpdeskTicket(props: IHelpdeskTicketProps): React.React
         <span aria-current="page">{view === 'raise' ? 'Raise a ticket' : 'My tickets'}</span>
       </nav>
       <div hidden={view !== 'raise'}>
-        <RaiseTicket api={api} user={user} department={department} onShowMine={() => setView('mine')} />
+        <RaiseTicket api={api} user={user} department={department} departmentColumn={departmentColumn} onShowMine={() => setView('mine')} />
       </div>
       <div hidden={view !== 'mine'}>
         <MyTickets api={api} userId={user.id} active={view === 'mine'} onRaise={() => setView('raise')} />

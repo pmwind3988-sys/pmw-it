@@ -1,5 +1,5 @@
 import { AREAS, categoryValue, effectiveKind, DEFAULT_PRIORITY, PRIORITIES } from './categories';
-import { emptyDraft, missingOf, toTicketItem, detailsToHtml, Draft } from './draft';
+import { emptyDraft, missingOf, toTicketItem, detailsToHtml, Draft, FREE_TEXT_DEPARTMENT, prefillDepartment } from './draft';
 import { fromListItem, isClosed, myTicketsQuery, matchesSearch, splitOpenClosed } from './myTickets';
 
 // The Tickets list's Category choices, read from the tenant on 2026-10-13.
@@ -55,6 +55,27 @@ describe('missingOf', () => {
 
   it('does not count a description of spaces', () => {
     expect(missingOf({ ...emptyDraft(), area: 'Network', title: '   ' })).toEqual(['Short description']);
+  });
+
+  it('asks for the department first, but only when the column is required', () => {
+    const ready: Draft = { ...emptyDraft(), area: 'Network', title: 'x' };
+    const required = { ...FREE_TEXT_DEPARTMENT, required: true };
+    expect(missingOf(ready, { value: ' ', column: required })).toEqual(['Department']);
+    expect(missingOf(emptyDraft(), { value: '', column: required })[0]).toBe('Department');
+    expect(missingOf(ready, { value: 'Finance', column: required })).toEqual([]);
+    expect(missingOf(ready, { value: '', column: FREE_TEXT_DEPARTMENT })).toEqual([]);
+  });
+});
+
+describe('prefillDepartment', () => {
+  it('uses the profile as typed for a text column', () => {
+    expect(prefillDepartment('  Finance ', FREE_TEXT_DEPARTMENT)).toBe('Finance');
+  });
+
+  it('picks the matching choice, ignoring case, and nothing that is not a choice', () => {
+    const col = { required: true, choices: ['Finance', 'HR'], maxLength: 255 };
+    expect(prefillDepartment('finance', col)).toBe('Finance');
+    expect(prefillDepartment('Accounts', col)).toBe('');
   });
 });
 

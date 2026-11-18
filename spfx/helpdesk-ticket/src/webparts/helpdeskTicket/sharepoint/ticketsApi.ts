@@ -4,7 +4,7 @@
 // could, and nothing else.
 
 import { SPHttpClient, SPHttpClientResponse } from '@microsoft/sp-http';
-import { Person } from '../tickets/draft';
+import { DepartmentColumn, FREE_TEXT_DEPARTMENT, Person } from '../tickets/draft';
 import { fromListItem, myTicketsQuery, TicketRow } from '../tickets/myTickets';
 
 export const LIST_TITLE = 'Tickets';
@@ -50,6 +50,33 @@ export class TicketsApi {
     } catch {
       // A missing profile must not stop a ticket; the field just stays blank.
       return '';
+    }
+  }
+
+  /**
+   * The Department column's settings as the list has them today: whether it
+   * is required, and its choices if it is a Choice column. SharePoint does not
+   * check "Require that this column contains information" on saves made
+   * through its API, only in its own form, so this form has to ask.
+   * If the column cannot be read, the field is free text and optional.
+   */
+  async departmentColumn(): Promise<DepartmentColumn> {
+    try {
+      const res = await this.http.get(
+        this.list(`/fields/getbyinternalnameortitle('Department')?$select=Required,TypeAsString,Choices,MaxLength`),
+        SPHttpClient.configurations.v1,
+        { headers: JSON_HEADERS }
+      );
+      if (!res.ok) return FREE_TEXT_DEPARTMENT;
+      const f = await res.json();
+      const choices: string[] =
+        f.TypeAsString === 'Choice' && Array.isArray(f.Choices)
+          ? f.Choices.filter((c: unknown): c is string => typeof c === 'string' && c !== '')
+          : [];
+      const maxLength = typeof f.MaxLength === 'number' && f.MaxLength > 0 ? Math.min(f.MaxLength, 255) : 255;
+      return { required: f.Required === true, choices, maxLength };
+    } catch {
+      return FREE_TEXT_DEPARTMENT;
     }
   }
 

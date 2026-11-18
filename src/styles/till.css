@@ -1121,3 +1121,6 @@ select.till-chip { padding-right: 12px; }
 .till-cat-head > span:last-child { font-size: 13px; color: var(--it-ink-soft); }
 .till-cat.empty .till-cat-head { opacity: 0.55; }
 .till-cat .till-outnow { margin-top: 6px; }
+.till-cat-head > .category-art { flex: none; }
+.till-cat-head { padding: 8px 16px 8px 8px; }
+.till-cat.empty .category-art { filter: grayscale(1); }

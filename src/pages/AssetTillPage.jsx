@@ -48,6 +48,7 @@ import {
 import {
   scanBack, addHandover, chooseHolder, setReturnQuantity, toReturns, itemCount as itemsBack, BACK_RESULT,
 } from '../features/assets/till/takeBack';
+import CategoryArt from '../features/assets/till/ui/CategoryArt';
 import { tillSearch, quickKeys, stockByCategory } from '../features/assets/till/tillSearch';
 import {
   inStash, findInStash, searchStash, findOutOfStash, searchOutOfStash, machineRow, machineTitle, machineSub,
@@ -1151,7 +1152,7 @@ export default function AssetTillPage() {
                     return (
                       <li key={group.category} className={group.left ? 'till-cat' : 'till-cat empty'}>
                         <button type="button" className="till-cat-head" aria-expanded={open} onClick={() => setOpenCategory(open ? null : group.category)}>
-                          <span className="till-mono">{badgeOf(group.category)}</span>
+                          <CategoryArt category={group.category} size={48} />
                           <strong>{group.category}</strong>
                           <span>{group.left ? `${group.left} available` : 'None left'}</span>
                         </button>

@@ -38,6 +38,7 @@ describe('the rest', () => {
     expect(initialsOfBrand('')).toBe('?');
     expect(logoUrlOf('intel')).toBe('https://cdn.simpleicons.org/intel');
     expect(logoUrlOf(null)).toBeNull();
+    expect(logoUrlOf('windows')).toBeNull();
   });
   it('gives Windows its own logo and RAM its sticks’ maker', () => {
     expect(partBrandOf('windows', {}, 'Windows 11 Pro').slug).toBe('windows');

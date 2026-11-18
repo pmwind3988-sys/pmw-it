@@ -138,9 +138,30 @@ export function initialsOfBrand(text) {
   return (words[0][0] + words[1][0]).toUpperCase();
 }
 
+/**
+ * Brands the online lookup does not carry (Microsoft withdrew its marks from
+ * Simple Icons), drawn here instead: `squares` is the four-pane mark, a letter
+ * mark is a coloured square with the product's letter.
+ */
+export const LOCAL_MARKS = {
+  windows: { squares: ['#0078d4', '#0078d4', '#0078d4', '#0078d4'] },
+  microsoft: { squares: ['#f25022', '#7fba00', '#00a4ef', '#ffb900'] },
+  microsoftoffice: { letter: 'O', bg: '#d83b01' },
+  microsoftword: { letter: 'W', bg: '#185abd' },
+  microsoftexcel: { letter: 'X', bg: '#107c41' },
+  microsoftpowerpoint: { letter: 'P', bg: '#c43e1c' },
+  microsoftoutlook: { letter: 'O', bg: '#0078d4' },
+  microsoftteams: { letter: 'T', bg: '#5b5fc7' },
+  microsoftedge: { letter: 'e', bg: '#0c7bd6' },
+  microsoftonedrive: { letter: 'D', bg: '#0364b8' },
+  microsoftsqlserver: { letter: 'S', bg: '#a91d22' },
+  visualstudio: { letter: 'V', bg: '#5c2d91' },
+  visualstudiocode: { letter: 'V', bg: '#007acc' },
+};
+
 /** The logo, in the brand's own colour. */
 export function logoUrlOf(slug) {
-  return slug ? `https://cdn.simpleicons.org/${encodeURIComponent(slug)}` : null;
+  return slug && !LOCAL_MARKS[slug] ? `https://cdn.simpleicons.org/${encodeURIComponent(slug)}` : null;
 }
 
 /**

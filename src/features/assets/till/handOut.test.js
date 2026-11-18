@@ -3,7 +3,7 @@ import { newBasket } from '../handover/basket.js';
 import { HANDOVER_KIND } from '../handover/availability.js';
 import { TRACKED, BULK } from '../assetKinds.js';
 import {
-  scanOut, addAsset, OUT_RESULT, refusalsFor, sendable, itemCount, dueOnFor, withTerms,
+  scanOut, addAsset, addUnit, OUT_RESULT, refusalsFor, sendable, itemCount, dueOnFor, withTerms,
 } from './handOut.js';
 
 const LAPTOP = {
@@ -16,6 +16,18 @@ const MICE = {
   partNumber: '509920', quantity: 2, quantityOut: 0,
 };
 const REGISTER = [LAPTOP, LENT, MICE];
+
+describe('addUnit', () => {
+  it('puts the one item picked from a search on, with its full serial, once', () => {
+    const unit = { index: 1, serialNumber: 'R9XW1002' };
+    let { basket, result } = addUnit(newBasket(), MICE, unit);
+    expect(result).toBe(OUT_RESULT.ADDED);
+    expect(basket.lines[0]).toMatchObject({ assetId: 2, unitIndex: 1, serialNumber: 'R9XW1002', quantity: 1 });
+    ({ basket, result } = addUnit(basket, MICE, unit));
+    expect(result).toBe(OUT_RESULT.DUPLICATE);
+    expect(basket.lines).toHaveLength(1);
+  });
+});
 
 describe('scanOut', () => {
   it('adds a laptop once and refuses the same box again', () => {

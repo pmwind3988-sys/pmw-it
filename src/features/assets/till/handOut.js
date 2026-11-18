@@ -46,6 +46,13 @@ export function addAsset(basket, asset) {
   return { basket: addLine(basket, line), result: OUT_RESULT.ADDED, line };
 }
 
+/** One item off a bulk line onto the basket: a search pick by part of its serial. */
+export function addUnit(basket, asset, unit) {
+  if (hasUnit(basket, asset.id, unit.index)) return { basket, result: OUT_RESULT.DUPLICATE, line: null };
+  const line = newUnitLine(asset, unit);
+  return { basket: addLine(basket, line), result: OUT_RESULT.ADDED, line };
+}
+
 export function scanOut(basket, raw, assets = []) {
   if (!String(raw ?? '').trim()) return { basket, result: OUT_RESULT.EMPTY, line: null };
 

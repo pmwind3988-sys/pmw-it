@@ -2,6 +2,7 @@ import { matchesQuery } from '../assetFilters.js';
 import { available, isOpen, nameOfItem, titleOfHeld } from '../handover/availability.js';
 import { TRACKED, BULK } from '../assetKinds.js';
 import { unitsOf } from '../units.js';
+import { normaliseCode } from '../identity.js';
 
 /**
  * Type to find, for when there is no barcode worth scanning.
@@ -40,18 +41,55 @@ function searchModels(needle, assets) {
   return results;
 }
 
-function searchStock(query, assets) {
-  return assets
-    .filter((asset) => available(asset) > 0 && matchesQuery(asset, query))
-    .map((asset) => ({
-      id: `asset:${asset.id}`,
-      kind: 'asset',
-      name: asset.title || modelName(asset),
-      sub: asset.trackingMode === TRACKED
-        ? [asset.serialNumber && `S/N ${asset.serialNumber}`, asset.assetTag].filter(Boolean).join(' · ') || 'In stock'
-        : `${available(asset)} in stock`,
+/**
+ * The items on a bulk line whose own serial or label holds what was typed,
+ * minus the ones somebody already has. Typing "XW10" names one tab off a box
+ * of twenty, so the answer is that tab and its FULL serial, not the box.
+ */
+function unitHits(query, asset, handovers) {
+  if (asset.trackingMode === TRACKED) return [];
+  const code = normaliseCode(query);
+  if (!code) return [];
+  const held = new Set(handovers
+    .filter((row) => row.assetKey === asset.assetKey && isOpen(row) && row.unitIndex != null && row.unitIndex !== '')
+    .map((row) => Number(row.unitIndex)));
+  return unitsOf(asset)
+    .filter((unit) => !held.has(unit.index))
+    .filter((unit) => [unit.serialNumber, unit.assetTag].some((value) => normaliseCode(value).includes(code)))
+    .map((unit) => ({
+      id: `unit:${asset.id}:${unit.index}`,
+      kind: 'unit',
+      name: `${asset.title || modelName(asset)} · item ${unit.index + 1}`,
+      sub: [unit.serialNumber && `S/N ${unit.serialNumber}`, unit.assetTag].filter(Boolean).join(' · '),
       asset,
+      unit,
     }));
+}
+
+function searchStock(query, assets, handovers) {
+  const results = [];
+  for (const asset of assets) {
+    if (available(asset) <= 0) continue;
+    const units = unitHits(query, asset, handovers);
+    results.push(...units);
+    // The line itself only when it matches on its OWN words (name, model,
+    // part number) — matched through an item's serial, the item is the answer.
+    // An item somebody already has does not bring its line back in either.
+    if (matchesQuery({ ...asset, units: '[]' }, query)) results.push(lineResult(asset));
+  }
+  return results;
+}
+
+function lineResult(asset) {
+  return {
+    id: `asset:${asset.id}`,
+    kind: 'asset',
+    name: asset.title || modelName(asset),
+    sub: asset.trackingMode === TRACKED
+      ? [asset.serialNumber && `S/N ${asset.serialNumber}`, asset.assetTag].filter(Boolean).join(' · ') || 'In stock'
+      : `${available(asset)} in stock`,
+    asset,
+  };
 }
 
 function searchHolders(needle, assets, handovers) {
@@ -81,7 +119,7 @@ export function tillSearch(mode, query, { assets = [], handovers = [] } = {}) {
   const needle = trimmed.toLowerCase();
 
   if (mode === 'in') return searchModels(needle, assets).slice(0, LIMIT);
-  if (mode === 'out') return searchStock(trimmed, assets).slice(0, LIMIT);
+  if (mode === 'out') return searchStock(trimmed, assets, handovers).slice(0, LIMIT);
   return searchHolders(needle, assets, handovers).slice(0, LIMIT);
 }
 

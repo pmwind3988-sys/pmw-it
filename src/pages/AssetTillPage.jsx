@@ -44,7 +44,7 @@ import {
   noCodeDraft, itemCount as itemsIn, STOCK_RESULT, linkToModel, addSerialsTo, serialCount, applySweep, nameLine, addSameModel,
 } from '../features/assets/till/stockIn';
 import {
-  scanOut, addAsset, refusalsFor, sendable, itemCount as itemsOut, withTerms, DUE_CHOICES, OUT_RESULT,
+  scanOut, addAsset, addUnit, refusalsFor, sendable, itemCount as itemsOut, withTerms, DUE_CHOICES, OUT_RESULT,
 } from '../features/assets/till/handOut';
 import {
   scanBack, addHandover, chooseHolder, setReturnQuantity, toReturns, itemCount as itemsBack, BACK_RESULT,
@@ -387,6 +387,11 @@ export default function AssetTillPage() {
       say('ok', out.result === STOCK_RESULT.COUNTED ? `+1 · ${result.name}` : `Added · ${result.name}`);
     } else if (result.kind === 'machine') {
       if (mode === 'back') addMachineBack(result.device); else addMachine(result.device);
+    } else if (result.kind === 'unit') {
+      const out = addUnit(basket, result.asset, result.unit);
+      if (out.result === OUT_RESULT.DUPLICATE) { say('ask', 'Already on this receipt'); return; }
+      setBasket(out.basket);
+      say('ok', `Added · ${result.name}${result.unit.serialNumber ? ` · S/N ${result.unit.serialNumber}` : ''}`);
     } else if (result.kind === 'asset') {
       const out = addAsset(basket, result.asset);
       if (out.result === OUT_RESULT.DUPLICATE) { say('ask', 'Already on this receipt'); return; }

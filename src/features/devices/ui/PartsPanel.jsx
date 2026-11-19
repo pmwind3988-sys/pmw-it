@@ -28,7 +28,7 @@ export default function PartsPanel({ device }) {
             <dt>{field.label}</dt>
             <dd className={field.mono ? 'mh-mono' : undefined}>
               <span className="pp-id-value">{dash(field.value)}</span>
-              {field.brand && field.value && <BrandLogo brand={brandOf(...field.brand)} fallback={field.brand[0]} size={30} />}
+              {field.brand && field.value && <BrandLogo brand={brandOf(...field.brand)} fallback={field.brand[0]} size={60} />}
             </dd>
           </div>
         ))}

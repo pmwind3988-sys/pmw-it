@@ -310,11 +310,11 @@
 [data-theme="dark"] .brand-logo:has(img), [data-theme="dark"] .brand-logo:has(svg) { background: #fff; padding: 3px; }
 
 /* Health: the logo centred top to bottom on the right of each tile */
-.mh-part { position: relative; padding-right: 66px; }
+.mh-part { position: relative; padding-right: 88px; }
 .mh-part-logo { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); display: flex; }
 
 /* Identity fields: the value, then its logo at the column's end */
-.pp-id dd { display: grid; grid-template-columns: minmax(0, 1fr) 40px; align-items: center; gap: 8px; }
+.pp-id dd { display: grid; grid-template-columns: minmax(0, 1fr) 64px; align-items: center; gap: 8px; }
 .pp-id dd .brand-logo { justify-self: center; }
 
 /* Tables: a narrow logo column after the name, the logo centred in it */

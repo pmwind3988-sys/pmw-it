@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The portal brand and canvas colours (src/styles/shell.css) -->
+    <color name="brand">#0078D4</color>
+    <color name="canvas">#F4F7FB</color>
+</resources>

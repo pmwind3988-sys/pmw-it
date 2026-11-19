@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.pmwgroup.itportal",
+      "sha256_cert_fingerprints": [
+        "11:F0:0E:54:4F:15:8B:43:35:87:3C:78:5A:41:14:F3:61:FE:97:50:2F:59:A8:4D:40:75:D1:6C:9A:0B:56:BB"
+      ]
+    }
+  }
+]

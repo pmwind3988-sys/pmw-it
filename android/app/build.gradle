@@ -1,0 +1,64 @@
+// The PMW IT portal as an Android app: a Trusted Web Activity, i.e. Chrome
+// showing the live site full screen with no address bar. Nothing of the portal
+// is inside this APK, so a push to main reaches the app on its next launch
+// without rebuilding it. Rebuild only to change the icon, name or address.
+//
+// Another address:  gradlew assembleRelease -PtwaHost=it.example.com
+
+plugins {
+    id 'com.android.application'
+}
+
+def twaHost = project.findProperty('twaHost') ?: 'pmw-it.vercel.app'
+
+// Signing details live in signing/keystore.properties, which is NOT in git.
+def signingProps = new Properties()
+def signingFile = rootProject.file('signing/keystore.properties')
+if (signingFile.exists()) signingFile.withInputStream { signingProps.load(it) }
+
+android {
+    namespace 'com.pmwgroup.itportal'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.pmwgroup.itportal'
+        minSdk 21
+        targetSdk 34
+        versionCode 1
+        versionName '1.0'
+
+        resValue 'string', 'twaHost', twaHost
+        resValue 'string', 'launchUrl', "https://${twaHost}/"
+        resValue 'string', 'assetStatements',
+            "[{ \\\"relation\\\": [\\\"delegate_permission/common.handle_all_urls\\\"], " +
+            "\\\"target\\\": { \\\"namespace\\\": \\\"web\\\", \\\"site\\\": \\\"https://${twaHost}\\\" } }]"
+        manifestPlaceholders = [hostName: twaHost]
+    }
+
+    signingConfigs {
+        release {
+            if (signingFile.exists()) {
+                storeFile rootProject.file("signing/${signingProps['storeFile']}")
+                storePassword signingProps['storePassword']
+                keyAlias signingProps['keyAlias']
+                keyPassword signingProps['keyPassword']
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (signingFile.exists()) signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.5.0'
+}

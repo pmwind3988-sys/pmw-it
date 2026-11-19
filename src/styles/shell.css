@@ -2212,3 +2212,41 @@ body {
   .ui-spinner { animation: ui-spinner-pulse 1.2s ease-in-out infinite; border-right-color: currentColor; }
 }
 @keyframes ui-spinner-pulse { 50% { opacity: 0.35; } }
+
+/* "A new version is ready" (components/UpdateWatcher.jsx). Bottom-centre so it
+   never covers the bar's actions or the till's checkout button for long, and
+   above the till sheets (z 65/75) since it is about the whole app. */
+.update-bar {
+  position: fixed;
+  left: 50%;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: calc(100vw - 32px);
+  padding: 10px 10px 10px 16px;
+  border-radius: var(--it-radius);
+  background: var(--it-ink);
+  color: #fff;
+  font-size: 14px;
+  box-shadow: 0 8px 24px rgb(16 24 40 / 0.25);
+}
+.update-bar button {
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 14px;
+  background: var(--it-brand);
+  color: var(--it-on-brand);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+[data-theme='dark'] .update-bar {
+  background: var(--it-panel);
+  color: var(--it-ink);
+  border: 1px solid var(--it-line);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.5);
+}

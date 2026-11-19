@@ -70,11 +70,29 @@ function checklistLinks(env) {
   }
 }
 
-export default defineConfig(({ mode }) => {
+/**
+ * Stamps every build with an id -- the deployed commit on Vercel -- baked into
+ * the bundle as `__APP_VERSION__` and written beside it as `/version.json`.
+ * An installed app compares the two to find out a newer deploy exists
+ * (`src/components/UpdateWatcher.jsx`). `npm run dev` is `dev`, never checked.
+ */
+function appVersion(command, env) {
+  const version =
+    command === 'serve' ? 'dev' : env.VERCEL_GIT_COMMIT_SHA || `local-${Date.now()}`
+  return {
+    name: 'app-version',
+    config: () => ({ define: { __APP_VERSION__: JSON.stringify(version) } }),
+    generateBundle() {
+      this.emitFile({ type: 'asset', fileName: 'version.json', source: JSON.stringify({ version }) })
+    },
+  }
+}
+
+export default defineConfig(({ command, mode }) => {
   const env = { ...process.env, ...loadEnv(mode, process.cwd(), '') }
 
   return {
-    plugins: [react(), checklistLinks(env)],
+    plugins: [react(), checklistLinks(env), appVersion(command, env)],
     server: {
       port: 5173,
     },

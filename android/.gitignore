@@ -1,0 +1,9 @@
+.gradle/
+build/
+app/build/
+local.properties
+.idea/
+*.iml
+# The signing key and its passwords. NEVER commit; back them up instead.
+signing/*
+!signing/README.md

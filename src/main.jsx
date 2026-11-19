@@ -14,6 +14,7 @@ import {
   rememberUser,
   setFlag,
 } from './utils/sessionKeys';
+import { rememberInstalledApp } from './utils/appVersion';
 import App from './App';
 import './index.css';
 import './App.css';
@@ -35,6 +36,10 @@ import './styles/forms.css';
 const MSAL_TIMEOUT_MS = 30000;
 
 async function bootstrap() {
+  // Before anything can navigate: the Android app's launch referrer is only
+  // there on the first page load.
+  rememberInstalledApp();
+
   const msalInstance = new PublicClientApplication(msalConfig);
 
   await msalInstance.initialize();

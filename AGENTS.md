@@ -202,6 +202,8 @@ pmw-it/
 | Bar and column charts | `src/components/ui/Charts.jsx` (the requests dashboard) |
 | SharePoint writes | `src/services/sharePointService.js` |
 | Theme | `src/context/ThemeContext.jsx`; toggle lives in the shell's bar |
+| The Android app (a Trusted Web Activity over the live site), its signing key and `assetlinks.json` | `android/README.md`, `public/.well-known/assetlinks.json` |
+| How an open app learns a newer deploy exists | `src/components/UpdateWatcher.jsx`, `src/utils/appVersion.js`, `appVersion` in `vite.config.js` (writes `/version.json`) |
 | Spreadsheet parsing / header detection | `src/features/semantic/ingest/` |
 | Column type inference and stats | `src/features/semantic/profile/` |
 | The cleaning ops, proposals and apply | `src/features/semantic/clean/` |

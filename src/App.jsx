@@ -19,6 +19,7 @@ import AssetHandoverPage from './pages/AssetHandoverPage';
 import AssetTillPage from './pages/AssetTillPage';
 import AssetPeoplePage from './pages/AssetPeoplePage';
 import AssetPersonPage from './pages/AssetPersonPage';
+import UpdateWatcher from './components/UpdateWatcher';
 
 // Lazy on purpose, not for tidiness: this page's chunk carries SheetJS,
 // ECharts and the sentence model, which together are larger than the
@@ -35,6 +36,7 @@ function LegacyListRedirect() {
 function App() {
   return (
     <div className="app-container">
+      <UpdateWatcher />
       <Routes>
         <Route path="/" element={<Homepage />} />
         <Route path="/login" element={<LoginPage />} />

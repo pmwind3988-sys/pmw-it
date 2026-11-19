@@ -8,6 +8,7 @@ import { initialsOf } from '../utils/initials';
 import Logo from './Logo';
 import { AccountBadge } from './ui/Badges';
 import Button from './ui/Button';
+import UpdateCheckButton from './UpdateCheckButton';
 import {
   LayoutDashboard,
   ScanLine,
@@ -217,6 +218,7 @@ export default function AppShell({
               <div className="shell-navuser-mail">{account?.username || 'Microsoft 365'}</div>
             </div>
           </div>
+          <UpdateCheckButton />
           <button type="button" className="shell-signout" onClick={signOut}>
             <LogOut size={13} /> Sign out
           </button>
